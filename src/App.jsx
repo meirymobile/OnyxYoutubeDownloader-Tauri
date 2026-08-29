@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Download, Music, Video, Sparkles, MonitorPlay, CheckCircle, Clock, Settings, UserCircle, Play, X, Trash2, ListPlus, MapPin, FolderOpen, ListMusic, Clipboard } from 'lucide-react'
+import { 
+  Search, Download, Music, Video, Sparkles, MonitorPlay, CheckCircle, Clock, Settings, 
+  UserCircle, Play, X, Trash2, ListPlus, MapPin, FolderOpen, ListMusic, Clipboard, 
+  Radio, Disc, Scissors, Layers, Check, RefreshCw
+} from 'lucide-react'
 import YouTube from 'react-youtube'
 
 function App() {
@@ -8,10 +12,12 @@ function App() {
   const [videoInfo, setVideoInfo] = useState(null)
   const [searchResults, setSearchResults] = useState([])
   const [loading, setLoading] = useState(false)
+  const [mobileTab, setMobileTab] = useState('search') // 'search', 'queue', 'settings'
   
-  // Default formats for searching
+  // Default Target Formats (All 9 Features Restored)
   const [defaultFormats, setDefaultFormats] = useState({ 
-    mp3: true, video: false, onyx: false, playlist: false, shazam: false, spotify: false, prefix: false, suffix: false, autoSplit: false 
+    mp3: true, video: false, onyx: false, playlist: false, shazam: false, spotify: false, 
+    prefix: false, suffix: true, autoSplit: false 
   })
 
   const [shazamSettings, setShazamSettings] = useState(() => {
@@ -23,15 +29,15 @@ function App() {
     localStorage.setItem('onyx_shazam_settings', JSON.stringify(shazamSettings))
   }, [shazamSettings])
 
-  // Queue & Active Jobs
+  // Queue & Active Jobs Tracking
   const [queue, setQueue] = useState([])
-  const [activeJobs, setActiveJobs] = useState({}) // { internalId: { job_id, status_data } }
+  const [activeJobs, setActiveJobs] = useState({})
 
-  // Updates
+  // Core Tools Updates
   const [updatesAvailable, setUpdatesAvailable] = useState(false)
   const [updating, setUpdating] = useState(false)
 
-  // Settings
+  // Settings & Directories
   const [showSettings, setShowSettings] = useState(false)
   const [directories, setDirectories] = useState(() => {
     const saved = localStorage.getItem('onyx_dirs')
@@ -42,10 +48,8 @@ function App() {
     }
   })
 
-  // Preview
+  // Modals
   const [previewVideoId, setPreviewVideoId] = useState(null)
-
-  // Trimmer
   const [trimModalItem, setTrimModalItem] = useState(null)
   const [trimStart, setTrimStart] = useState('')
   const [trimEnd, setTrimEnd] = useState('')
@@ -74,7 +78,7 @@ function App() {
             break
           }
         } catch (e) {
-          // Continue searching
+          // Searching
         }
       }
     }
@@ -86,16 +90,14 @@ function App() {
     }
   }, [])
 
-  // Auto Check for Yt-dlp Updates on App Startup
+  // Auto Check for Yt-dlp Updates
   useEffect(() => {
     const checkUpdates = async () => {
       try {
         const res = await fetch(`http://localhost:${serverPort}/api/check-updates`)
         if (res.ok) {
           const data = await res.json()
-          if (data.update_available) {
-            setUpdatesAvailable(true)
-          }
+          if (data.update_available) setUpdatesAvailable(true)
         }
       } catch (err) {
         console.error('Failed to check yt-dlp updates:', err)
@@ -145,7 +147,7 @@ function App() {
             }))
           }
         } catch (e) {
-          // Ignore polling errors
+          // Ignore
         }
       }
     }, 1500)
@@ -167,7 +169,7 @@ function App() {
   }
 
   const handleSearch = async () => {
-    if (!searchQuery) return
+    if (!searchQuery.trim()) return
     setLoading(true)
     try {
       const res = await fetch(`http://localhost:${serverPort}/api/search?q=${encodeURIComponent(searchQuery)}`)
@@ -181,7 +183,7 @@ function App() {
   }
 
   const handleUrlLoad = async () => {
-    if (!url) return
+    if (!url.trim()) return
     setLoading(true)
     try {
       const res = await fetch(`http://localhost:${serverPort}/api/info?url=${encodeURIComponent(url)}`)
@@ -236,6 +238,7 @@ function App() {
       internalId,
       url: targetUrl,
       title: item.title,
+      uploader: item.uploader || 'YouTube',
       thumbnail: item.thumbnail || (item.thumbnails && item.thumbnails[0]?.url) || '',
       formats: { ...defaultFormats },
       trimStart: '',
@@ -375,48 +378,76 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans" style={{ WebkitAppRegion: 'drag' }}>
-      <div className="h-6 shrink-0 bg-slate-950"></div>
+    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans pb-16 md:pb-8 select-none">
+      {/* macOS Window Drag Bar */}
+      <div className="h-6 shrink-0 bg-slate-950" style={{ WebkitAppRegion: 'drag' }}></div>
 
-      <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-4 md:px-8 pb-8 space-y-6" style={{ WebkitAppRegion: 'no-drag' }}>
+      <div className="flex-1 max-w-[1400px] w-full mx-auto px-3 md:px-8 space-y-4 md:space-y-6" style={{ WebkitAppRegion: 'no-drag' }}>
         
-        {/* Responsive Header with Brand Logo */}
-        <div className="flex flex-wrap justify-between items-center bg-slate-900/60 p-4 rounded-2xl border border-slate-800 shadow-xl mb-2 backdrop-blur-md gap-3">
-          <div className="flex items-center gap-3">
-            <img src="/logo_concept_2_transparent.png" alt="Onyx Logo" className="w-10 h-10 object-contain drop-shadow-[0_0_12px_rgba(168,85,247,0.8)]" />
-            <h1 className="text-xl md:text-2xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent tracking-tight">
-              Onyx<span className="font-light text-slate-300">Downloader</span>
-            </h1>
+        {/* Pro DJ Studio Header & Spectrum Visualizer */}
+        <header className="glass-panel p-4 md:p-6 space-y-3 relative overflow-hidden">
+          <div className="flex justify-between items-center z-10">
+            <div className="flex items-center gap-3">
+              <img 
+                src="/logo_concept_2_transparent.png" 
+                alt="Onyx Logo" 
+                className="w-9 h-9 md:w-12 md:h-12 object-contain drop-shadow-[0_0_12px_rgba(168,85,247,0.8)] shrink-0" 
+              />
+              <div>
+                <h1 className="text-lg md:text-2xl font-black tracking-wider bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent uppercase">
+                  ONYX <span className="font-light text-slate-300">STUDIO</span>
+                </h1>
+                <p className="text-[9px] md:text-xs text-slate-400 font-mono tracking-widest hidden sm:block">PRO AUDIO & VIDEO EXTRACTOR</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => alert("Google OAuth Login will open here")} 
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-xl text-xs font-semibold border border-slate-800 transition-all"
+              >
+                <UserCircle className="w-4 h-4 text-purple-400" /> Connect Account
+              </button>
+              <button 
+                onClick={() => setShowSettings(true)} 
+                className="p-2 bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-all active:scale-95"
+              >
+                <Settings className="w-5 h-5 text-slate-300" />
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button onClick={() => alert("Google OAuth Login will open here")} className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold border border-slate-700 transition-all">
-              <UserCircle className="w-4 h-4 text-slate-300" /> <span className="hidden sm:inline">Connect Account</span>
-            </button>
-            <button onClick={() => setShowSettings(true)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all">
-              <Settings className="w-5 h-5 text-slate-300" />
-            </button>
+          {/* Animated Spectrum Waveform Header */}
+          <div className="w-full h-10 bg-slate-950/80 rounded-xl border border-slate-800/80 p-1.5 flex items-center justify-between gap-1 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-cyan-500/10 to-emerald-500/10 pointer-events-none"></div>
+            {[35, 70, 45, 90, 60, 100, 50, 85, 65, 95, 40, 80, 55, 75, 90, 45, 85, 60, 95, 50, 75, 35, 85, 65, 100, 45, 90, 55, 70, 40, 85, 60, 95, 50].map((h, i) => (
+              <div 
+                key={i} 
+                className="flex-1 bg-gradient-to-t from-purple-600 via-pink-500 to-cyan-400 rounded-full transition-all duration-300"
+                style={{ height: `${h}%`, opacity: 0.7 + (i % 3) * 0.1 }}
+              ></div>
+            ))}
           </div>
-        </div>
+        </header>
 
         {/* Plugin Update Banner */}
         {updatesAvailable && (
-          <div className="bg-gradient-to-r from-purple-900/90 to-indigo-900/90 border border-purple-400/50 rounded-xl p-4 shadow-lg flex items-center justify-between backdrop-blur-md">
+          <div className="bg-gradient-to-r from-purple-900/90 to-indigo-900/90 border border-purple-400/50 rounded-xl p-3.5 shadow-lg flex items-center justify-between backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div className="bg-purple-500/20 p-2 rounded-lg">
                 <Sparkles className="w-5 h-5 text-purple-300" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-sm">Plugin Updates Available</h3>
-                <p className="text-purple-100 text-xs mt-0.5">Core tools (yt-dlp) need an update to prevent download failures.</p>
+                <h3 className="text-white font-bold text-xs md:text-sm">yt-dlp Core Plugin Update</h3>
+                <p className="text-purple-100 text-[11px]">Keep download engine updated for uninterrupted streaming.</p>
               </div>
             </div>
             <button 
               onClick={handleUpdatePlugins} 
               disabled={updating}
-              className={`px-4 py-2 rounded-lg font-semibold text-xs transition-all shadow-md ${updating ? 'bg-purple-400 text-white cursor-wait' : 'bg-white text-purple-900 hover:bg-purple-50 hover:scale-105'}`}
+              className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all shadow-md ${updating ? 'bg-purple-400 text-white cursor-wait' : 'bg-white text-purple-950 hover:bg-purple-50 hover:scale-105'}`}
             >
-              {updating ? 'Updating...' : 'Update Now'}
+              {updating ? 'Updating...' : 'Update Engine'}
             </button>
           </div>
         )}
@@ -424,42 +455,44 @@ function App() {
         {/* Settings Modal */}
         {showSettings && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="glass-panel p-6 w-full max-w-md space-y-4">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Download Directories</h2>
-                <button onClick={() => setShowSettings(false)}><X className="text-slate-400 hover:text-white" /></button>
+            <div className="glass-panel p-5 w-full max-w-md space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h2 className="text-base font-bold flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-purple-400" /> Download Preferences
+                </h2>
+                <button onClick={() => setShowSettings(false)} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-slate-400">Audio Directory</label>
-                  <input type="text" value={directories.audio_dir} onChange={e => setDirectories({...directories, audio_dir: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:border-indigo-500 outline-none" />
+                  <label className="text-xs font-semibold text-slate-400">Audio Directory</label>
+                  <input type="text" value={directories.audio_dir} onChange={e => setDirectories({...directories, audio_dir: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none mt-1" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400">Video Directory</label>
-                  <input type="text" value={directories.video_dir} onChange={e => setDirectories({...directories, video_dir: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:border-indigo-500 outline-none" />
+                  <label className="text-xs font-semibold text-slate-400">Video Directory</label>
+                  <input type="text" value={directories.video_dir} onChange={e => setDirectories({...directories, video_dir: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none mt-1" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400">ONYX Projects Directory</label>
-                  <input type="text" value={directories.onyx_dir} onChange={e => setDirectories({...directories, onyx_dir: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:border-indigo-500 outline-none" />
+                  <label className="text-xs font-semibold text-slate-400">ONYX Projects Directory</label>
+                  <input type="text" value={directories.onyx_dir} onChange={e => setDirectories({...directories, onyx_dir: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none mt-1" />
                 </div>
 
-                <div className="pt-3 border-t border-slate-700/50 space-y-2">
-                  <h3 className="text-sm font-semibold text-purple-300">Shazam Auto-Extract Settings 🎙️</h3>
+                <div className="pt-3 border-t border-slate-800 space-y-2">
+                  <h3 className="text-xs font-bold text-purple-300 uppercase tracking-wider">Shazam Auto-Extract Settings 🎙️</h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-slate-400">Sample Duration (Sec)</label>
-                      <input type="number" min="5" max="30" value={shazamSettings.sampleDuration} onChange={e => setShazamSettings({...shazamSettings, sampleDuration: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:border-purple-500 outline-none" />
+                      <label className="text-[11px] text-slate-400">Sample Duration (sec)</label>
+                      <input type="number" min="5" max="30" value={shazamSettings.sampleDuration} onChange={e => setShazamSettings({...shazamSettings, sampleDuration: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs focus:border-purple-500 outline-none mt-1" />
                     </div>
                     <div>
-                      <label className="text-xs text-slate-400">Sample Interval (Sec)</label>
-                      <input type="number" min="30" max="600" value={shazamSettings.sampleInterval} onChange={e => setShazamSettings({...shazamSettings, sampleInterval: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:border-purple-500 outline-none" />
+                      <label className="text-[11px] text-slate-400">Sample Interval (sec)</label>
+                      <input type="number" min="30" max="600" value={shazamSettings.sampleInterval} onChange={e => setShazamSettings({...shazamSettings, sampleInterval: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs focus:border-purple-500 outline-none mt-1" />
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 flex justify-end">
-                <button onClick={() => setShowSettings(false)} className="glow-button">Save & Close</button>
+              <div className="pt-2 flex justify-end">
+                <button onClick={() => setShowSettings(false)} className="glow-button py-2 text-xs">Save & Close</button>
               </div>
             </div>
           </div>
@@ -468,12 +501,12 @@ function App() {
         {/* Video Preview Modal */}
         {previewVideoId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="glass-panel p-4 w-full max-w-3xl space-y-4">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-bold">Video Preview</h2>
-                <button onClick={() => setPreviewVideoId(null)}><X className="text-slate-400 hover:text-white" /></button>
+            <div className="glass-panel p-4 w-full max-w-3xl space-y-3">
+              <div className="flex justify-between items-center mb-1">
+                <h2 className="text-sm font-bold text-white">Video Preview</h2>
+                <button onClick={() => setPreviewVideoId(null)}><X className="w-5 h-5 text-slate-400 hover:text-white" /></button>
               </div>
-              <div className="aspect-video w-full bg-black rounded-lg overflow-hidden">
+              <div className="aspect-video w-full bg-black rounded-xl overflow-hidden">
                 <iframe 
                   width="100%" 
                   height="100%" 
@@ -487,18 +520,18 @@ function App() {
           </div>
         )}
 
-        {/* Trimmer Modal */}
+        {/* Trimmer Modal (With YouTube Player & Start/End Capture) */}
         {trimModalItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="glass-panel p-6 w-full max-w-2xl space-y-6">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <span className="text-2xl">✂️</span> Trimmer: {trimModalItem.title}
+            <div className="glass-panel p-5 w-full max-w-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h2 className="text-sm md:text-base font-bold flex items-center gap-2 text-purple-300 truncate">
+                  <Scissors className="w-5 h-5 text-purple-400" /> Trimmer: {trimModalItem.title}
                 </h2>
-                <button onClick={() => {setTrimModalItem(null); setYtPlayer(null)}}><X className="text-slate-400 hover:text-white w-6 h-6" /></button>
+                <button onClick={() => {setTrimModalItem(null); setYtPlayer(null)}}><X className="w-5 h-5 text-slate-400 hover:text-white" /></button>
               </div>
               
-              <div className="aspect-video w-full bg-black rounded-lg overflow-hidden border border-slate-700/50 shadow-inner">
+              <div className="aspect-video w-full bg-black rounded-xl overflow-hidden border border-slate-800 shadow-inner">
                 <YouTube 
                   videoId={extractVideoId(trimModalItem.url)} 
                   opts={{
@@ -511,11 +544,11 @@ function App() {
                 />
               </div>
 
-              <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 flex gap-6">
-                <div className="flex-1 space-y-2 relative">
-                  <div className="flex justify-between items-end">
-                    <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Start Time</label>
-                    <button onClick={() => captureTime('start')} className="text-[10px] flex items-center gap-1 bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 px-2 py-1 rounded transition-colors" title="Set to current video time">
+              <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 flex gap-4">
+                <div className="flex-1 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[11px] text-slate-400 font-bold uppercase">Start Time</label>
+                    <button onClick={() => captureTime('start')} className="text-[10px] flex items-center gap-1 bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 px-2 py-0.5 rounded-lg border border-purple-500/30 transition-colors">
                       <MapPin className="w-3 h-3" /> Capture
                     </button>
                   </div>
@@ -524,13 +557,14 @@ function App() {
                     value={trimStart}
                     onChange={(e) => setTrimStart(e.target.value)}
                     placeholder="00:00.000"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-lg font-mono text-center focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-700" 
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-sm font-mono text-center focus:border-purple-500 outline-none text-purple-200" 
                   />
                 </div>
-                <div className="flex-1 space-y-2 relative">
-                  <div className="flex justify-between items-end">
-                    <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">End Time</label>
-                    <button onClick={() => captureTime('end')} className="text-[10px] flex items-center gap-1 bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 px-2 py-1 rounded transition-colors" title="Set to current video time">
+
+                <div className="flex-1 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[11px] text-slate-400 font-bold uppercase">End Time</label>
+                    <button onClick={() => captureTime('end')} className="text-[10px] flex items-center gap-1 bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 px-2 py-0.5 rounded-lg border border-purple-500/30 transition-colors">
                       <MapPin className="w-3 h-3" /> Capture
                     </button>
                   </div>
@@ -539,137 +573,141 @@ function App() {
                     value={trimEnd}
                     onChange={(e) => setTrimEnd(e.target.value)}
                     placeholder="03:45.000"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-lg font-mono text-center focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-700" 
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-sm font-mono text-center focus:border-purple-500 outline-none text-purple-200" 
                   />
                 </div>
               </div>
               
-              <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => {setTrimModalItem(null); setYtPlayer(null)}} className="px-6 py-2.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium transition-colors">Cancel</button>
-                <button onClick={saveTrimSettings} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium shadow-lg shadow-indigo-500/20 transition-all active:scale-95">Save Trims</button>
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => {setTrimModalItem(null); setYtPlayer(null)}} className="px-4 py-2 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-300 text-xs font-semibold">Cancel</button>
+                <button onClick={saveTrimSettings} className="glow-button py-2 px-5 text-xs">Save Trims</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Main 2-Column Responsive Layout */}
+        {/* Main Application Layout (Responsive Tabs on Mobile, 2-Columns on Desktop) */}
         <div className="flex flex-col lg:flex-row gap-6 flex-1">
           
-          {/* Left Column: Search & Results */}
-          <div className="flex-1 flex flex-col space-y-6">
-            {/* Search & URL Load Inputs */}
-            <div className="glass-panel p-4 md:p-6 space-y-6">
+          {/* Search & Inputs Panel */}
+          <div className={`flex-1 flex-col space-y-6 ${mobileTab === 'search' ? 'flex' : 'hidden lg:flex'}`}>
+            <div className="glass-panel p-4 md:p-6 space-y-5">
               <div className="flex flex-col xl:flex-row gap-4">
+                {/* Search YouTube Query */}
                 <div className="flex-1 space-y-2">
-                  <label className="text-sm text-slate-400 font-medium">Search YouTube</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Search YouTube</label>
                   <div className="flex gap-2">
                     <input 
                       type="text" 
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                      placeholder="e.g. Synthwave Mix 2026"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition-colors"
+                      placeholder="e.g. Synthwave Mix 2026..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-xs md:text-sm text-white focus:border-purple-500 outline-none"
                     />
                     <button onClick={handleSearch} className="glow-button flex items-center justify-center min-w-[48px]">
-                      <Search className="w-5 h-5" />
+                      <Search className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-                
+
                 <div className="hidden xl:flex items-center justify-center">
-                  <span className="text-slate-500 mt-6 text-xs font-bold">OR</span>
+                  <span className="text-slate-600 font-bold text-xs mt-6">OR</span>
                 </div>
 
+                {/* Direct Link Input */}
                 <div className="flex-1 space-y-2">
-                  <label className="text-sm text-slate-400 font-medium">Direct Link (Video/Playlist)</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Direct Link (Video/Playlist)</label>
                   <div className="flex gap-2">
                     <input 
                       type="text" 
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleUrlLoad()}
-                      placeholder="https://youtube.com/..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition-colors"
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-xs md:text-sm text-white focus:border-purple-500 outline-none"
                     />
-                    <button onClick={handlePasteClipboard} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1">
-                      <Clipboard className="w-3.5 h-3.5" /> Paste
+                    <button 
+                      onClick={handlePasteClipboard} 
+                      className="px-3 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-200 rounded-2xl text-xs font-bold border border-purple-500/40 flex items-center gap-1 shrink-0 transition-all active:scale-95"
+                    >
+                      <Clipboard className="w-3.5 h-3.5 text-purple-300" /> Paste
                     </button>
-                    <button onClick={handleUrlLoad} className="glow-button px-5 whitespace-nowrap">
+                    <button onClick={handleUrlLoad} className="glow-button px-5 whitespace-nowrap text-xs">
                       Load
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Default Target Format Selection */}
-              <div className="pt-4 border-t border-slate-800">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Default Target Formats</h3>
-                <div className="flex flex-wrap gap-2.5">
-                  <button onClick={() => toggleDefaultFormat('video')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${defaultFormats.video ? 'bg-blue-500/20 border-blue-500 text-blue-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}`}>
+              {/* Default Target Format Toggles (All 9 Features) */}
+              <div className="pt-4 border-t border-slate-800/80">
+                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Default Target Formats</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => toggleDefaultFormat('video')} className={`pill-tab ${defaultFormats.video ? 'pill-tab-active-cyan' : 'pill-tab-inactive'}`}>
                     <Video className="w-3.5 h-3.5" /> HQ Video
                   </button>
-                  <button onClick={() => toggleDefaultFormat('mp3')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${defaultFormats.mp3 ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}`}>
-                    <Music className="w-3.5 h-3.5" /> Audio
+                  <button onClick={() => toggleDefaultFormat('mp3')} className={`pill-tab ${defaultFormats.mp3 ? 'pill-tab-active-purple' : 'pill-tab-inactive'}`}>
+                    <Music className="w-3.5 h-3.5" /> Audio (MP3 320k)
                   </button>
-                  <button onClick={() => toggleDefaultFormat('onyx')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${defaultFormats.onyx ? 'bg-purple-500/20 border-purple-500 text-purple-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}`}>
+                  <button onClick={() => toggleDefaultFormat('onyx')} className={`pill-tab ${defaultFormats.onyx ? 'pill-tab-active-purple' : 'pill-tab-inactive'}`}>
                     <Sparkles className="w-3.5 h-3.5" /> ONYX Stems
                   </button>
-                  <button onClick={() => toggleDefaultFormat('playlist')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${defaultFormats.playlist ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}`}>
+                  <button onClick={() => toggleDefaultFormat('playlist')} className={`pill-tab ${defaultFormats.playlist ? 'pill-tab-active-emerald' : 'pill-tab-inactive'}`}>
                     <ListMusic className="w-3.5 h-3.5" /> DJ Playlist 🎧
                   </button>
-                  <button onClick={() => toggleDefaultFormat('shazam')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${defaultFormats.shazam ? 'bg-purple-600/30 border-purple-500 text-purple-200' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}`}>
-                    <Music className="w-3.5 h-3.5 text-purple-400" /> Shazam Extract 🎙️
+                  <button onClick={() => toggleDefaultFormat('shazam')} className={`pill-tab ${defaultFormats.shazam ? 'pill-tab-active-purple' : 'pill-tab-inactive'}`}>
+                    <Radio className="w-3.5 h-3.5" /> Shazam Extract 🎙️
                   </button>
-                  <button onClick={() => toggleDefaultFormat('spotify')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${defaultFormats.spotify ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}`}>
+                  <button onClick={() => toggleDefaultFormat('spotify')} className={`pill-tab ${defaultFormats.spotify ? 'pill-tab-active-emerald' : 'pill-tab-inactive'}`}>
                     Spotify 🟢
                   </button>
-                  <button onClick={() => toggleDefaultFormat('prefix')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${defaultFormats.prefix ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}`}>
+                  <button onClick={() => toggleDefaultFormat('prefix')} className={`pill-tab ${defaultFormats.prefix ? 'pill-tab-active-cyan' : 'pill-tab-inactive'}`}>
                     Prefix BPM
                   </button>
-                  <button onClick={() => toggleDefaultFormat('suffix')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${defaultFormats.suffix ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-700'}`}>
+                  <button onClick={() => toggleDefaultFormat('suffix')} className={`pill-tab ${defaultFormats.suffix ? 'pill-tab-active-cyan' : 'pill-tab-inactive'}`}>
                     Suffix BPM
                   </button>
-                  <button onClick={() => toggleDefaultFormat('autoSplit')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${defaultFormats.autoSplit ? 'bg-rose-500/20 border-rose-500 text-rose-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'}`}>
+                  <button onClick={() => toggleDefaultFormat('autoSplit')} className={`pill-tab ${defaultFormats.autoSplit ? 'pill-tab-active-purple' : 'pill-tab-inactive'}`}>
                     Auto-Split 🔪
                   </button>
                 </div>
               </div>
             </div>
 
-            {loading && <div className="text-center py-6 text-purple-300 font-semibold animate-pulse">Fetching video info & track metadata...</div>}
+            {loading && <div className="text-center py-6 text-purple-300 text-xs font-mono animate-pulse">Fetching video info & track metadata...</div>}
 
             {/* Single Loaded Video Info Card */}
             {videoInfo && !loading && (
-              <div className="glass-panel p-4 flex flex-col md:flex-row gap-6 animate-in slide-in-from-bottom-4">
-                <div className="relative group cursor-pointer w-full md:w-64 aspect-video shrink-0 bg-slate-950 rounded-xl overflow-hidden border border-slate-800" onClick={() => setPreviewVideoId(extractVideoId(videoInfo.webpage_url || videoInfo.original_url || videoInfo.url || videoInfo.id))}>
+              <div className="glass-panel p-4 flex flex-col md:flex-row gap-4 items-center">
+                <div className="relative group cursor-pointer w-full md:w-56 aspect-video shrink-0 bg-slate-950 rounded-xl overflow-hidden border border-slate-800" onClick={() => setPreviewVideoId(extractVideoId(videoInfo.webpage_url || videoInfo.original_url || videoInfo.url || videoInfo.id))}>
                   <img src={videoInfo.thumbnail} alt="thumb" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Play className="w-12 h-12 text-white drop-shadow-lg" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Play className="w-10 h-10 text-white drop-shadow-lg" />
                   </div>
                 </div>
-                <div className="flex flex-col justify-between py-1 flex-1">
+                <div className="flex flex-col justify-between flex-1 space-y-2 w-full">
                   <div>
-                    <h3 className="text-base md:text-lg font-bold text-white line-clamp-2 mb-1">{videoInfo.title}</h3>
+                    <h3 className="text-sm font-bold text-white line-clamp-2">{videoInfo.title}</h3>
                     <p className="text-xs text-slate-400">{videoInfo.uploader || 'YouTube'}</p>
                   </div>
-                  <button onClick={() => addToQueue(videoInfo)} className="glow-button w-fit flex items-center gap-2 mt-4 text-sm">
+                  <button onClick={() => addToQueue(videoInfo)} className="glow-button w-fit flex items-center gap-1.5 py-2 text-xs">
                     <ListPlus className="w-4 h-4" /> Add to Queue
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Search Results List */}
+            {/* Search Results Grid */}
             {searchResults.length > 0 && !loading && (
-              <div className="space-y-4">
-                <h3 className="font-bold text-sm text-purple-300 uppercase tracking-wider border-b border-slate-800 pb-2">Results ({searchResults.length})</h3>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+              <div className="space-y-3">
+                <h3 className="font-bold text-xs text-purple-300 uppercase tracking-wider border-b border-slate-800 pb-2">Results ({searchResults.length})</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {searchResults.map((item, idx) => {
                     const vidId = extractVideoId(item.webpage_url || item.original_url || item.url || item.id)
                     return (
-                      <div key={item.id || idx} className="glass-panel p-3 flex gap-3 hover:bg-slate-800/40 transition-colors">
-                        <div className="relative group cursor-pointer w-28 h-18 bg-slate-950 rounded-lg overflow-hidden shrink-0 border border-slate-800" onClick={() => setPreviewVideoId(vidId)}>
+                      <div key={item.id || idx} className="glass-card p-3 flex gap-3 items-center">
+                        <div className="relative group cursor-pointer w-24 h-16 bg-slate-950 rounded-lg overflow-hidden shrink-0 border border-slate-800" onClick={() => setPreviewVideoId(vidId)}>
                           {item.thumbnail || (item.thumbnails && item.thumbnails[0]?.url) ? (
                             <img src={item.thumbnail || item.thumbnails[0].url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                           ) : null}
@@ -677,11 +715,11 @@ function App() {
                             <Play className="w-6 h-6 text-white drop-shadow-lg" />
                           </div>
                         </div>
-                        <div className="flex flex-col justify-between flex-1 overflow-hidden">
-                          <p className="text-xs font-bold text-white line-clamp-2" title={item.title}>{item.title}</p>
+                        <div className="flex flex-col justify-between flex-1 overflow-hidden space-y-1">
+                          <p className="text-xs font-bold text-white truncate" title={item.title}>{item.title}</p>
                           <button 
                             onClick={() => addToQueue(item)}
-                            className="text-xs font-semibold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/50 px-3 py-1.5 rounded-xl w-fit mt-2 transition-all flex items-center gap-1.5 active:scale-95"
+                            className="text-[11px] font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 px-2.5 py-1 rounded-xl w-fit transition-all flex items-center gap-1 active:scale-95"
                           >
                             <ListPlus className="w-3.5 h-3.5" /> Add to Queue
                           </button>
@@ -694,54 +732,56 @@ function App() {
             )}
           </div>
 
-          {/* Right Column: Download Queue / Cart */}
-          <div className="w-full lg:w-96 shrink-0 flex flex-col bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl relative">
-            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
-              <h2 className="font-bold text-sm text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+          {/* Right Column: Download Queue & Batch Actions */}
+          <div className={`w-full lg:w-96 shrink-0 flex-col bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl relative ${mobileTab === 'queue' ? 'flex' : 'hidden lg:flex'}`}>
+            <div className="p-3.5 border-b border-slate-800 flex justify-between items-center bg-slate-950/80">
+              <h2 className="font-bold text-xs text-cyan-300 uppercase tracking-wider flex items-center gap-2">
                 <Download className="w-4 h-4 text-cyan-400" />
                 Download Queue ({queue.length})
               </h2>
             </div>
 
+            {/* Batch Actions Bar (Apply to Entire List) */}
             {queue.length > 0 && (
-              <div className="p-3 bg-slate-950/60 border-b border-slate-800 flex flex-col gap-2">
+              <div className="p-3 bg-slate-950/80 border-b border-slate-800 flex flex-col gap-2">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Apply to entire list:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  <button onClick={() => applyToAll('video')} className="text-[10px] font-semibold bg-slate-900 hover:bg-blue-500/20 text-slate-300 hover:text-blue-300 px-2 py-1 rounded-lg border border-slate-800">
-                    + All MP4
+                <div className="flex flex-wrap gap-1">
+                  <button onClick={() => applyToAll('video')} className="text-[10px] font-semibold bg-slate-900 hover:bg-blue-500/20 text-slate-300 hover:text-blue-300 px-2 py-0.5 rounded-md border border-slate-800">
+                    + MP4
                   </button>
-                  <button onClick={() => applyToAll('mp3')} className="text-[10px] font-semibold bg-slate-900 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 px-2 py-1 rounded-lg border border-slate-800">
-                    + All MP3
+                  <button onClick={() => applyToAll('mp3')} className="text-[10px] font-semibold bg-slate-900 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 px-2 py-0.5 rounded-md border border-slate-800">
+                    + MP3
                   </button>
-                  <button onClick={() => applyToAll('onyx')} className="text-[10px] font-semibold bg-slate-900 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 px-2 py-1 rounded-lg border border-slate-800">
-                    + All ONYX
+                  <button onClick={() => applyToAll('onyx')} className="text-[10px] font-semibold bg-slate-900 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 px-2 py-0.5 rounded-md border border-slate-800">
+                    + ONYX
                   </button>
-                  <button onClick={() => applyToAll('playlist')} className="text-[10px] font-semibold bg-slate-900 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 px-2 py-1 rounded-lg border border-slate-800">
-                    + All Playlist 🎧
+                  <button onClick={() => applyToAll('playlist')} className="text-[10px] font-semibold bg-slate-900 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 px-2 py-0.5 rounded-md border border-slate-800">
+                    + Playlist 🎧
                   </button>
-                  <button onClick={() => applyToAll('spotify')} className="text-[10px] font-semibold bg-slate-900 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 px-2 py-1 rounded-lg border border-slate-800">
-                    + All Spotify
+                  <button onClick={() => applyToAll('spotify')} className="text-[10px] font-semibold bg-slate-900 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 px-2 py-0.5 rounded-md border border-slate-800">
+                    + Spotify
                   </button>
-                  <button onClick={() => applyToAll('prefix')} className="text-[10px] font-semibold bg-slate-900 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 px-2 py-1 rounded-lg border border-slate-800">
+                  <button onClick={() => applyToAll('prefix')} className="text-[10px] font-semibold bg-slate-900 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 px-2 py-0.5 rounded-md border border-slate-800">
                     + Prefix
                   </button>
-                  <button onClick={() => applyToAll('suffix')} className="text-[10px] font-semibold bg-slate-900 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 px-2 py-1 rounded-lg border border-slate-800">
+                  <button onClick={() => applyToAll('suffix')} className="text-[10px] font-semibold bg-slate-900 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 px-2 py-0.5 rounded-md border border-slate-800">
                     + Suffix
                   </button>
-                  <button onClick={() => applyToAll('autoSplit')} className="text-[10px] font-semibold bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 px-2 py-1 rounded-lg border border-slate-800">
+                  <button onClick={() => applyToAll('autoSplit')} className="text-[10px] font-semibold bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 px-2 py-0.5 rounded-md border border-slate-800">
                     + Auto-Split 🔪
                   </button>
-                  <button onClick={clearAllFormats} className="text-[10px] font-semibold bg-slate-900 hover:bg-red-500/20 text-slate-300 hover:text-red-300 px-2 py-1 rounded-lg border border-slate-800 ml-auto">
-                    Clear All
+                  <button onClick={clearAllFormats} className="text-[10px] font-semibold bg-slate-900 hover:bg-red-500/20 text-slate-300 hover:text-red-300 px-2 py-0.5 rounded-md border border-slate-800 ml-auto">
+                    Clear
                   </button>
                 </div>
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            {/* Queued Items List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
               {queue.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center text-slate-500 space-y-2 text-center">
-                  <ListPlus className="w-10 h-10 opacity-20" />
+                  <ListPlus className="w-8 h-8 opacity-20" />
                   <p className="text-xs">Queue is empty. Search YouTube or paste a URL to extract tracks.</p>
                 </div>
               ) : (
@@ -761,8 +801,8 @@ function App() {
                       )}
 
                       <div className="relative z-10">
-                        <div className="flex gap-3 mb-2.5">
-                          <img src={item.thumbnail} className="w-16 h-10 object-cover rounded bg-black shrink-0 border border-slate-800" />
+                        <div className="flex gap-2.5 mb-2">
+                          <img src={item.thumbnail} className="w-14 h-9 object-cover rounded bg-black shrink-0 border border-slate-800" />
                           <div className="flex-1 overflow-hidden flex flex-col justify-center">
                             <h4 className="text-xs font-bold line-clamp-1 text-slate-200">{item.title}</h4>
                             {(item.trimStart || item.trimEnd) && (
@@ -772,9 +812,9 @@ function App() {
                             )}
                           </div>
                           {!job && (
-                            <div className="flex flex-col items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0">
                               <button onClick={() => openTrimModal(item)} className="text-slate-400 hover:text-purple-400 transition-colors p-1 rounded" title="Trim Segment">
-                                ✂️
+                                <Scissors className="w-3.5 h-3.5" />
                               </button>
                               <button onClick={() => removeFromQueue(item.internalId)} className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded" title="Remove">
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -783,36 +823,37 @@ function App() {
                           )}
                         </div>
 
+                        {/* Inline Item Format Badges Toggle */}
                         {!job ? (
-                          <div className="flex flex-col gap-1.5">
-                            <div className="flex flex-wrap gap-1.5">
-                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'video')} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors ${item.formats.video ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex flex-wrap gap-1">
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'video')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.video ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 MP4
                               </button>
-                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'mp3')} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors ${item.formats.mp3 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'mp3')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.mp3 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 MP3
                               </button>
-                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'onyx')} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors ${item.formats.onyx ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'onyx')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.onyx ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 ONYX
                               </button>
-                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'playlist')} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors ${item.formats.playlist ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'playlist')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.playlist ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 Playlist 🎧
                               </button>
-                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'shazam')} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors ${item.formats.shazam ? 'bg-purple-600/30 text-purple-200 border border-purple-500/30' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'shazam')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.shazam ? 'bg-purple-600/30 text-purple-200 border border-purple-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 Shazam 🎙️
                               </button>
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'spotify')} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors ${item.formats.spotify ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                            <div className="flex flex-wrap gap-1">
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'spotify')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.spotify ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 Spotify
                               </button>
-                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'prefix')} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors ${item.formats.prefix ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'prefix')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.prefix ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 Prefix
                               </button>
-                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'suffix')} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors ${item.formats.suffix ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'suffix')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.suffix ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 Suffix
                               </button>
-                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'autoSplit')} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-colors ${item.formats.autoSplit ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'autoSplit')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.autoSplit ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 Auto-Split 🔪
                               </button>
                             </div>
@@ -833,7 +874,7 @@ function App() {
                                       <FolderOpen className="w-3 h-3" /> Folder
                                     </button>
                                   )}
-                                  <CheckCircle className="w-3 h-3 text-emerald-400" />
+                                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
                                 </div>
                               ) : <span className="font-mono text-cyan-300 font-bold">{percent.toFixed(0)}%</span>}
                             </div>
@@ -850,13 +891,13 @@ function App() {
             </div>
 
             {queue.length > 0 && (
-              <div className="p-4 bg-slate-900/80 border-t border-slate-800">
+              <div className="p-3 bg-slate-950/90 border-t border-slate-800">
                 <button 
                   onClick={startBatchDownload}
-                  className="w-full glow-button py-3 font-bold text-sm flex items-center justify-center gap-2"
+                  className="w-full glow-button py-2.5 font-bold text-xs flex items-center justify-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Download All Queued Tracks
+                  Download All Tracks ({queue.length})
                 </button>
               </div>
             )}
@@ -864,6 +905,30 @@ function App() {
           
         </div>
       </div>
+
+      {/* Mobile Navigation Bar */}
+      <nav className="fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-6 py-2 flex justify-around items-center z-40 lg:hidden">
+        <button 
+          onClick={() => setMobileTab('search')}
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-semibold transition-colors ${mobileTab === 'search' ? 'text-purple-400 font-bold' : 'text-slate-500'}`}
+        >
+          <Search className="w-4 h-4" /> Search
+        </button>
+
+        <button 
+          onClick={() => setMobileTab('queue')}
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-semibold transition-colors ${mobileTab === 'queue' ? 'text-purple-400 font-bold' : 'text-slate-500'}`}
+        >
+          <Download className="w-4 h-4" /> Queue ({queue.length})
+        </button>
+
+        <button 
+          onClick={() => setShowSettings(true)}
+          className="flex flex-col items-center gap-0.5 text-[10px] font-semibold text-slate-500 hover:text-slate-300"
+        >
+          <Settings className="w-4 h-4" /> Settings
+        </button>
+      </nav>
     </div>
   )
 }
