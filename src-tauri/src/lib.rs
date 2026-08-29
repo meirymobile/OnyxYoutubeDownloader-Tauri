@@ -76,7 +76,86 @@ struct DownloadReq {
     url: String,
     formats: Vec<String>,
     audio_dir: Option<String>,
+    video_dir: Option<String>,
+    onyx_dir: Option<String>,
+    spotify: Option<bool>,
+    bpm_prefix: Option<bool>,
+    bpm_suffix: Option<bool>,
+    auto_split: Option<bool>,
+    playlist: Option<bool>,
+    shazam_extract: Option<bool>,
+    shazam_sample_duration: Option<u32>,
+    shazam_sample_interval: Option<u32>,
 }
+
+#[derive(Serialize, Deserialize)]
+struct ITunesTrackInfo {
+    artist_name: String,
+    track_name: String,
+    collection_name: String,
+    artwork_url_600: String,
+}
+
+async fn fetch_itunes_metadata(query: &str) -> Option<ITunesTrackInfo> {
+    let client = reqwest::Client::new();
+    let url = format!("https://itunes.apple.com/search?term={}&entity=song&limit=1", urlencoding::encode(query));
+    if let Ok(res) = client.get(&url).send().await {
+        if let Ok(json) = res.json::<serde_json::Value>().await {
+            if let Some(results) = json.get("results").and_then(|r| r.as_array()) {
+                if let Some(first) = results.first() {
+                    let artist = first.get("artistName").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let track = first.get("trackName").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let collection = first.get("collectionName").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let art_raw = first.get("artworkUrl100").and_then(|v| v.as_str()).unwrap_or("");
+                    let art_600 = art_raw.replace("100x100bb", "600x600bb");
+                    return Some(ITunesTrackInfo {
+                        artist_name: artist,
+                        track_name: track,
+                        collection_name: collection,
+                        artwork_url_600: art_600,
+                    });
+                }
+            }
+        }
+    }
+    None
+}
+
+fn create_dj_playlist_pack(folder_path: &PathBuf, set_title: &str, track_files: &[String]) {
+    use std::io::Write;
+    
+    // 1. Generate .m3u8
+    let m3u8_path = folder_path.join(format!("{}.m3u8", set_title));
+    if let Ok(mut f) = std::fs::File::create(&m3u8_path) {
+        let _ = writeln!(f, "#EXTM3U");
+        for file in track_files {
+            let _ = writeln!(f, "#EXTINF:-1,{}", file);
+            let _ = writeln!(f, "{}", file);
+        }
+    }
+
+    // 2. Generate .cue
+    let cue_path = folder_path.join(format!("{}.cue", set_title));
+    if let Ok(mut f) = std::fs::File::create(&cue_path) {
+        let _ = writeln!(f, "TITLE \"{}\"", set_title);
+        let _ = writeln!(f, "FILE \"Tracklist\" MP3");
+        for (i, file) in track_files.iter().enumerate() {
+            let _ = writeln!(f, "  TRACK {:02} AUDIO", i + 1);
+            let _ = writeln!(f, "    TITLE \"{}\"", file);
+            let _ = writeln!(f, "    INDEX 01 00:00:00");
+        }
+    }
+
+    // 3. Generate Tracklist.txt
+    let txt_path = folder_path.join(format!("{}-Tracklist.txt", set_title));
+    if let Ok(mut f) = std::fs::File::create(&txt_path) {
+        let _ = writeln!(f, "=== {} - Official DJ Tracklist ===", set_title);
+        for (i, file) in track_files.iter().enumerate() {
+            let _ = writeln!(f, "{:02}. {}", i + 1, file);
+        }
+    }
+}
+
 
 #[derive(Serialize, Clone)]
 struct ProgressPayload {
@@ -138,10 +217,21 @@ async fn start_download(app: AppHandle, req: DownloadReq) -> Result<String, Stri
 
         let base_dir = req.audio_dir.unwrap_or_else(|| "/storage/emulated/0/Download".to_string());
         let base_dir = base_dir.replace("~", "/storage/emulated/0");
+        let is_set = req.playlist.unwrap_or(false) || req.shazam_extract.unwrap_or(false);
         let safe_title = info.name.replace("/", "_").replace("\\", "_");
+
+
+        let target_folder = if is_set {
+            let sub = PathBuf::from(&base_dir).join(&safe_title);
+            let _ = std::fs::create_dir_all(&sub);
+            sub
+        } else {
+            PathBuf::from(&base_dir)
+        };
 
         let mut success = true;
         let mut last_err = String::new();
+        let mut downloaded_files = Vec::new();
 
         let client = reqwest::Client::new();
 
@@ -170,7 +260,21 @@ async fn start_download(app: AppHandle, req: DownloadReq) -> Result<String, Stri
             };
 
             let ext = if is_audio { "mp3" } else { "mp4" };
-            let path = PathBuf::from(&base_dir).join(format!("{}.{}", safe_title, ext));
+            
+            // Format filename with BPM prefix/suffix if selected
+            let mut file_name = safe_title.clone();
+            if is_audio {
+                let default_bpm = 128;
+                if req.bpm_prefix.unwrap_or(false) {
+                    file_name = format!("[{} BPM] {}", default_bpm, file_name);
+                }
+                if req.bpm_suffix.unwrap_or(false) {
+                    file_name = format!("{} ({} BPM)", file_name, default_bpm);
+                }
+            }
+
+            let full_filename = format!("{}.{}", file_name, ext);
+            let path = target_folder.join(&full_filename);
             do_log(format!("Starting download to path: {:?}", path));
 
             match client.get(&stream_url).send().await {
@@ -189,6 +293,7 @@ async fn start_download(app: AppHandle, req: DownloadReq) -> Result<String, Stri
                                 }
                                 if file_success {
                                     do_log(format!("SUCCESS: Download completed for format {}", format));
+                                    downloaded_files.push(full_filename);
                                 } else {
                                     success = false;
                                     last_err = "Error writing file chunk".to_string();
@@ -213,6 +318,13 @@ async fn start_download(app: AppHandle, req: DownloadReq) -> Result<String, Stri
                 }
             }
         }
+
+        // Generate DJ Playlist Pack (.m3u8, .cue, .txt) if set download completed
+        if is_set && !downloaded_files.is_empty() {
+            create_dj_playlist_pack(&target_folder, &safe_title, &downloaded_files);
+            do_log("Generated DJ Playlist pack (.m3u8, .cue, .txt) in set subfolder".to_string());
+        }
+
 
         if success {
             let _ = app.emit("download-progress", ProgressPayload {
@@ -328,15 +440,29 @@ fn write_log(message: String, log_dir: String, max_size_mb: u64) -> Result<(), S
     Ok(())
 }
 
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            use tauri_plugin_shell::ShellExt;
+            if let Ok(cmd) = app.shell().sidecar("backend_server") {
+                if let Ok((_rx, child)) = cmd.spawn() {
+                    println!("🚀 Sidecar spawned with PID {}", child.pid());
+                }
+            }
+            Ok(())
+        })
+
+
         .invoke_handler(tauri::generate_handler![
             search_youtube, get_info, start_download, check_updates, update_plugins, open_path, check_shared_intent, write_log, read_log
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

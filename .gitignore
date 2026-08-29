@@ -3,9 +3,10 @@ node_modules/
 dist/
 .DS_Store
 
-# Rust / Tauri
+# Rust / Tauri / Binaries
 src-tauri/target/
 src-tauri/gen/
+src-tauri/bin/
 
 # Python
 backend/venv/
