@@ -6,6 +6,21 @@ import {
 } from 'lucide-react'
 import YouTube from 'react-youtube'
 
+// Tauri IPC Invoker Helper (Works on both Native Mobile & Desktop Web Server)
+const isTauri = () => typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.__TAURI__)
+
+const invokeTauri = async (cmd, args = {}) => {
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      return await invoke(cmd, args)
+    } catch (e) {
+      console.warn(`Tauri invoke failed for ${cmd}:`, e)
+    }
+  }
+  return null
+}
+
 function App() {
   const [url, setUrl] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -14,7 +29,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [mobileTab, setMobileTab] = useState('search') // 'search', 'queue', 'settings'
   
-  // Default Target Formats (All 9 Features Restored)
+  // Default Target Formats
   const [defaultFormats, setDefaultFormats] = useState({ 
     mp3: true, video: false, onyx: false, playlist: false, shazam: false, spotify: false, 
     prefix: false, suffix: true, autoSplit: false 
@@ -29,7 +44,7 @@ function App() {
     localStorage.setItem('onyx_shazam_settings', JSON.stringify(shazamSettings))
   }, [shazamSettings])
 
-  // Queue & Active Jobs Tracking
+  // Queue & Active Jobs
   const [queue, setQueue] = useState([])
   const [activeJobs, setActiveJobs] = useState({})
 
@@ -59,7 +74,7 @@ function App() {
     localStorage.setItem('onyx_dirs', JSON.stringify(directories))
   }, [directories])
 
-  // Dynamic Server Port Auto-Discovery
+  // Dynamic Server Port Auto-Discovery for Desktop Fallback
   const [serverPort, setServerPort] = useState(8000)
 
   useEffect(() => {
@@ -90,6 +105,29 @@ function App() {
     }
   }, [])
 
+  // Auto Check Shared YouTube Intent on Mobile App Launch & Resume
+  useEffect(() => {
+    const checkIntent = async () => {
+      try {
+        const shared = await invokeTauri('check_shared_intent')
+        if (shared) {
+          // Extract YouTube URL from shared text
+          const match = shared.match(/(https?:\/\/[^\s]+)/)
+          const extractedUrl = match ? match[1] : shared.trim()
+          if (extractedUrl) {
+            setUrl(extractedUrl)
+            handleUrlLoad(extractedUrl)
+          }
+        }
+      } catch (err) {
+        console.error('Check shared intent error:', err)
+      }
+    }
+    checkIntent()
+    const intentInterval = setInterval(checkIntent, 2000)
+    return () => clearInterval(intentInterval)
+  }, [])
+
   // Auto Check for Yt-dlp Updates
   useEffect(() => {
     const checkUpdates = async () => {
@@ -100,7 +138,7 @@ function App() {
           if (data.update_available) setUpdatesAvailable(true)
         }
       } catch (err) {
-        console.error('Failed to check yt-dlp updates:', err)
+        // Desktop update check
       }
     }
     checkUpdates()
@@ -171,34 +209,62 @@ function App() {
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
     setLoading(true)
+    
+    // 1. Try Native Tauri Rust Search (Native Mobile & Desktop)
+    const tauriRes = await invokeTauri('search_youtube', { q: searchQuery })
+    if (tauriRes && Array.isArray(tauriRes)) {
+      setSearchResults(tauriRes)
+      setVideoInfo(null)
+      setLoading(false)
+      return
+    }
+
+    // 2. HTTP Fallback to Python backend
     try {
       const res = await fetch(`http://localhost:${serverPort}/api/search?q=${encodeURIComponent(searchQuery)}`)
-      const data = await res.json()
-      setSearchResults(Array.isArray(data) ? data : data.results || [])
-      setVideoInfo(null)
-    } catch (e) {
-      console.error(e)
-    }
-    setLoading(false)
-  }
-
-  const handleUrlLoad = async () => {
-    if (!url.trim()) return
-    setLoading(true)
-    try {
-      const res = await fetch(`http://localhost:${serverPort}/api/info?url=${encodeURIComponent(url)}`)
-      const data = await res.json()
-      if (data.entries) {
-        setSearchResults(data.entries)
+      if (res.ok) {
+        const data = await res.json()
+        setSearchResults(Array.isArray(data) ? data : data.results || [])
         setVideoInfo(null)
-      } else {
-        setVideoInfo(data)
-        setSearchResults([])
       }
     } catch (e) {
-      console.error(e)
+      console.error('Search error:', e)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
+  }
+
+  const handleUrlLoad = async (inputUrl = url) => {
+    if (!inputUrl.trim()) return
+    setLoading(true)
+    
+    // 1. Try Native Tauri Rust Video Info (Native Mobile & Desktop)
+    const tauriInfo = await invokeTauri('get_info', { url: inputUrl })
+    if (tauriInfo && tauriInfo.title) {
+      setVideoInfo(tauriInfo)
+      setSearchResults([])
+      setLoading(false)
+      return
+    }
+
+    // 2. HTTP Fallback to Python backend
+    try {
+      const res = await fetch(`http://localhost:${serverPort}/api/info?url=${encodeURIComponent(inputUrl)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.entries) {
+          setSearchResults(data.entries)
+          setVideoInfo(null)
+        } else {
+          setVideoInfo(data)
+          setSearchResults([])
+        }
+      }
+    } catch (e) {
+      console.error('Url load error:', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handlePasteClipboard = async () => {
@@ -207,6 +273,9 @@ function App() {
         const text = await navigator.clipboard.readText()
         if (text) {
           setUrl(text)
+          if (text.includes('youtube.com') || text.includes('youtu.be')) {
+            handleUrlLoad(text)
+          }
         }
       }
     } catch (err) {
@@ -239,12 +308,13 @@ function App() {
       url: targetUrl,
       title: item.title,
       uploader: item.uploader || 'YouTube',
-      thumbnail: item.thumbnail || (item.thumbnails && item.thumbnails[0]?.url) || '',
+      thumbnail: item.thumbnail || (item.thumbnails && item.thumbnails[0]?.url) || `https://i.ytimg.com/vi/${extractVideoId(targetUrl)}/hqdefault.jpg`,
       formats: { ...defaultFormats },
       trimStart: '',
       trimEnd: ''
     }
     setQueue(prev => [...prev, newItem])
+    setMobileTab('queue') // Auto navigate to queue on mobile
   }
 
   const removeFromQueue = (internalId) => {
@@ -325,39 +395,52 @@ function App() {
       if (item.formats.playlist) selectedFormats.push('playlist')
       if (item.formats.shazam) selectedFormats.push('shazam')
       
-      if (selectedFormats.length === 0) continue
+      if (selectedFormats.length === 0) selectedFormats.push('mp3')
 
       setActiveJobs(prev => ({
         ...prev,
         [item.internalId]: { job_id: null, status_data: { status: 'queued', progress: 'Initializing...' } }
       }))
 
+      // 1. Try Native Tauri Download
+      const reqPayload = {
+        url: item.url,
+        formats: selectedFormats,
+        audio_dir: directories.audio_dir,
+        video_dir: directories.video_dir,
+        onyx_dir: directories.onyx_dir,
+        spotify: item.formats.spotify,
+        bpm_prefix: item.formats.prefix,
+        bpm_suffix: item.formats.suffix,
+        trim_start: item.trimStart || null,
+        trim_end: item.trimEnd || null,
+        auto_split: item.formats.autoSplit,
+        playlist: item.formats.playlist,
+        shazam_extract: item.formats.shazam,
+        shazam_sample_duration: parseInt(shazamSettings.sampleDuration) || 10,
+        shazam_sample_interval: parseInt(shazamSettings.sampleInterval) || 90
+      }
+
+      const jobId = await invokeTauri('start_download', { req: reqPayload })
+      if (jobId) {
+        setActiveJobs(prev => ({
+          ...prev,
+          [item.internalId]: { job_id: jobId, status_data: { status: 'downloading', progress: 'Downloading stream...' } }
+        }))
+        continue
+      }
+
+      // 2. HTTP Fallback to Python backend
       try {
         const res = await fetch(`http://localhost:${serverPort}/api/download`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: item.url,
-            formats: selectedFormats,
-            audio_dir: directories.audio_dir,
-            video_dir: directories.video_dir,
-            onyx_dir: directories.onyx_dir,
-            spotify: item.formats.spotify,
-            bpm_prefix: item.formats.prefix,
-            bpm_suffix: item.formats.suffix,
-            trim_start: item.trimStart || null,
-            trim_end: item.trimEnd || null,
-            auto_split: item.formats.autoSplit,
-            playlist: item.formats.playlist,
-            shazam_extract: item.formats.shazam,
-            shazam_sample_duration: parseInt(shazamSettings.sampleDuration) || 10,
-            shazam_sample_interval: parseInt(shazamSettings.sampleInterval) || 90
-          })
+          body: JSON.stringify(reqPayload)
         })
         const data = await res.json()
         setActiveJobs(prev => ({
           ...prev,
-          [item.internalId]: { job_id: data.job_id, status_data: { status: 'queued', progress: 'Waiting in backend queue...' } }
+          [item.internalId]: { job_id: data.job_id, status_data: { status: 'queued', progress: 'Waiting in queue...' } }
         }))
       } catch(e) {
         setActiveJobs(prev => ({
@@ -520,7 +603,7 @@ function App() {
           </div>
         )}
 
-        {/* Trimmer Modal (With YouTube Player & Start/End Capture) */}
+        {/* Trimmer Modal */}
         {trimModalItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <div className="glass-panel p-5 w-full max-w-2xl space-y-4">
@@ -586,7 +669,7 @@ function App() {
           </div>
         )}
 
-        {/* Main Application Layout (Responsive Tabs on Mobile, 2-Columns on Desktop) */}
+        {/* Main Application Layout */}
         <div className="flex flex-col lg:flex-row gap-6 flex-1">
           
           {/* Search & Inputs Panel */}
@@ -633,14 +716,14 @@ function App() {
                     >
                       <Clipboard className="w-3.5 h-3.5 text-purple-300" /> Paste
                     </button>
-                    <button onClick={handleUrlLoad} className="glow-button px-5 whitespace-nowrap text-xs">
+                    <button onClick={() => handleUrlLoad(url)} className="glow-button px-5 whitespace-nowrap text-xs">
                       Load
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Default Target Format Toggles (All 9 Features) */}
+              {/* Default Target Format Toggles */}
               <div className="pt-4 border-t border-slate-800/80">
                 <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Default Target Formats</h3>
                 <div className="flex flex-wrap gap-2">
@@ -741,7 +824,7 @@ function App() {
               </h2>
             </div>
 
-            {/* Batch Actions Bar (Apply to Entire List) */}
+            {/* Batch Actions Bar */}
             {queue.length > 0 && (
               <div className="p-3 bg-slate-950/80 border-b border-slate-800 flex flex-col gap-2">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Apply to entire list:</span>

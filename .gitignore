@@ -3,6 +3,10 @@ node_modules/
 dist/
 .DS_Store
 
+# PyInstaller Build
+build/
+*.spec
+
 # Rust / Tauri / Binaries
 src-tauri/target/
 src-tauri/gen/
