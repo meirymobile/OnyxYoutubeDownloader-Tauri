@@ -1,0 +1,17 @@
+# Node / React
+node_modules/
+dist/
+.DS_Store
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Python
+backend/venv/
+__pycache__/
+*.pyc
+port.json
+
+# Environment
+.env
