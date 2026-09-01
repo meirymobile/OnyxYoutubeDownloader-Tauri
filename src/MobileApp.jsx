@@ -382,14 +382,28 @@ export default function MobileApp() {
           </button>
         </div>
 
-        {/* Animated Mobile Waveform */}
-        <div className="w-full h-8 bg-slate-950/80 rounded-xl border border-slate-800/80 p-1 flex items-center justify-between gap-1 overflow-hidden">
-          {[40, 75, 50, 90, 60, 100, 50, 85, 65, 95, 40, 80, 55, 75, 90, 45, 85, 60, 95, 50, 75, 35, 85, 65].map((h, i) => (
-            <div 
-              key={i} 
-              className="flex-1 bg-gradient-to-t from-purple-600 via-pink-500 to-cyan-400 rounded-full transition-all duration-300"
-              style={{ height: `${h}%`, opacity: 0.8 }}
-            ></div>
+        {/* Animated Mobile Equalizer */}
+        <div className="w-full h-8 bg-slate-950/80 rounded-xl border border-slate-800/80 p-1 flex items-end justify-between gap-[2px] overflow-hidden">
+          {Array.from({ length: 30 }).map((_, i) => (
+            <div key={i} className="flex-1 flex flex-col-reverse gap-[1px] h-full justify-start">
+              {Array.from({ length: 6 }).map((_, r) => {
+                const hue = 190 - (r / 6) * 60; // Cyan to purple
+                // Randomize heights using a simple CSS animation delay approach
+                const isActive = Math.random() > (r / 6);
+                return (
+                  <div
+                    key={r}
+                    className="w-full h-[3px] rounded-[1px] transition-all duration-75"
+                    style={{
+                      backgroundColor: isActive ? `hsl(${hue}, 90%, 60%)` : '#1e293b',
+                      boxShadow: isActive ? `0 0 4px hsl(${hue}, 90%, 60%)` : 'none',
+                      animation: `eq-bounce ${0.5 + Math.random() * 0.5}s infinite alternate ease-in-out`,
+                      animationDelay: `${Math.random()}s`
+                    }}
+                  />
+                );
+              })}
+            </div>
           ))}
         </div>
       </header>

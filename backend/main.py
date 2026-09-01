@@ -1,10 +1,18 @@
+import os
+import sys
+
+# Fix for PyInstaller on macOS breaking system ffmpeg with dyld errors
+if getattr(sys, 'frozen', False) and 'DYLD_LIBRARY_PATH' in os.environ:
+    del os.environ['DYLD_LIBRARY_PATH']
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI, BackgroundTasks, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import uvicorn
 import argparse
-import os
 import uuid
 import threading
 import subprocess
@@ -12,11 +20,13 @@ import json
 from pydantic import BaseModel
 from typing import List, Optional
 
+
 from downloader import get_video_info, download_video
 from onyx_generator import generate_onyx_project
 from metadata_enricher import enrich_and_rename_file
 from splitter import split_album
 from playlist_generator import create_dj_playlist_pack, extract_track_info_from_file
+from shazam_extractor import extract_and_download_shazam_set
 
 app = FastAPI(title="OnyxYouTubeDownloader Backend")
 
@@ -78,7 +88,7 @@ threading.Thread(target=demucs_worker_loop, daemon=True).start()
 
 class DownloadRequest(BaseModel):
     url: str
-    formats: List[str] # e.g. ["mp3", "video", "onyx", "playlist"]
+    formats: List[str] # e.g. ["mp3", "video", "onyx", "playlist", "shazam"]
     audio_dir: Optional[str] = os.path.expanduser("~/Downloads/OnyxAudio")
     video_dir: Optional[str] = os.path.expanduser("~/Downloads/OnyxVideo")
     onyx_dir: Optional[str] = os.path.expanduser("~/Downloads/OnyxProjects")
@@ -89,78 +99,128 @@ class DownloadRequest(BaseModel):
     trim_end: Optional[str] = None
     auto_split: Optional[bool] = False
     playlist: Optional[bool] = False
+    shazam_extract: Optional[bool] = False
+    shazam_sample_duration: Optional[int] = 10
+    shazam_sample_interval: Optional[int] = 90
 
+
+from datetime import datetime
 
 def process_download(job_id: str, req: DownloadRequest):
-    DOWNLOAD_JOBS[job_id] = {"status": "processing", "progress": "Starting download..."}
+    DOWNLOAD_JOBS[job_id] = {
+        "status": "processing", 
+        "progress": "Starting download...",
+        "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] Job initialized."]
+    }
     
     # Expand ~ to actual home directory
     req.audio_dir = os.path.expanduser(req.audio_dir)
     req.video_dir = os.path.expanduser(req.video_dir)
     req.onyx_dir = os.path.expanduser(req.onyx_dir)
     
+    def log_msg(msg: str):
+        ts = datetime.now().strftime("%H:%M:%S")
+        line = f"[{ts}] {msg}"
+        DOWNLOAD_JOBS[job_id]["progress"] = msg
+        if "logs" not in DOWNLOAD_JOBS[job_id]:
+            DOWNLOAD_JOBS[job_id]["logs"] = []
+        # Avoid duplicate consecutive progress lines
+        if not DOWNLOAD_JOBS[job_id]["logs"] or DOWNLOAD_JOBS[job_id]["logs"][-1] != line:
+            DOWNLOAD_JOBS[job_id]["logs"].append(line)
+        if len(DOWNLOAD_JOBS[job_id]["logs"]) > 500:
+            DOWNLOAD_JOBS[job_id]["logs"].pop(0)
+
     def on_progress(d):
+        if DOWNLOAD_JOBS.get(job_id, {}).get("cancelled"):
+            raise RuntimeError("Job cancelled by user")
         if isinstance(d, dict) and d.get('status') == 'downloading':
             p = d.get('_percent_str', '').strip()
+            speed = d.get('_speed_str', '').strip()
+            eta = d.get('_eta_str', '').strip()
             if p:
-                DOWNLOAD_JOBS[job_id]["progress"] = f"Downloading: {p}"
+                text = f"Downloading: {p}"
+                if speed: text += f" ({speed})"
+                if eta: text += f" ETA {eta}"
+                log_msg(text)
         elif isinstance(d, str):
-            DOWNLOAD_JOBS[job_id]["progress"] = d
+            log_msg(d)
 
     try:
         video_downloaded_file = None
         if "video" in req.formats:
             os.makedirs(req.video_dir, exist_ok=True)
-            DOWNLOAD_JOBS[job_id]["progress"] = "Starting High Quality Video download..."
+            log_msg("Starting High Quality Video download...")
             video_downloaded_file = download_video(req.url, req.video_dir, format_type="video", progress_callback=on_progress, trim_start=req.trim_start, trim_end=req.trim_end)
             
         is_playlist_requested = "playlist" in req.formats or req.playlist
+        is_shazam_requested = "shazam" in req.formats or req.shazam_extract
         track_paths = []
         playlist_m3u8_file = None
 
-        if "mp3" in req.formats or "onyx" in req.formats or is_playlist_requested:
-            base_audio_dir = req.audio_dir if ("mp3" in req.formats or is_playlist_requested) else req.onyx_dir
+        if "mp3" in req.formats or "onyx" in req.formats or is_playlist_requested or is_shazam_requested:
+            base_audio_dir = req.audio_dir if ("mp3" in req.formats or is_playlist_requested or is_shazam_requested) else req.onyx_dir
             os.makedirs(base_audio_dir, exist_ok=True)
-            DOWNLOAD_JOBS[job_id]["progress"] = "Starting Audio download..."
+            log_msg("Starting Audio download...")
             audio_path = download_video(req.url, base_audio_dir, format_type="audio", progress_callback=on_progress, trim_start=req.trim_start, trim_end=req.trim_end)
             
-            # Handle Auto-Split
-            track_paths = [audio_path]
-            if req.auto_split:
-                DOWNLOAD_JOBS[job_id]["progress"] = "Fetching video info for chapters..."
-                info_dict = get_video_info(req.url)
-                track_paths = split_album(audio_path, info_dict, base_audio_dir, progress_callback=on_progress)
-            
-            # Enrich and rename if requested
-            if "mp3" in req.formats or is_playlist_requested or (req.bpm_prefix or req.bpm_suffix or req.spotify):
-                enriched_paths = []
-                for track in track_paths:
-                    enriched = enrich_and_rename_file(
-                        track, 
-                        spotify=req.spotify, 
-                        bpm_prefix=req.bpm_prefix, 
-                        bpm_suffix=req.bpm_suffix, 
-                        progress_callback=on_progress
-                    )
-                    enriched_paths.append(enriched)
-                track_paths = enriched_paths
-            
-            # Generate DJ Playlist Pack if requested
-            if is_playlist_requested and track_paths:
-                DOWNLOAD_JOBS[job_id]["progress"] = "Generating DJ Playlist Pack (.m3u8, .cue, .txt)..."
-                target_dir = os.path.dirname(track_paths[0])
-                album_name = os.path.basename(target_dir) if target_dir != base_audio_dir else os.path.splitext(os.path.basename(track_paths[0]))[0]
+            # Handle Shazam AI Recognition & Individual Track Extraction if requested
+            if is_shazam_requested:
+                log_msg("Starting Shazam AI set recognition...")
+                shazam_res = extract_and_download_shazam_set(
+                    set_audio_path=audio_path,
+                    output_dir=base_audio_dir,
+                    sample_duration=req.shazam_sample_duration or 10,
+                    sample_interval=req.shazam_sample_interval or 90,
+                    spotify=req.spotify,
+                    bpm_prefix=req.bpm_prefix,
+                    bpm_suffix=req.bpm_suffix,
+                    progress_callback=on_progress
+                )
+                track_paths = shazam_res.get("tracks", [])
+                playlist_m3u8_file = shazam_res.get("playlist_m3u8")
+            else:
+                # Handle Auto-Split
+                track_paths = [audio_path]
+                if req.auto_split:
+                    log_msg("Fetching video info for chapters...")
+                    info_dict = get_video_info(req.url)
+                    track_paths = split_album(audio_path, info_dict, base_audio_dir, progress_callback=on_progress)
                 
-                tracks_info = []
-                current_time = 0.0
-                for track in track_paths:
-                    t_info = extract_track_info_from_file(track, start_time=current_time)
-                    tracks_info.append(t_info)
-                    current_time += t_info.get("duration", 0.0)
+                # Enrich and rename if requested
+                if "mp3" in req.formats or is_playlist_requested or (req.bpm_prefix or req.bpm_suffix or req.spotify):
+                    enriched_paths = []
+                    for track in track_paths:
+                        enriched = enrich_and_rename_file(
+                            track, 
+                            spotify=req.spotify, 
+                            bpm_prefix=req.bpm_prefix, 
+                            bpm_suffix=req.bpm_suffix, 
+                            progress_callback=on_progress
+                        )
+                        enriched_paths.append(enriched)
+                    track_paths = enriched_paths
+                
+                # Generate DJ Playlist Pack if requested
+                if is_playlist_requested and track_paths:
+                    log_msg("Generating DJ Playlist Pack (.m3u8, .cue, .txt)...")
+                    target_dir = os.path.dirname(track_paths[0])
+                    album_name = os.path.basename(target_dir) if target_dir != base_audio_dir else os.path.splitext(os.path.basename(track_paths[0]))[0]
                     
-                pack_files = create_dj_playlist_pack(target_dir, album_name, tracks_info)
-                playlist_m3u8_file = pack_files["m3u8"]
+                    tracks_info = []
+                    current_time = 0.0
+                    for track in track_paths:
+                        t_info = extract_track_info_from_file(track, start_time=current_time)
+                        tracks_info.append(t_info)
+                        current_time += t_info.get("duration", 0.0)
+                        
+                    pack_files = create_dj_playlist_pack(target_dir, album_name, tracks_info)
+                    playlist_m3u8_file = pack_files["m3u8"]
             
+        if DOWNLOAD_JOBS.get(job_id, {}).get("cancelled"):
+            DOWNLOAD_JOBS[job_id]["status"] = "cancelled"
+            log_msg("⛔ Job explicitly cancelled by user.")
+            return
+
         # Complete primary download phase (Audio / Video / Playlist) immediately
         DOWNLOAD_JOBS[job_id]["status"] = "completed"
         
@@ -179,19 +239,28 @@ def process_download(job_id: str, req: DownloadRequest):
         if "onyx" in req.formats and track_paths:
             keep_mp3 = ("mp3" in req.formats or is_playlist_requested)
             DEMUCS_QUEUE.put((job_id, track_paths, req.onyx_dir, keep_mp3))
-            DOWNLOAD_JOBS[job_id]["progress"] = "Done! (Queued for ONYX Stems AI...)"
+            log_msg("Done! (Queued for ONYX Stems AI...)")
         else:
-            DOWNLOAD_JOBS[job_id]["progress"] = "Done!"
+            log_msg("Done!")
 
     except Exception as e:
-        DOWNLOAD_JOBS[job_id]["status"] = "error"
-        DOWNLOAD_JOBS[job_id]["progress"] = str(e)
+        if DOWNLOAD_JOBS.get(job_id, {}).get("cancelled"):
+            DOWNLOAD_JOBS[job_id]["status"] = "cancelled"
+            log_msg("⛔ Job explicitly cancelled by user.")
+        else:
+            DOWNLOAD_JOBS[job_id]["status"] = "error"
+            log_msg(f"ERROR: {e}")
 
-
-
-    except Exception as e:
-        DOWNLOAD_JOBS[job_id]["status"] = "error"
-        DOWNLOAD_JOBS[job_id]["progress"] = str(e)
+@app.post("/api/download/cancel/{job_id}")
+def cancel_download_job(job_id: str):
+    if job_id in DOWNLOAD_JOBS:
+        DOWNLOAD_JOBS[job_id]["cancelled"] = True
+        DOWNLOAD_JOBS[job_id]["status"] = "cancelled"
+        ts = datetime.now().strftime("%H:%M:%S")
+        if "logs" in DOWNLOAD_JOBS[job_id]:
+            DOWNLOAD_JOBS[job_id]["logs"].append(f"[{ts}] ⛔ Cancellation requested by user.")
+        return {"status": "cancelled", "job_id": job_id}
+    raise HTTPException(status_code=404, detail="Job not found")
 
 @app.get("/api/health")
 def health_check():

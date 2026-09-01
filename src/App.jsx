@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { 
   Search, Download, Music, Video, Sparkles, MonitorPlay, CheckCircle, Clock, Settings, 
   UserCircle, Play, X, Trash2, ListPlus, MapPin, FolderOpen, ListMusic, Clipboard, 
-  Radio, Disc, Scissors, Layers, Check, RefreshCw
+  Radio, Disc, Scissors, Layers, Check, RefreshCw, Terminal, XCircle, CheckCheck
 } from 'lucide-react'
 import YouTube from 'react-youtube'
+import OnyxPlayer from './OnyxPlayer'
 
 // Tauri IPC Invoker Helper (Works on both Native Mobile & Desktop Web Server)
 const isTauri = () => typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.__TAURI__)
@@ -21,6 +22,147 @@ const invokeTauri = async (cmd, args = {}) => {
   return null
 }
 
+function DJSoftwareWaveform({ isProcessing, analyserNode, isPlaying }) {
+  const canvasRef = useRef(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    let animationFrameId
+    
+    // Equalizer configuration
+    const barWidth = 6
+    const barSpacing = 3
+    const rowHeight = 3
+    const rowSpacing = 2
+    
+    const bars = []
+    
+    const offCanvas = document.createElement('canvas')
+    const offCtx = offCanvas.getContext('2d')
+    let textOffset = 0
+    const textStr = "ONYX DOWNLOADER BY DJ SHAZZ      "
+    
+    let frequencyData = null;
+    if (analyserNode) {
+      frequencyData = new Uint8Array(analyserNode.frequencyBinCount);
+    }
+    
+    const render = (now) => {
+      animationFrameId = requestAnimationFrame(render)
+      
+      const rect = canvas.getBoundingClientRect()
+      if (canvas.width !== rect.width || canvas.height !== rect.height) {
+        canvas.width = rect.width
+        canvas.height = rect.height
+        offCanvas.width = rect.width
+        offCanvas.height = rect.height
+      }
+      
+      const width = canvas.width
+      const height = canvas.height
+      
+      // Clear background
+      ctx.fillStyle = '#050507'
+      ctx.fillRect(0, 0, width, height)
+      
+      const numBars = Math.floor(width / (barWidth + barSpacing))
+      if (bars.length !== numBars) {
+        bars.length = 0
+        for (let i = 0; i < numBars; i++) {
+          bars.push({
+            phase: Math.random() * Math.PI * 2,
+            speed: 0.002 + Math.random() * 0.003
+          })
+        }
+      }
+      
+      const numRows = Math.floor(height / (rowHeight + rowSpacing))
+      
+      if (isPlaying && analyserNode && frequencyData) {
+        analyserNode.getByteFrequencyData(frequencyData);
+      } else {
+        // Draw scrolling text to offscreen canvas
+        textOffset -= 2.0;
+        offCtx.clearRect(0, 0, width, height)
+        offCtx.fillStyle = 'white'
+        offCtx.font = '900 52px "Inter", sans-serif'
+        offCtx.textAlign = 'left'
+        offCtx.textBaseline = 'middle'
+        
+        const textWidth = offCtx.measureText(textStr).width
+        if (textOffset < -textWidth) textOffset = 0
+        
+        for(let i=0; i<4; i++) {
+            offCtx.fillText(textStr, textOffset + (textWidth * i), height / 2 + 4)
+        }
+      }
+      
+      const textPixels = !isPlaying ? offCtx.getImageData(0, 0, width, height).data : null;
+      
+      for (let i = 0; i < numBars; i++) {
+        const bar = bars[i]
+        bar.phase += bar.speed * (isProcessing ? 4.0 : 1.5)
+        
+        let activeRows = 0;
+        let activeRowsProcessing = 0;
+        
+        if (isPlaying && frequencyData) {
+          const freqIndex = Math.floor((i / numBars) * (frequencyData.length * 0.6));
+          const val = frequencyData[freqIndex] || 0;
+          const energy = Math.pow(val / 255.0, 1.2); 
+          activeRows = Math.floor(energy * numRows);
+        } else if (isProcessing) {
+          let energy = Math.abs(Math.sin(bar.phase)) * Math.abs(Math.cos(bar.phase * 0.4 + i * 0.2))
+          activeRowsProcessing = Math.floor(energy * numRows)
+        }
+        
+        for (let r = 0; r < numRows; r++) {
+          const y = height - (r + 1) * (rowHeight + rowSpacing) - Math.floor((height % (rowHeight + rowSpacing)) / 2)
+          const x = i * (barWidth + barSpacing) + Math.floor((width % (barWidth + barSpacing)) / 2)
+          
+          let isActive = false;
+          if (isPlaying) {
+            isActive = (r < activeRows);
+          } else {
+            // Text rendering
+            const px = x + Math.floor(barWidth / 2);
+            const py = y + Math.floor(rowHeight / 2);
+            if (px >= 0 && px < width && py >= 0 && py < height) {
+              const alpha = textPixels[(py * width + px) * 4 + 3];
+              if (alpha > 128) isActive = true;
+            }
+            if (!isActive && isProcessing && r < activeRowsProcessing) isActive = true;
+          }
+          
+          if (isActive) {
+            const hue = 190 - (r / numRows) * 60 
+            ctx.fillStyle = `hsl(${hue}, 90%, 60%)`
+            ctx.shadowColor = `hsl(${hue}, 90%, 60%)`
+            ctx.shadowBlur = 5
+          } else {
+            ctx.fillStyle = '#1e293b' 
+            ctx.shadowBlur = 0
+          }
+          
+          ctx.fillRect(x, y, barWidth, rowHeight)
+        }
+      }
+      ctx.shadowBlur = 0 
+    }
+
+    animationFrameId = requestAnimationFrame(render)
+    return () => cancelAnimationFrame(animationFrameId)
+  }, [isProcessing, analyserNode, isPlaying])
+
+  return (
+    <div className="w-full h-16 bg-[#050507] rounded-xl border border-slate-800 overflow-hidden relative shadow-2xl flex items-center p-1">
+      <canvas ref={canvasRef} className="w-full h-full block" />
+    </div>
+  )
+}
+
 function App() {
   const [url, setUrl] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -28,6 +170,78 @@ function App() {
   const [searchResults, setSearchResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [mobileTab, setMobileTab] = useState('search') // 'search', 'queue', 'settings'
+  
+  // Internal Player & Web Audio API
+  const [internalPlayer, setInternalPlayer] = useState({ src: null, name: '', playing: false });
+  const [activeOnyxStems, setActiveOnyxStems] = useState(null);
+  const [activeAnalyser, setActiveAnalyser] = useState(null);
+  const [audioProgress, setAudioProgress] = useState({ currentTime: 0, duration: 0 });
+
+  const formatTime = (time) => {
+    if (!time || isNaN(time)) return '0:00';
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleSeek = (e) => {
+    const time = parseFloat(e.target.value);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+      setAudioProgress(prev => ({ ...prev, currentTime: time }));
+    }
+  };
+  const audioRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const analyserRef = useRef(null);
+
+  const initAudio = () => {
+    if (!audioCtxRef.current) {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      
+      const source = audioCtx.createMediaElementSource(audioRef.current);
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      
+      audioCtxRef.current = audioCtx;
+      analyserRef.current = analyser;
+      setActiveAnalyser(analyser);
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+  };
+
+  const playInternalAudio = async (filePath, name) => {
+    try {
+      const { convertFileSrc } = await import('@tauri-apps/api/core');
+      const assetUrl = convertFileSrc(filePath);
+      setInternalPlayer({ src: assetUrl, name, playing: true });
+      setTimeout(() => {
+         initAudio();
+         if (audioRef.current) {
+           audioRef.current.play().catch(e => console.error("Play error:", e));
+         }
+      }, 50);
+    } catch (e) {
+      console.error("Failed to load audio", e);
+    }
+  };
+
+  const toggleInternalPlay = () => {
+    if (audioRef.current) {
+      if (internalPlayer.playing) {
+        audioRef.current.pause();
+        setInternalPlayer(prev => ({ ...prev, playing: false }));
+      } else {
+        initAudio();
+        audioRef.current.play().catch(e => console.error("Play error:", e));
+        setInternalPlayer(prev => ({ ...prev, playing: true }));
+      }
+    }
+  };
   
   // Default Target Formats
   const [defaultFormats, setDefaultFormats] = useState({ 
@@ -66,6 +280,8 @@ function App() {
   // Modals
   const [previewVideoId, setPreviewVideoId] = useState(null)
   const [trimModalItem, setTrimModalItem] = useState(null)
+  const [showLogsModalItem, setShowLogsModalItem] = useState(null)
+  const logsEndRef = useRef(null)
   const [trimStart, setTrimStart] = useState('')
   const [trimEnd, setTrimEnd] = useState('')
   const [ytPlayer, setYtPlayer] = useState(null)
@@ -192,6 +408,12 @@ function App() {
 
     return () => clearInterval(interval)
   }, [serverPort])
+
+  useEffect(() => {
+    if (showLogsModalItem && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [activeJobs, showLogsModalItem])
 
   const handleOpenPath = async (path) => {
     if (!path) return
@@ -384,71 +606,122 @@ function App() {
     })))
   }
 
-  const startBatchDownload = async () => {
-    const unstartedItems = queue.filter(item => !activeJobs[item.internalId])
+  const retrySingleItem = (item) => {
+    setActiveJobs(prev => {
+      const copy = { ...prev }
+      delete copy[item.internalId]
+      return copy
+    })
+    setTimeout(() => {
+      startSingleDownload(item)
+    }, 50)
+  }
+
+  const startSingleDownload = async (item) => {
+    const selectedFormats = []
+    if (item.formats.video) selectedFormats.push('video')
+    if (item.formats.mp3) selectedFormats.push('mp3')
+    if (item.formats.onyx) selectedFormats.push('onyx')
+    if (item.formats.playlist) selectedFormats.push('playlist')
+    if (item.formats.shazam) selectedFormats.push('shazam')
     
-    for (const item of unstartedItems) {
-      const selectedFormats = []
-      if (item.formats.video) selectedFormats.push('video')
-      if (item.formats.mp3) selectedFormats.push('mp3')
-      if (item.formats.onyx) selectedFormats.push('onyx')
-      if (item.formats.playlist) selectedFormats.push('playlist')
-      if (item.formats.shazam) selectedFormats.push('shazam')
-      
-      if (selectedFormats.length === 0) selectedFormats.push('mp3')
+    if (selectedFormats.length === 0) selectedFormats.push('mp3')
 
-      setActiveJobs(prev => ({
-        ...prev,
-        [item.internalId]: { job_id: null, status_data: { status: 'queued', progress: 'Initializing...' } }
-      }))
+    setActiveJobs(prev => ({
+      ...prev,
+      [item.internalId]: { job_id: null, status_data: { status: 'queued', progress: 'Initializing...' } }
+    }))
 
-      // 1. Try Native Tauri Download
-      const reqPayload = {
-        url: item.url,
-        formats: selectedFormats,
-        audio_dir: directories.audio_dir,
-        video_dir: directories.video_dir,
-        onyx_dir: directories.onyx_dir,
-        spotify: item.formats.spotify,
-        bpm_prefix: item.formats.prefix,
-        bpm_suffix: item.formats.suffix,
-        trim_start: item.trimStart || null,
-        trim_end: item.trimEnd || null,
-        auto_split: item.formats.autoSplit,
-        playlist: item.formats.playlist,
-        shazam_extract: item.formats.shazam,
-        shazam_sample_duration: parseInt(shazamSettings.sampleDuration) || 10,
-        shazam_sample_interval: parseInt(shazamSettings.sampleInterval) || 90
-      }
+    const reqPayload = {
+      url: item.url,
+      formats: selectedFormats,
+      audio_dir: directories.audio_dir,
+      video_dir: directories.video_dir,
+      onyx_dir: directories.onyx_dir,
+      spotify: item.formats.spotify,
+      bpm_prefix: item.formats.prefix,
+      bpm_suffix: item.formats.suffix,
+      trim_start: item.trimStart || null,
+      trim_end: item.trimEnd || null,
+      auto_split: item.formats.autoSplit,
+      playlist: item.formats.playlist,
+      shazam_extract: item.formats.shazam,
+      shazam_sample_duration: parseInt(shazamSettings.sampleDuration) || 10,
+      shazam_sample_interval: parseInt(shazamSettings.sampleInterval) || 90
+    }
 
-      const jobId = await invokeTauri('start_download', { req: reqPayload })
-      if (jobId) {
-        setActiveJobs(prev => ({
-          ...prev,
-          [item.internalId]: { job_id: jobId, status_data: { status: 'downloading', progress: 'Downloading stream...' } }
-        }))
-        continue
-      }
-
-      // 2. HTTP Fallback to Python backend
+    if (window.__TAURI__ && window.__TAURI__.core) {
       try {
-        const res = await fetch(`http://localhost:${serverPort}/api/download`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(reqPayload)
-        })
-        const data = await res.json()
+        const jobId = await window.__TAURI__.core.invoke('start_download', { req: reqPayload })
         setActiveJobs(prev => ({
           ...prev,
-          [item.internalId]: { job_id: data.job_id, status_data: { status: 'queued', progress: 'Waiting in queue...' } }
+          [item.internalId]: { job_id: jobId, status_data: { status: 'processing', progress: 'Download Started...' } }
         }))
-      } catch(e) {
-        setActiveJobs(prev => ({
-          ...prev,
-          [item.internalId]: { job_id: null, status_data: { status: 'error', progress: 'Network error submitting job' } }
-        }))
+        return
+      } catch (tauriErr) {
+        console.warn('Tauri native download failed, falling back to Python HTTP API:', tauriErr)
       }
     }
+
+    try {
+      const res = await fetch(`http://localhost:${serverPort}/api/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reqPayload)
+      })
+      const data = await res.json()
+      if (data.job_id) {
+        setActiveJobs(prev => ({
+          ...prev,
+          [item.internalId]: { job_id: data.job_id, status_data: { status: 'processing', progress: 'Download Started...' } }
+        }))
+      }
+    } catch (apiErr) {
+      console.error('API Download request failed:', apiErr)
+      setActiveJobs(prev => ({
+        ...prev,
+        [item.internalId]: { job_id: null, status_data: { status: 'error', progress: 'Failed to connect to backend server' } }
+      }))
+    }
+  }
+
+  const startBatchDownload = async () => {
+    const unstartedItems = queue.filter(item => {
+      const st = activeJobs[item.internalId]?.status_data?.status
+      return !activeJobs[item.internalId] || st === 'error' || st === 'cancelled'
+    })
+    
+    for (const item of unstartedItems) {
+      await startSingleDownload(item)
+    }
+  }
+
+  const cancelDownloadJob = async (internalId, jobId) => {
+    if (jobId) {
+      try {
+        await fetch(`http://localhost:${serverPort}/api/download/cancel/${jobId}`, { method: 'POST' })
+      } catch (e) {
+        console.error('Cancel request failed:', e)
+      }
+    }
+    setActiveJobs(prev => ({
+      ...prev,
+      [internalId]: {
+        ...prev[internalId],
+        status_data: { 
+          ...(prev[internalId]?.status_data || {}), 
+          status: 'cancelled', 
+          progress: 'Cancelled by user' 
+        }
+      }
+    }))
+  }
+
+  const clearCompletedQueue = () => {
+    setQueue(prev => prev.filter(item => {
+      const st = activeJobs[item.internalId]?.status_data?.status
+      return st !== 'completed' && st !== 'cancelled'
+    }))
   }
 
   const getProgressPercent = (statusData) => {
@@ -478,13 +751,19 @@ function App() {
               />
               <div>
                 <h1 className="text-lg md:text-2xl font-black tracking-wider bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent uppercase">
-                  ONYX <span className="font-light text-slate-300">STUDIO</span>
+                  ONYX <span className="font-light text-slate-300">EXTRACTOR</span>
                 </h1>
                 <p className="text-[9px] md:text-xs text-slate-400 font-mono tracking-widest hidden sm:block">PRO AUDIO & VIDEO EXTRACTOR</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setActiveOnyxStems("SELECT_FOLDER")} 
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-cyan-500 hover:opacity-90 rounded-xl text-xs font-bold text-white shadow-[0_0_10px_rgba(168,85,247,0.4)] transition-all"
+              >
+                <ListMusic className="w-4 h-4" /> Onyx Player
+              </button>
               <button 
                 onClick={() => alert("Google OAuth Login will open here")} 
                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-xl text-xs font-semibold border border-slate-800 transition-all"
@@ -500,17 +779,12 @@ function App() {
             </div>
           </div>
 
-          {/* Animated Spectrum Waveform Header */}
-          <div className="w-full h-10 bg-slate-950/80 rounded-xl border border-slate-800/80 p-1.5 flex items-center justify-between gap-1 overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-cyan-500/10 to-emerald-500/10 pointer-events-none"></div>
-            {[35, 70, 45, 90, 60, 100, 50, 85, 65, 95, 40, 80, 55, 75, 90, 45, 85, 60, 95, 50, 75, 35, 85, 65, 100, 45, 90, 55, 70, 40, 85, 60, 95, 50].map((h, i) => (
-              <div 
-                key={i} 
-                className="flex-1 bg-gradient-to-t from-purple-600 via-pink-500 to-cyan-400 rounded-full transition-all duration-300"
-                style={{ height: `${h}%`, opacity: 0.7 + (i % 3) * 0.1 }}
-              ></div>
-            ))}
-          </div>
+          {/* Animated Rekordbox/Serato DJ Waveform Display */}
+          <DJSoftwareWaveform 
+            isProcessing={queue.some(i => ['downloading', 'extracting', 'shazam', 'processing'].includes(activeJobs[i.internalId]?.status_data?.status))} 
+            analyserNode={activeAnalyser}
+            isPlaying={internalPlayer.playing}
+          />
         </header>
 
         {/* Plugin Update Banner */}
@@ -669,6 +943,45 @@ function App() {
           </div>
         )}
 
+        {/* Live Terminal Logs Console Modal */}
+        {showLogsModalItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <div className="glass-panel p-5 w-full max-w-3xl space-y-3.5 border border-purple-500/30 shadow-2xl">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>
+                  <h2 className="text-xs md:text-sm font-bold text-emerald-400 font-mono flex items-center gap-2 truncate">
+                    <Terminal className="w-4 h-4 text-emerald-400 shrink-0" /> Process Terminal Logs — {showLogsModalItem.title}
+                  </h2>
+                </div>
+                <button onClick={() => setShowLogsModalItem(null)} className="p-1 text-slate-400 hover:text-white shrink-0"><X className="w-5 h-5" /></button>
+              </div>
+
+              {/* Console Output Window */}
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-[11px] md:text-xs text-emerald-300 h-80 md:h-96 overflow-y-auto space-y-1 shadow-inner custom-scrollbar">
+                {activeJobs[showLogsModalItem.internalId]?.status_data?.logs?.length > 0 ? (
+                  activeJobs[showLogsModalItem.internalId].status_data.logs.map((logLine, idx) => (
+                    <div key={idx} className="leading-relaxed hover:bg-slate-900/60 px-1.5 py-0.5 rounded transition-colors flex items-start gap-2">
+                      <span className="text-purple-400 select-none shrink-0">&gt;</span>
+                      <span className={logLine.includes('ERROR') ? 'text-rose-400 font-bold' : logLine.includes('★') ? 'text-amber-300 font-bold' : 'text-slate-200'}>
+                        {logLine}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-slate-500 italic py-12 text-center">No logs generated yet. Starting process...</div>
+                )}
+                <div ref={logsEndRef} />
+              </div>
+
+              <div className="flex justify-between items-center pt-1 text-[11px] text-slate-400 font-mono">
+                <span className="truncate pr-2">Current Status: <strong className="text-purple-300">{activeJobs[showLogsModalItem.internalId]?.status_data?.progress || 'Running...'}</strong></span>
+                <button onClick={() => setShowLogsModalItem(null)} className="glow-button px-5 py-1.5 text-xs font-sans shrink-0">Close Console</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Application Layout */}
         <div className="flex flex-col lg:flex-row gap-6 flex-1">
           
@@ -822,6 +1135,26 @@ function App() {
                 <Download className="w-4 h-4 text-cyan-400" />
                 Download Queue ({queue.length})
               </h2>
+              {queue.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  {queue.some(i => ['completed', 'cancelled'].includes(activeJobs[i.internalId]?.status_data?.status)) && (
+                    <button 
+                      onClick={clearCompletedQueue} 
+                      className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 font-bold transition-all shadow"
+                      title="Remove finished and cancelled items from queue"
+                    >
+                      <CheckCheck className="w-3.5 h-3.5 text-emerald-400" /> Clear Finished 🧹
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setShowLogsModalItem(queue.find(i => activeJobs[i.internalId]) || queue[0])} 
+                    className="text-[10px] bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 px-2 py-1 rounded-lg border border-emerald-500/40 flex items-center gap-1 font-mono font-bold transition-all shadow"
+                    title="Open Live Terminal Logs"
+                  >
+                    <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Live Logs 📟
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Batch Actions Bar */}
@@ -894,16 +1227,21 @@ function App() {
                               </span>
                             )}
                           </div>
-                          {!job && (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button onClick={() => openTrimModal(item)} className="text-slate-400 hover:text-purple-400 transition-colors p-1 rounded" title="Trim Segment">
-                                <Scissors className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => removeFromQueue(item.internalId)} className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded" title="Remove">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={() => setShowLogsModalItem(item)} className="text-[10px] bg-slate-900 hover:bg-purple-900/40 text-purple-300 hover:text-purple-200 px-1.5 py-0.5 rounded border border-purple-500/30 flex items-center gap-1 transition-all" title="View Live Process Logs">
+                              <Terminal className="w-3 h-3 text-purple-400" /> Logs 📟
+                            </button>
+                            {!job && (
+                              <>
+                                <button onClick={() => openTrimModal(item)} className="text-slate-400 hover:text-purple-400 transition-colors p-1 rounded" title="Trim Segment">
+                                  <Scissors className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => removeFromQueue(item.internalId)} className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded" title="Remove">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
 
                         {/* Inline Item Format Badges Toggle */}
@@ -944,22 +1282,67 @@ function App() {
                         ) : (
                           <div className="mt-2 space-y-1.5">
                             <div className="flex justify-between items-center text-[10px]">
-                              <span className="text-purple-300 font-medium truncate pr-2">{statusData?.progress || 'Processing...'}</span>
-                              {statusData?.status === 'completed' ? (
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  {statusData.result_file && (
-                                    <button onClick={() => handleOpenPath(statusData.result_file)} className="text-[10px] bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors">
-                                      <Play className="w-3 h-3" /> Play
+                              <span className="text-purple-300 font-medium truncate pr-2">
+                                {statusData?.status === 'completed' && statusData.result_file ? statusData.result_file.split(/[\\/]/).pop() : statusData?.progress || 'Processing...'}
+                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {statusData?.status === 'completed' ? (
+                                  <>
+                                    {statusData.result_file && (
+                                      <button 
+                                        onClick={() => {
+                                          if (statusData.result_file.endsWith('.mp3')) {
+                                            playInternalAudio(statusData.result_file, item.title || 'Track');
+                                          } else {
+                                            handleOpenPath(statusData.result_file);
+                                          }
+                                        }} 
+                                        className="text-[10px] bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors"
+                                      >
+                                        <Play className="w-3 h-3" /> Play
+                                      </button>
+                                    )}
+                                    {statusData.result_file && (
+                                      <button onClick={() => handleOpenPath(statusData.result_file)} className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors">
+                                        <FolderOpen className="w-3 h-3" /> Folder
+                                      </button>
+                                    )}
+                                    {statusData.result_dir && (
+                                      <>
+                                        <button onClick={() => handleOpenPath(statusData.result_dir)} className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors">
+                                          <FolderOpen className="w-3 h-3" /> Folder
+                                        </button>
+                                        <button 
+                                          onClick={() => setActiveOnyxStems(statusData.result_dir)} 
+                                          className="text-[10px] bg-gradient-to-r from-purple-600 to-cyan-500 hover:opacity-90 text-white font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-[0_0_10px_rgba(168,85,247,0.4)] transition-all"
+                                        >
+                                          <ListMusic className="w-3 h-3" /> Onyx Player
+                                        </button>
+                                      </>
+                                    )}
+                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                  </>
+                                ) : statusData?.status === 'cancelled' ? (
+                                  <button onClick={() => retrySingleItem(item)} className="text-[10px] bg-amber-600 hover:bg-amber-500 text-white font-bold px-2 py-0.5 rounded flex items-center gap-1 transition-all active:scale-95 shadow">
+                                    <RefreshCw className="w-3 h-3" /> Resume 🔄
+                                  </button>
+                                ) : statusData?.status === 'error' ? (
+                                  <button onClick={() => retrySingleItem(item)} className="text-[10px] bg-rose-600 hover:bg-rose-500 text-white font-bold px-2 py-0.5 rounded flex items-center gap-1 transition-all active:scale-95 shadow">
+                                    <RefreshCw className="w-3 h-3 animate-spin-hover" /> Retry 🔄
+                                  </button>
+                                ) : (
+                                  <>
+                                    <span className="font-mono text-cyan-300 font-bold">{percent.toFixed(0)}%</span>
+                                    <button 
+                                      onClick={() => cancelDownloadJob(item.internalId, job?.job_id)} 
+                                      className="text-[9px] bg-rose-600/80 hover:bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded flex items-center gap-1 transition-all active:scale-95 shadow"
+                                      title="Cancel Process"
+                                    >
+                                      <XCircle className="w-3 h-3" /> Cancel ⛔
                                     </button>
-                                  )}
-                                  {statusData.result_dir && (
-                                    <button onClick={() => handleOpenPath(statusData.result_dir)} className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors">
-                                      <FolderOpen className="w-3 h-3" /> Folder
-                                    </button>
-                                  )}
-                                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                                </div>
-                              ) : <span className="font-mono text-cyan-300 font-bold">{percent.toFixed(0)}%</span>}
+                                  </>
+                                )}
+                              </div>
                             </div>
                             <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-800">
                               <div className={`h-full rounded-full transition-all duration-300 ${statusData?.status === 'completed' ? 'bg-emerald-400' : 'bg-purple-500'}`} style={{ width: `${percent}%` }}></div>
@@ -988,6 +1371,65 @@ function App() {
           
         </div>
       </div>
+
+      {/* Internal Audio Player */}
+      <audio 
+        ref={audioRef} 
+        src={internalPlayer.src} 
+        crossOrigin="anonymous"
+        onTimeUpdate={(e) => setAudioProgress(prev => ({ ...prev, currentTime: e.target.currentTime }))}
+        onLoadedMetadata={(e) => setAudioProgress({ currentTime: e.target.currentTime, duration: e.target.duration })}
+        onEnded={() => setInternalPlayer(prev => ({ ...prev, playing: false }))}
+      />
+      {internalPlayer.src && (
+        <div className="fixed bottom-14 lg:bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-lg bg-slate-900/95 backdrop-blur-xl border border-slate-700 p-3 rounded-2xl shadow-2xl z-50 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 overflow-hidden flex-1">
+            <button 
+              onClick={toggleInternalPlay} 
+              className="w-10 h-10 shrink-0 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition-all"
+            >
+              {internalPlayer.playing ? (
+                <div className="w-3 h-3 bg-white flex justify-between"><div className="w-[4px] bg-white h-full"/><div className="w-[4px] bg-white h-full"/></div>
+              ) : (
+                <Play className="w-5 h-5 ml-1" fill="currentColor" />
+              )}
+            </button>
+            <div className="flex flex-col overflow-hidden flex-1 mr-2">
+              <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Now Playing</span>
+              <span className="text-xs font-semibold text-white truncate">{internalPlayer.name}</span>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[9px] text-slate-400 font-medium min-w-[24px] text-right">{formatTime(audioProgress.currentTime)}</span>
+                <input 
+                  type="range" 
+                  min={0} 
+                  max={audioProgress.duration || 100} 
+                  value={audioProgress.currentTime} 
+                  onChange={handleSeek}
+                  className="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer accent-purple-500"
+                />
+                <span className="text-[9px] text-slate-400 font-medium min-w-[24px]">{formatTime(audioProgress.duration)}</span>
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={() => {
+              if(audioRef.current) audioRef.current.pause();
+              setInternalPlayer({ src: null, name: '', playing: false });
+            }}
+            className="p-1.5 shrink-0 rounded-full hover:bg-slate-800 text-slate-400 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Onyx Player Overlay */}
+      {activeOnyxStems && (
+        <OnyxPlayer 
+          stemsPath={activeOnyxStems} 
+          onClose={() => setActiveOnyxStems(null)} 
+        />
+      )}
 
       {/* Mobile Navigation Bar */}
       <nav className="fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-6 py-2 flex justify-around items-center z-40 lg:hidden">

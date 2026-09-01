@@ -1,6 +1,7 @@
 import yt_dlp
 import os
-from yt_dlp.utils import download_range_func
+import time
+from yt_dlp.utils import download_range_func, DownloadError
 
 def parse_time_str(time_str: str) -> float:
     if not time_str:
@@ -15,7 +16,11 @@ def get_video_info(url: str):
     ydl_opts = {
         'quiet': True,
         'extract_flat': True,
-        'skip_download': True
+        'skip_download': True,
+        'retries': 20,
+        'fragment_retries': 20,
+        'socket_timeout': 30,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web', 'tv']}},
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -24,7 +29,15 @@ def get_video_info(url: str):
 def download_video(url: str, output_dir: str, format_type: str = "video", progress_callback=None, trim_start=None, trim_end=None):
     # format_type can be 'video' or 'audio'
     
-    ydl_opts = {}
+    ydl_opts = {
+        'retries': 20,
+        'fragment_retries': 20,
+        'file_access_retries': 20,
+        'socket_timeout': 30,
+        'nocheckcertificate': True,
+        'continuedl': True, # Resume interrupted downloads automatically
+        'http_headers': {'Connection': 'close'}, # Fix for [Errno 32] Broken pipe on macOS
+    }
     
     if progress_callback:
         ydl_opts['progress_hooks'] = [progress_callback]
@@ -44,9 +57,10 @@ def download_video(url: str, output_dir: str, format_type: str = "video", progre
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
-                'preferredquality': '192',
+                'preferredquality': '320',
             }],
-            'quiet': False
+            'quiet': True,
+            'no_warnings': True
         })
     else:
         # Highest quality video + audio
@@ -54,18 +68,26 @@ def download_video(url: str, output_dir: str, format_type: str = "video", progre
             'format': 'bestvideo+bestaudio/best',
             'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
             'merge_output_format': 'mp4',
-            'quiet': False
+            'quiet': True,
+            'no_warnings': True
         })
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        # Returns the path to the downloaded file
-        # Note: if postprocessing happens, the extension might change.
-        # We can predict the final filename using ydl.prepare_filename
-        filename = ydl.prepare_filename(info)
-        if format_type == "audio":
-            filename = os.path.splitext(filename)[0] + ".mp3"
-        elif format_type == "video" and not filename.endswith(".mp4"):
-            filename = os.path.splitext(filename)[0] + ".mp4"
-            
-        return filename
+    max_attempts = 3
+    last_err = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                filename = ydl.prepare_filename(info)
+                if format_type == "audio":
+                    filename = os.path.splitext(filename)[0] + ".mp3"
+                elif format_type == "video" and not filename.endswith(".mp4"):
+                    filename = os.path.splitext(filename)[0] + ".mp4"
+                return filename
+        except Exception as e:
+            last_err = e
+            print(f"Download attempt {attempt}/{max_attempts} failed for '{url}': {e}")
+            if attempt < max_attempts:
+                time.sleep(2)
+
+    raise last_err
