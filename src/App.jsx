@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { 
   Search, Download, Music, Video, Sparkles, MonitorPlay, CheckCircle, Clock, Settings, 
   UserCircle, Play, X, Trash2, ListPlus, MapPin, FolderOpen, ListMusic, Clipboard, 
-  Radio, Disc, Scissors, Layers, Check, RefreshCw, Terminal, XCircle, CheckCheck
+  Radio, Disc, Scissors, Layers, Check, RefreshCw, Terminal, XCircle, CheckCheck, Sliders
 } from 'lucide-react'
 import YouTube from 'react-youtube'
 import OnyxPlayer from './OnyxPlayer'
+import AudioSettings from './AudioSettings'
+import MixerScreen from './MixerScreen'
 
 // Tauri IPC Invoker Helper (Works on both Native Mobile & Desktop Web Server)
 const isTauri = () => typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.__TAURI__)
@@ -173,8 +175,9 @@ function App() {
   
   // Internal Player & Web Audio API
   const [internalPlayer, setInternalPlayer] = useState({ src: null, name: '', playing: false });
-  const [activeOnyxStems, setActiveOnyxStems] = useState(null);
+  const [activeOnyxStems, setActiveOnyxStems] = useState(() => localStorage.getItem('onyx_stems_path') || null);
   const [activeAnalyser, setActiveAnalyser] = useState(null);
+  const [onyxPlaying, setOnyxPlaying] = useState(false);
   const [audioProgress, setAudioProgress] = useState({ currentTime: 0, duration: 0 });
 
   const formatTime = (time) => {
@@ -273,7 +276,9 @@ function App() {
     return saved ? JSON.parse(saved) : {
       audio_dir: '~/Downloads/OnyxAudio',
       video_dir: '~/Downloads/OnyxVideo',
-      onyx_dir: '~/Downloads/OnyxProjects'
+      onyx_dir: '~/Downloads/OnyxProjects',
+      concurrent_limit: 3,
+      download_delay: 5
     }
   })
 
@@ -302,7 +307,7 @@ function App() {
         try {
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), 800)
-          const res = await fetch(`http://localhost:${p}/api/health`, { signal: controller.signal })
+          const res = await fetch(`http://127.0.0.1:${p}/api/health`, { signal: controller.signal })
           clearTimeout(timeoutId)
           if (res.ok) {
             setServerPort(p)
@@ -348,7 +353,7 @@ function App() {
   useEffect(() => {
     const checkUpdates = async () => {
       try {
-        const res = await fetch(`http://localhost:${serverPort}/api/check-updates`)
+        const res = await fetch(`http://127.0.0.1:${serverPort}/api/check-updates`)
         if (res.ok) {
           const data = await res.json()
           if (data.update_available) setUpdatesAvailable(true)
@@ -363,7 +368,7 @@ function App() {
   const handleUpdatePlugins = async () => {
     setUpdating(true)
     try {
-      await fetch(`http://localhost:${serverPort}/api/update-plugins`, { method: 'POST' })
+      await fetch(`http://127.0.0.1:${serverPort}/api/update-plugins`, { method: 'POST' })
       setTimeout(() => {
         setUpdating(false)
         setUpdatesAvailable(false)
@@ -392,7 +397,7 @@ function App() {
 
       for (const [id, job] of activeEntries) {
         try {
-          const res = await fetch(`http://localhost:${serverPort}/api/download/${job.job_id}`)
+          const res = await fetch(`http://127.0.0.1:${serverPort}/api/download/${job.job_id}`)
           if (res.ok) {
             const data = await res.json()
             setActiveJobs(prev => ({
@@ -418,7 +423,7 @@ function App() {
   const handleOpenPath = async (path) => {
     if (!path) return
     try {
-      await fetch(`http://localhost:${serverPort}/api/open-path`, {
+      await fetch(`http://127.0.0.1:${serverPort}/api/open-path`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path })
@@ -443,7 +448,7 @@ function App() {
 
     // 2. HTTP Fallback to Python backend
     try {
-      const res = await fetch(`http://localhost:${serverPort}/api/search?q=${encodeURIComponent(searchQuery)}`)
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/search?q=${encodeURIComponent(searchQuery)}`)
       if (res.ok) {
         const data = await res.json()
         setSearchResults(Array.isArray(data) ? data : data.results || [])
@@ -456,9 +461,82 @@ function App() {
     }
   }
 
+  const handleLocalFileSelect = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Audio Files',
+          extensions: ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'aac']
+        }]
+      });
+      if (selected) {
+        const fileUrl = `file://${selected}`;
+        setUrl(fileUrl);
+        handleUrlLoad(fileUrl);
+      }
+    } catch(e) {
+      console.warn("Failed to select local file:", e);
+    }
+  };
+
   const handleUrlLoad = async (inputUrl = url) => {
     if (!inputUrl.trim()) return
     setLoading(true)
+
+    if (inputUrl.startsWith('file://')) {
+        const filePath = inputUrl.replace('file://', '');
+        const fileName = filePath.split('/').pop().split('\\').pop();
+        
+        addToQueue({
+            url: inputUrl,
+            title: fileName,
+            thumbnail: '', 
+            uploader: 'Local File',
+            formats: { ...defaultFormats }
+        });
+        
+        setUrl('');
+        setMobileTab('queue');
+        setLoading(false);
+        return;
+    }
+
+    // Check if it's a Spotify or Apple Music playlist
+    if (inputUrl.includes('spotify.com/playlist') || inputUrl.includes('spotify.com/album') || (inputUrl.includes('music.apple.com') && inputUrl.includes('/playlist'))) {
+      try {
+        const res = await fetch(`http://127.0.0.1:${serverPort}/api/playlist/parse`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: inputUrl })
+        });
+        const data = await res.json();
+        if (data && data.tracks && data.tracks.length > 0) {
+          data.tracks.forEach((trackQuery, i) => {
+            setTimeout(() => {
+              addToQueue({
+                url: trackQuery,
+                title: trackQuery,
+                formats: { video: false, mp3: true, onyx: false, shazam: false, prefix: false, suffix: false, autoSplit: false, playlist: false }
+              });
+            }, i * 200); // Stagger downloads slightly
+          });
+          setUrl('');
+          setMobileTab('queue');
+          return;
+        } else {
+          alert('Could not extract any tracks from the playlist. Please make sure the link is public and valid.');
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.error('Playlist load error:', e);
+        alert('JS Error: ' + e.message + '\n' + e.stack);
+        setLoading(false);
+        return;
+      }
+    }
     
     // 1. Try Native Tauri Rust Video Info (Native Mobile & Desktop)
     const tauriInfo = await invokeTauri('get_info', { url: inputUrl })
@@ -471,7 +549,7 @@ function App() {
 
     // 2. HTTP Fallback to Python backend
     try {
-      const res = await fetch(`http://localhost:${serverPort}/api/info?url=${encodeURIComponent(inputUrl)}`)
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/info?url=${encodeURIComponent(inputUrl)}`)
       if (res.ok) {
         const data = await res.json()
         if (data.entries) {
@@ -617,7 +695,7 @@ function App() {
     }, 50)
   }
 
-  const startSingleDownload = async (item) => {
+  const startSingleDownload = async (item, overrideDirs = null) => {
     const selectedFormats = []
     if (item.formats.video) selectedFormats.push('video')
     if (item.formats.mp3) selectedFormats.push('mp3')
@@ -635,9 +713,9 @@ function App() {
     const reqPayload = {
       url: item.url,
       formats: selectedFormats,
-      audio_dir: directories.audio_dir,
-      video_dir: directories.video_dir,
-      onyx_dir: directories.onyx_dir,
+      audio_dir: overrideDirs ? overrideDirs.audio_dir : directories.audio_dir,
+      video_dir: overrideDirs ? overrideDirs.video_dir : directories.video_dir,
+      onyx_dir: overrideDirs ? overrideDirs.onyx_dir : directories.onyx_dir,
       spotify: item.formats.spotify,
       bpm_prefix: item.formats.prefix,
       bpm_suffix: item.formats.suffix,
@@ -647,59 +725,87 @@ function App() {
       playlist: item.formats.playlist,
       shazam_extract: item.formats.shazam,
       shazam_sample_duration: parseInt(shazamSettings.sampleDuration) || 10,
-      shazam_sample_interval: parseInt(shazamSettings.sampleInterval) || 90
-    }
-
-    if (window.__TAURI__ && window.__TAURI__.core) {
-      try {
-        const jobId = await window.__TAURI__.core.invoke('start_download', { req: reqPayload })
-        setActiveJobs(prev => ({
-          ...prev,
-          [item.internalId]: { job_id: jobId, status_data: { status: 'processing', progress: 'Download Started...' } }
-        }))
-        return
-      } catch (tauriErr) {
-        console.warn('Tauri native download failed, falling back to Python HTTP API:', tauriErr)
-      }
+      shazam_sample_interval: parseInt(shazamSettings.sampleInterval) || 90,
+      download_delay: parseInt(directories.download_delay) || 0
     }
 
     try {
-      const res = await fetch(`http://localhost:${serverPort}/api/download`, {
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reqPayload)
       })
       const data = await res.json()
+      
       if (data.job_id) {
         setActiveJobs(prev => ({
           ...prev,
-          [item.internalId]: { job_id: data.job_id, status_data: { status: 'processing', progress: 'Download Started...' } }
+          [item.internalId]: { job_id: data.job_id, status_data: { status: 'processing', progress: 'Initializing...' } }
         }))
+        return data.job_id
       }
     } catch (apiErr) {
-      console.error('API Download request failed:', apiErr)
+      console.error("Backend error:", apiErr)
       setActiveJobs(prev => ({
         ...prev,
-        [item.internalId]: { job_id: null, status_data: { status: 'error', progress: 'Failed to connect to backend server' } }
+        [item.internalId]: { status_data: { status: 'error', progress: 'Failed to connect to backend server' } }
       }))
-    }
+    }  return null
   }
 
-  const startBatchDownload = async () => {
+  const startBatchDownload = async (overrideDirs = null) => {
+    // Get latest activeJobs from ref to avoid any stale closures
+    const currentJobs = activeJobsRef.current;
     const unstartedItems = queue.filter(item => {
-      const st = activeJobs[item.internalId]?.status_data?.status
-      return !activeJobs[item.internalId] || st === 'error' || st === 'cancelled'
+      const st = currentJobs[item.internalId]?.status_data?.status
+      return !currentJobs[item.internalId] || st === 'error' || st === 'cancelled'
     })
     
-    for (const item of unstartedItems) {
-      await startSingleDownload(item)
+    const limit = parseInt(directories.concurrent_limit) || 3;
+    let i = 0;
+
+    const worker = async () => {
+      while (i < unstartedItems.length) {
+        const item = unstartedItems[i++];
+        
+        // Double check status before actually starting to prevent redownloading completed items
+        const currentSt = activeJobsRef.current[item.internalId]?.status_data?.status;
+        if (currentSt === 'completed' || currentSt === 'processing' || currentSt === 'queued') {
+          continue;
+        }
+
+        const jobId = await startSingleDownload(item, overrideDirs);
+        if (jobId) {
+          while (true) {
+            const st = activeJobsRef.current[item.internalId]?.status_data?.status;
+            if (st === 'completed' || st === 'error' || st === 'cancelled') break;
+            await new Promise(r => setTimeout(r, 1500));
+          }
+          
+          // Apply user-defined delay before next download
+          const delayMs = (parseInt(directories.download_delay) || 5) * 1000;
+          if (delayMs > 0 && i < unstartedItems.length) {
+            await new Promise(r => setTimeout(r, delayMs));
+          }
+        }
+      }
+    };
+
+    const workers = [];
+    for (let w = 0; w < limit; w++) {
+      // Stagger the initial start of concurrent workers to prevent hitting YouTube at the exact same millisecond
+      workers.push(
+        new Promise(r => setTimeout(r, w * 2000)).then(() => worker())
+      );
     }
+    
+    await Promise.all(workers);
   }
 
   const cancelDownloadJob = async (internalId, jobId) => {
     if (jobId) {
       try {
-        await fetch(`http://localhost:${serverPort}/api/download/cancel/${jobId}`, { method: 'POST' })
+        await fetch(`http://127.0.0.1:${serverPort}/api/download/cancel/${jobId}`, { method: 'POST' })
       } catch (e) {
         console.error('Cancel request failed:', e)
       }
@@ -740,8 +846,9 @@ function App() {
 
       <div className="flex-1 max-w-[1400px] w-full mx-auto px-3 md:px-8 space-y-4 md:space-y-6" style={{ WebkitAppRegion: 'no-drag' }}>
         
+
         {/* Pro DJ Studio Header & Spectrum Visualizer */}
-        <header className="glass-panel p-4 md:p-6 space-y-3 relative overflow-hidden">
+        <header className="glass-panel p-4 md:p-6 space-y-3 sticky top-0 z-50 overflow-hidden shadow-2xl backdrop-blur-3xl">
           <div className="flex justify-between items-center z-10">
             <div className="flex items-center gap-3">
               <img 
@@ -759,16 +866,17 @@ function App() {
 
             <div className="flex items-center gap-2">
               <button 
-                onClick={() => setActiveOnyxStems("SELECT_FOLDER")} 
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-cyan-500 hover:opacity-90 rounded-xl text-xs font-bold text-white shadow-[0_0_10px_rgba(168,85,247,0.4)] transition-all"
-              >
-                <ListMusic className="w-4 h-4" /> Onyx Player
-              </button>
-              <button 
                 onClick={() => alert("Google OAuth Login will open here")} 
                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 rounded-xl text-xs font-semibold border border-slate-800 transition-all"
               >
                 <UserCircle className="w-4 h-4 text-purple-400" /> Connect Account
+              </button>
+              <button 
+                className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white text-sm font-semibold rounded-full shadow-lg shadow-teal-900/50 transition-all hover:scale-105"
+                onClick={() => invokeTauri('open_mixer_window')}
+              >
+                <Sliders className="w-5 h-5" />
+                <span>Live Mixer</span>
               </button>
               <button 
                 onClick={() => setShowSettings(true)} 
@@ -783,7 +891,7 @@ function App() {
           <DJSoftwareWaveform 
             isProcessing={queue.some(i => ['downloading', 'extracting', 'shazam', 'processing'].includes(activeJobs[i.internalId]?.status_data?.status))} 
             analyserNode={activeAnalyser}
-            isPlaying={internalPlayer.playing}
+            isPlaying={internalPlayer.playing || onyxPlaying}
           />
         </header>
 
@@ -831,6 +939,20 @@ function App() {
                 <div>
                   <label className="text-xs font-semibold text-slate-400">ONYX Projects Directory</label>
                   <input type="text" value={directories.onyx_dir} onChange={e => setDirectories({...directories, onyx_dir: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400">Concurrent Downloads Limit (Batch Size)</label>
+                  <input type="number" min="1" max="10" value={directories.concurrent_limit || 3} onChange={e => setDirectories({...directories, concurrent_limit: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none mt-1" />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    <strong className="text-amber-500">Note:</strong> Maximum safe limit is 3-5. Requesting too many files from YouTube simultaneously (e.g. 20) may trigger bot-detection and block your IP address.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400">Download Delay (Seconds)</label>
+                  <input type="number" min="0" max="60" value={directories.download_delay !== undefined ? directories.download_delay : 5} onChange={e => setDirectories({...directories, download_delay: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none mt-1" />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Adds a random pause between downloads to mimic human behavior and protect your IP from YouTube bot-detection blocks.
+                  </p>
                 </div>
 
                 <div className="pt-3 border-t border-slate-800 space-y-2">
@@ -1015,6 +1137,13 @@ function App() {
                 <div className="flex-1 space-y-2">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Direct Link (Video/Playlist)</label>
                   <div className="flex gap-2">
+                    <button 
+                      onClick={handleLocalFileSelect}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl flex items-center justify-center transition-colors border border-slate-700 shrink-0"
+                      title="Load Local File for Separation"
+                    >
+                      <FolderOpen className="w-4 h-4" />
+                    </button>
                     <input 
                       type="text" 
                       value={url}
@@ -1025,7 +1154,7 @@ function App() {
                     />
                     <button 
                       onClick={handlePasteClipboard} 
-                      className="px-3 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-200 rounded-2xl text-xs font-bold border border-purple-500/40 flex items-center gap-1 shrink-0 transition-all active:scale-95"
+                      className="px-3 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-200 rounded-2xl text-xs font-bold border border-purple-500/40 flex items-center gap-1 shrink-0 transition-all active:scale-95 hidden md:flex"
                     >
                       <Clipboard className="w-3.5 h-3.5 text-purple-300" /> Paste
                     </button>
@@ -1174,6 +1303,9 @@ function App() {
                   <button onClick={() => applyToAll('playlist')} className="text-[10px] font-semibold bg-slate-900 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 px-2 py-0.5 rounded-md border border-slate-800">
                     + Playlist 🎧
                   </button>
+                  <button onClick={() => applyToAll('shazam')} className="text-[10px] font-semibold bg-slate-900 hover:bg-purple-600/30 text-slate-300 hover:text-purple-200 px-2 py-0.5 rounded-md border border-slate-800">
+                    + Shazam 🎙️
+                  </button>
                   <button onClick={() => applyToAll('spotify')} className="text-[10px] font-semibold bg-slate-900 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 px-2 py-0.5 rounded-md border border-slate-800">
                     + Spotify
                   </button>
@@ -1313,7 +1445,10 @@ function App() {
                                           <FolderOpen className="w-3 h-3" /> Folder
                                         </button>
                                         <button 
-                                          onClick={() => setActiveOnyxStems(statusData.result_dir)} 
+                                          onClick={() => {
+                                            setActiveOnyxStems(statusData.result_dir);
+                                            localStorage.setItem('onyx_stems_path', statusData.result_dir);
+                                          }} 
                                           className="text-[10px] bg-gradient-to-r from-purple-600 to-cyan-500 hover:opacity-90 text-white font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-[0_0_10px_rgba(168,85,247,0.4)] transition-all"
                                         >
                                           <ListMusic className="w-3 h-3" /> Onyx Player
@@ -1357,13 +1492,26 @@ function App() {
             </div>
 
             {queue.length > 0 && (
-              <div className="p-3 bg-slate-950/90 border-t border-slate-800">
+              <div className="p-3 bg-slate-950/90 border-t border-slate-800 flex gap-2">
                 <button 
-                  onClick={startBatchDownload}
-                  className="w-full glow-button py-2.5 font-bold text-xs flex items-center justify-center gap-2"
+                  onClick={async () => {
+                    const { open } = await import('@tauri-apps/plugin-dialog');
+                    const selected = await open({ directory: true });
+                    if (selected) {
+                      startBatchDownload({ audio_dir: selected, video_dir: selected, onyx_dir: selected });
+                    }
+                  }}
+                  className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 font-bold text-xs flex items-center justify-center gap-1 border border-slate-700 rounded-xl transition-all shadow"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  Save To...
+                </button>
+                <button 
+                  onClick={() => startBatchDownload()}
+                  className="w-2/3 glow-button py-2.5 font-bold text-xs flex items-center justify-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Download All Tracks ({queue.length})
+                  Download All ({queue.length})
                 </button>
               </div>
             )}
@@ -1423,13 +1571,14 @@ function App() {
         </div>
       )}
 
-      {/* Onyx Player Overlay */}
-      {activeOnyxStems && (
+      {/* Integrated Onyx Player at Bottom */}
+      <div className="w-full mt-4 mb-24 lg:mb-8 px-3 md:px-8 max-w-[1400px] mx-auto z-40 relative">
         <OnyxPlayer 
           stemsPath={activeOnyxStems} 
-          onClose={() => setActiveOnyxStems(null)} 
+          onAnalyserReady={setActiveAnalyser}
+          onPlayStateChange={setOnyxPlaying}
         />
-      )}
+      </div>
 
       {/* Mobile Navigation Bar */}
       <nav className="fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-6 py-2 flex justify-around items-center z-40 lg:hidden">

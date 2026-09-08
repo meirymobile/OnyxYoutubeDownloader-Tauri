@@ -3,7 +3,7 @@ import os
 import sys
 
 def build():
-    print("🚀 Compiling Python Backend into standalone sidecar executable...")
+    print("🚀 Compiling Python Backend into standalone executable...")
     
     output_dir = os.path.abspath("src-tauri/bin")
     os.makedirs(output_dir, exist_ok=True)
@@ -16,7 +16,11 @@ def build():
         "--onefile",
         "--name", target_name,
         "--distpath", output_dir,
-        "--hidden-import=uvicorn.logging",
+        "--collect-all", "torch",
+        "--collect-all", "torchaudio",
+        "--collect-all", "demucs",
+        "--hidden-import=pyaudioop",
+                "--hidden-import=uvicorn.logging",
         "--hidden-import=uvicorn.loops",
         "--hidden-import=uvicorn.loops.auto",
         "--hidden-import=uvicorn.protocols",
@@ -24,11 +28,6 @@ def build():
         "--hidden-import=uvicorn.protocols.http.auto",
         "--hidden-import=uvicorn.lifespan",
         "--hidden-import=uvicorn.lifespan.on",
-        "--hidden-import=shazamio",
-        "--hidden-import=shazamio_core",
-        "--hidden-import=librosa",
-        "--hidden-import=mutagen",
-        "--hidden-import=spotipy",
         "backend/main.py"
     ]
     

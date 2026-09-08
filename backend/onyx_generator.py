@@ -43,21 +43,16 @@ def generate_onyx_project(audio_file: str, output_root: str, progress_callback=N
     print(f"Starting Demucs separation for {audio_file}...")
     if progress_callback: progress_callback("Starting Demucs AI Separation...")
     
-    process = subprocess.Popen(
-        ["demucs", "-n", "htdemucs", "--out", temp_demucs, audio_file],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True
-    )
-    
-    for line in iter(process.stdout.readline, ""):
-        line = line.strip()
-        if line and progress_callback:
-            if "%" in line:
-                progress_callback(f"Demucs: {line}")
-                
-    process.stdout.close()
-    process.wait()
+    try:
+        from demucs.separate import main as demucs_main
+        opts = ["-n", "htdemucs", "--out", temp_demucs, audio_file]
+        return_code = demucs_main(opts)
+        if return_code != 0 and return_code is not None:
+            raise RuntimeError(f"Demucs AI separation failed with exit code {return_code}.")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Demucs AI separation failed: {e}. Ensure the system is configured correctly.")
 
     # 3. Move Stems to Project Directory
     if progress_callback: progress_callback("Packaging ONYX project...")
@@ -77,6 +72,9 @@ def generate_onyx_project(audio_file: str, output_root: str, progress_callback=N
     try:
         shutil.rmtree(temp_demucs)
     except: pass
+
+    if not processed_stems:
+        raise RuntimeError("Demucs did not output any audio stems. Please check your Demucs installation.")
 
     # 4. Generate lyrics.json (Mocked for now, as full whisper extraction is heavy)
     lyrics_file = os.path.join(project_dir, "lyrics.json")

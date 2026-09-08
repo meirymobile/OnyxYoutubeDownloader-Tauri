@@ -4,6 +4,8 @@ use rustypipe::client::RustyPipe;
 use std::path::PathBuf;
 use reqwest;
 
+mod audio_engine;
+mod link_sync;
 #[derive(Serialize)]
 struct SearchResult {
     id: String,
@@ -158,190 +160,23 @@ fn create_dj_playlist_pack(folder_path: &PathBuf, set_title: &str, track_files: 
 
 
 #[derive(Serialize, Clone)]
+struct LogPayload {
+    job_id: String,
+    msg: String,
+}
+
+#[derive(Serialize, Clone)]
 struct ProgressPayload {
     job_id: String,
     status: String,
     progress: String,
 }
 
+use tauri_plugin_shell::ShellExt;
+
 #[tauri::command]
 async fn start_download(app: AppHandle, req: DownloadReq) -> Result<String, String> {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let job_id = format!("{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
-    let job_id_clone = job_id.clone();
-    
-    // Internal helper for logging
-    let app_for_log = app.clone();
-    let url_clone = req.url.clone();
-    
-    tauri::async_runtime::spawn(async move {
-        // Logging helper macro-like closure
-        let do_log = |msg: String| {
-            // Read settings if we had them or just assume true for now, 
-            // wait, we can just write log if settings exist, but we will handle this in frontend.
-            // Actually, we'll let frontend decide when to call write_log except for internal errors.
-            // Let's emit log events so frontend can write them.
-            let _ = app_for_log.emit("backend-log", msg);
-        };
-        
-        do_log(format!("Starting download process for URL: {}", url_clone));
-        let _ = app.emit("download-progress", ProgressPayload {
-            job_id: job_id_clone.clone(),
-            status: "downloading".to_string(),
-            progress: "10%".to_string(),
-        });
-        
-        let rp = RustyPipe::new();
-        let video_id = extract_video_id(&req.url);
-        
-        let info = match rp.query().video_details(&video_id).await {
-            Ok(i) => {
-                do_log(format!("Successfully fetched video info: {}", i.name));
-                i
-            },
-            Err(e) => {
-                do_log(format!("ERROR: Failed to get video info: {}", e));
-                let _ = app.emit("download-progress", ProgressPayload { job_id: job_id_clone.clone(), status: "error".to_string(), progress: e.to_string() });
-                return;
-            }
-        };
-
-        let player = match rp.query().player(&video_id).await {
-            Ok(p) => p,
-            Err(e) => {
-                do_log(format!("ERROR: Failed to get player streams: {}", e));
-                let _ = app.emit("download-progress", ProgressPayload { job_id: job_id_clone.clone(), status: "error".to_string(), progress: e.to_string() });
-                return;
-            }
-        };
-
-        let base_dir = req.audio_dir.unwrap_or_else(|| "/storage/emulated/0/Download".to_string());
-        let base_dir = base_dir.replace("~", "/storage/emulated/0");
-        let is_set = req.playlist.unwrap_or(false) || req.shazam_extract.unwrap_or(false);
-        let safe_title = info.name.replace("/", "_").replace("\\", "_");
-
-
-        let target_folder = if is_set {
-            let sub = PathBuf::from(&base_dir).join(&safe_title);
-            let _ = std::fs::create_dir_all(&sub);
-            sub
-        } else {
-            PathBuf::from(&base_dir)
-        };
-
-        let mut success = true;
-        let mut last_err = String::new();
-        let mut downloaded_files = Vec::new();
-
-        let client = reqwest::Client::new();
-
-        for format in req.formats {
-            let _ = app.emit("download-progress", ProgressPayload {
-                job_id: job_id_clone.clone(),
-                status: "downloading".to_string(),
-                progress: format!("Downloading {}...", format.to_uppercase()),
-            });
-
-            let is_audio = format == "mp3";
-            do_log(format!("Preparing to download format: {}", format));
-            
-            let stream_url = if is_audio {
-                player.audio_streams.first().map(|s| s.url.clone())
-            } else {
-                player.video_streams.first().map(|s| s.url.clone())
-            };
-            
-            let Some(stream_url) = stream_url else {
-                let err_msg = "Video source empty: No stream found";
-                do_log(format!("ERROR: {}", err_msg));
-                success = false;
-                last_err = err_msg.to_string();
-                continue;
-            };
-
-            let ext = if is_audio { "mp3" } else { "mp4" };
-            
-            // Format filename with BPM prefix/suffix if selected
-            let mut file_name = safe_title.clone();
-            if is_audio {
-                let default_bpm = 128;
-                if req.bpm_prefix.unwrap_or(false) {
-                    file_name = format!("[{} BPM] {}", default_bpm, file_name);
-                }
-                if req.bpm_suffix.unwrap_or(false) {
-                    file_name = format!("{} ({} BPM)", file_name, default_bpm);
-                }
-            }
-
-            let full_filename = format!("{}.{}", file_name, ext);
-            let path = target_folder.join(&full_filename);
-            do_log(format!("Starting download to path: {:?}", path));
-
-            match client.get(&stream_url).send().await {
-                Ok(mut response) => {
-                    if response.status().is_success() {
-                        use tokio::io::AsyncWriteExt;
-                        match tokio::fs::File::create(&path).await {
-                            Ok(mut file) => {
-                                let mut file_success = true;
-                                while let Ok(Some(chunk)) = response.chunk().await {
-                                    if let Err(e) = file.write_all(&chunk).await {
-                                        do_log(format!("ERROR writing to file: {}", e));
-                                        file_success = false;
-                                        break;
-                                    }
-                                }
-                                if file_success {
-                                    do_log(format!("SUCCESS: Download completed for format {}", format));
-                                    downloaded_files.push(full_filename);
-                                } else {
-                                    success = false;
-                                    last_err = "Error writing file chunk".to_string();
-                                }
-                            },
-                            Err(e) => {
-                                do_log(format!("ERROR: Failed to create file {:?}: {}", path, e));
-                                success = false;
-                                last_err = e.to_string();
-                            }
-                        }
-                    } else {
-                        do_log(format!("ERROR: Request failed with status {}", response.status()));
-                        success = false;
-                        last_err = format!("HTTP error {}", response.status());
-                    }
-                },
-                Err(e) => {
-                    do_log(format!("ERROR: Download request failed: {}", e));
-                    success = false;
-                    last_err = e.to_string();
-                }
-            }
-        }
-
-        // Generate DJ Playlist Pack (.m3u8, .cue, .txt) if set download completed
-        if is_set && !downloaded_files.is_empty() {
-            create_dj_playlist_pack(&target_folder, &safe_title, &downloaded_files);
-            do_log("Generated DJ Playlist pack (.m3u8, .cue, .txt) in set subfolder".to_string());
-        }
-
-
-        if success {
-            let _ = app.emit("download-progress", ProgressPayload {
-                job_id: job_id_clone.clone(),
-                status: "completed".to_string(),
-                progress: "Done".to_string(),
-            });
-        } else {
-            let _ = app.emit("download-progress", ProgressPayload {
-                job_id: job_id_clone.clone(),
-                status: "error".to_string(),
-                progress: last_err,
-            });
-        }
-    });
-    
-    Ok(job_id)
+    Err("Not using native download anymore. Using Python backend.".to_string())
 }
 
 #[tauri::command]
@@ -428,6 +263,36 @@ fn read_log(log_dir: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn print_log(msg: String) {
+    println!("[Frontend] {}", msg);
+}
+
+#[tauri::command]
+fn open_mixer_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if app.get_webview_window("mixer").is_none() {
+        tauri::WebviewWindowBuilder::new(&app, "mixer", tauri::WebviewUrl::App("index.html?mixer=true".into()))
+            .title("Onyx Live Mixer")
+            .inner_size(1000.0, 800.0)
+            .build()
+            .map_err(|e| e.to_string())?;
+    } else {
+        let window = app.get_webview_window("mixer").unwrap();
+        window.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn close_mixer_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("mixer") {
+        window.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn write_log(message: String, log_dir: String, max_size_mb: u64) -> Result<(), String> {
     use std::fs::{OpenOptions, metadata};
     use std::io::Write;
@@ -475,10 +340,14 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            use tauri_plugin_shell::ShellExt;
+            // Ensure no leftover zombie Python servers are running from previous crashes
+            std::process::Command::new("pkill").arg("-f").arg("backend_server").output().ok();
+            
             if let Ok(cmd) = app.shell().sidecar("backend_server") {
                 if let Ok((_rx, child)) = cmd.spawn() {
-                    println!("🚀 Sidecar spawned with PID {}", child.pid());
+                    println!("🚀 Python Backend Sidecar spawned with PID {}", child.pid());
+                } else {
+                    println!("❌ Failed to spawn Python Backend Sidecar");
                 }
             }
             Ok(())
@@ -486,7 +355,9 @@ pub fn run() {
 
 
         .invoke_handler(tauri::generate_handler![
-            search_youtube, get_info, start_download, check_updates, update_plugins, open_path, check_shared_intent, write_log, read_log
+            search_youtube, get_info, start_download, check_updates, update_plugins, open_path, check_shared_intent, write_log, print_log, read_log, open_mixer_window, close_mixer_window,
+            audio_engine::get_audio_devices, audio_engine::start_audio_routing, audio_engine::install_blackhole,
+            link_sync::toggle_link, link_sync::get_link_status, link_sync::get_link_phase
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

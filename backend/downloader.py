@@ -13,6 +13,8 @@ def parse_time_str(time_str: str) -> float:
     return seconds
 
 def get_video_info(url: str):
+    if not url.startswith("http") and not url.startswith("ytsearch"):
+        url = f"ytsearch1:{url}"
     ydl_opts = {
         'quiet': True,
         'extract_flat': True,
@@ -26,7 +28,9 @@ def get_video_info(url: str):
         info = ydl.extract_info(url, download=False)
         return info
 
-def download_video(url: str, output_dir: str, format_type: str = "video", progress_callback=None, trim_start=None, trim_end=None):
+def download_video(url: str, output_dir: str, format_type: str = "video", progress_callback=None, trim_start=None, trim_end=None, download_delay: int = 0):
+    if not url.startswith("http") and not url.startswith("ytsearch"):
+        url = f"ytsearch1:{url}"
     # format_type can be 'video' or 'audio'
     
     ydl_opts = {
@@ -37,7 +41,12 @@ def download_video(url: str, output_dir: str, format_type: str = "video", progre
         'nocheckcertificate': True,
         'continuedl': True, # Resume interrupted downloads automatically
         'http_headers': {'Connection': 'close'}, # Fix for [Errno 32] Broken pipe on macOS
+        'windowsfilenames': True, # Sanitize filenames for all OS
     }
+    
+    if download_delay and download_delay > 0:
+        ydl_opts['sleep_interval_requests'] = download_delay
+        ydl_opts['sleep_interval'] = download_delay
     
     if progress_callback:
         ydl_opts['progress_hooks'] = [progress_callback]
@@ -78,7 +87,13 @@ def download_video(url: str, output_dir: str, format_type: str = "video", progre
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
+                
+                # If it's a search result (playlist), the downloaded entry is the first item
+                if info.get('_type') == 'playlist' and 'entries' in info and len(info['entries']) > 0:
+                    filename = ydl.prepare_filename(info['entries'][0])
+                else:
+                    filename = ydl.prepare_filename(info)
+                    
                 if format_type == "audio":
                     filename = os.path.splitext(filename)[0] + ".mp3"
                 elif format_type == "video" and not filename.endswith(".mp4"):
