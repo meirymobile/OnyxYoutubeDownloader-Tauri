@@ -42,6 +42,7 @@ def download_video(url: str, output_dir: str, format_type: str = "video", progre
         'continuedl': True, # Resume interrupted downloads automatically
         'http_headers': {'Connection': 'close'}, # Fix for [Errno 32] Broken pipe on macOS
         'windowsfilenames': True, # Sanitize filenames for all OS
+        'overwrites': True, # Overwrite files automatically to prevent ffmpeg hanging
     }
     
     if download_delay and download_delay > 0:

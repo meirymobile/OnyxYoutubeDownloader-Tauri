@@ -175,7 +175,7 @@ struct ProgressPayload {
 use tauri_plugin_shell::ShellExt;
 
 #[tauri::command]
-async fn start_download(app: AppHandle, req: DownloadReq) -> Result<String, String> {
+async fn start_download(_app: AppHandle, _req: DownloadReq) -> Result<String, String> {
     Err("Not using native download anymore. Using Python backend.".to_string())
 }
 
@@ -263,8 +263,49 @@ fn read_log(log_dir: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn print_log(msg: String) {
-    println!("[Frontend] {}", msg);
+fn open_logs_folder() -> Result<(), String> {
+    use std::path::PathBuf;
+    
+    let docs_dir = dirs::document_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+    let log_dir_path = docs_dir.join("OnyxYoutubeDownloader").join("Logs");
+    
+    if log_dir_path.exists() {
+        std::process::Command::new("open")
+            .arg(&log_dir_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open logs folder: {}", e))?;
+    } else {
+        return Err("Logs folder does not exist yet.".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn print_log(message: String) {
+    println!("[Frontend] {}", message);
+}
+
+
+#[tauri::command]
+fn open_djay_companion(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if app.get_webview_window("djay").is_none() {
+        tauri::WebviewWindowBuilder::new(&app, "djay", tauri::WebviewUrl::App("index.html?djay=true".into()))
+            .title("djay Companion")
+            .inner_size(300.0, 240.0)
+            .min_inner_size(300.0, 240.0)
+            .max_inner_size(300.0, 240.0)
+            .resizable(false)
+            .always_on_top(true)
+            .decorations(false)
+            
+            .build()
+            .map_err(|e| e.to_string())?;
+    } else {
+        let window = app.get_webview_window("djay").unwrap();
+        window.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -293,24 +334,25 @@ fn close_mixer_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn write_log(message: String, log_dir: String, max_size_mb: u64) -> Result<(), String> {
-    use std::fs::{OpenOptions, metadata};
+fn write_log(message: String) -> Result<(), String> {
+    use std::fs::{OpenOptions, metadata, create_dir_all};
     use std::io::Write;
     use std::path::PathBuf;
     
-    // Default to a fallback if empty
-    let dir = if log_dir.is_empty() {
-        "/storage/emulated/0/Download".to_string()
-    } else {
-        log_dir.replace("~", "/storage/emulated/0")
-    };
+    // Default to unified log file
+    let docs_dir = dirs::document_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+    let log_dir_path = docs_dir.join("OnyxYoutubeDownloader").join("Logs");
     
-    let path = PathBuf::from(dir).join("onyx_debug.log");
+    if let Err(e) = create_dir_all(&log_dir_path) {
+        return Err(format!("Failed to create log dir: {}", e));
+    }
     
-    // Check file size and truncate if larger than max_size_mb
+    let path = log_dir_path.join("onyx.log");
+    
+    // Check file size and truncate if larger than 1MB
     if let Ok(meta) = metadata(&path) {
         let size_mb = meta.len() / (1024 * 1024);
-        if size_mb >= max_size_mb {
+        if size_mb >= 1 {
             let _ = std::fs::remove_file(&path);
         }
     }
@@ -321,17 +363,68 @@ fn write_log(message: String, log_dir: String, max_size_mb: u64) -> Result<(), S
         .open(&path)
         .map_err(|e| e.to_string())?;
         
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = chrono::Local::now();
+    writeln!(file, "{} - [FRONTEND] - {}", now.format("%Y-%m-%d %H:%M:%S,%3f"), message)
+        .map_err(|e| e.to_string())?;
         
-    writeln!(file, "[{}] {}", timestamp, message).map_err(|e| e.to_string())?;
-    
     Ok(())
 }
 
 
+
+#[tauri::command]
+fn start_djay_drag(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("djay") {
+        let _ = window.start_dragging();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn close_djay_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("djay") {
+        let _ = window.close();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn minimize_djay_to_tray(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("djay") {
+        let _ = window.hide();
+    }
+    Ok(())
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+
+use libloading::{Library, Symbol};
+use std::ffi::CStr;
+use std::os::raw::c_char;
+
+#[tauri::command]
+async fn get_djay_tracks_native(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    unsafe {
+        let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+        let dylib_path = exe_path.parent().unwrap().parent().unwrap().join("Frameworks").join("djay_reader.dylib");
+        
+        let lib = Library::new(&dylib_path).map_err(|e| format!("Failed to load dylib at {:?}: {}", dylib_path, e))?;
+        let func: Symbol<unsafe extern "C" fn() -> *mut c_char> = lib.get(b"get_djay_tracks_json").map_err(|e| e.to_string())?;
+        
+        let ptr = func();
+        if ptr.is_null() {
+            return Err("Failed to get tracks".to_string());
+        }
+        let c_str = CStr::from_ptr(ptr);
+        let s = c_str.to_string_lossy().into_owned();
+        libc::free(ptr as *mut libc::c_void);
+        Ok(s)
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -344,18 +437,59 @@ pub fn run() {
             std::process::Command::new("pkill").arg("-f").arg("backend_server").output().ok();
             
             if let Ok(cmd) = app.shell().sidecar("backend_server") {
-                if let Ok((_rx, child)) = cmd.spawn() {
+                if let Ok((mut rx, child)) = cmd.spawn() {
                     println!("🚀 Python Backend Sidecar spawned with PID {}", child.pid());
+                    tauri::async_runtime::spawn(async move {
+                        use tauri_plugin_shell::process::CommandEvent;
+                        while let Some(event) = rx.recv().await {
+                            if let CommandEvent::Stdout(ref line) = event {
+                                let msg = String::from_utf8_lossy(line).to_string();
+                                let _ = write_log(msg.trim().to_string());
+                            }
+                            if let CommandEvent::Stderr(ref line) = event {
+                                let msg = String::from_utf8_lossy(line).to_string();
+                                let _ = write_log(format!("[ERROR] {}", msg.trim()));
+                            }
+                        }
+                    });
                 } else {
                     println!("❌ Failed to spawn Python Backend Sidecar");
                 }
             }
+
+            #[cfg(desktop)]
+            {
+                use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent, TrayIcon};
+                use tauri::Manager;
+                
+                if let Some(icon) = app.default_window_icon() {
+                    let _tray = TrayIconBuilder::new()
+                        .icon(icon.clone())
+                        .tooltip("djay Companion")
+                        .on_tray_icon_event(|tray: &TrayIcon, event: TrayIconEvent| {
+                            if let TrayIconEvent::Click { button, button_state, .. } = event {
+                                if button == MouseButton::Left && button_state == MouseButtonState::Up {
+                                    if let Some(window) = tray.app_handle().get_webview_window("djay") {
+                                        let _ = window.show();
+                                        let _ = window.set_focus();
+                                    }
+                                }
+                            }
+                        })
+                        .build(app)?;
+                }
+            }
+
             Ok(())
         })
 
 
         .invoke_handler(tauri::generate_handler![
-            search_youtube, get_info, start_download, check_updates, update_plugins, open_path, check_shared_intent, write_log, print_log, read_log, open_mixer_window, close_mixer_window,
+            get_djay_tracks_native,
+            search_youtube, get_info, start_download, check_updates, update_plugins, open_path, check_shared_intent, write_log, print_log, read_log, open_mixer_window, close_mixer_window, open_djay_companion, open_logs_folder,
+            start_djay_drag,
+            close_djay_window,
+            minimize_djay_to_tray,
             audio_engine::get_audio_devices, audio_engine::start_audio_routing, audio_engine::install_blackhole,
             link_sync::toggle_link, link_sync::get_link_status, link_sync::get_link_phase
         ])

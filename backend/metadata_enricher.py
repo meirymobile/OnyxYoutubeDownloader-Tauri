@@ -53,6 +53,7 @@ def enrich_and_rename_file(
     spotify: bool, 
     bpm_prefix: bool, 
     bpm_suffix: bool, 
+    analyze_bpm: bool = True,
     known_artist: Optional[str] = None,
     known_title: Optional[str] = None,
     progress_callback=None
@@ -71,23 +72,29 @@ def enrich_and_rename_file(
     bpm_val = 128
     key_val = "8B"
 
-    # 1. Librosa Analysis for BPM
-    try:
-        if progress_callback: 
-            progress_callback(f"Analyzing BPM for '{base_name}'...")
-        y, sr = librosa.load(audio_path, duration=60)
-        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        
-        if isinstance(tempo, (list, np.ndarray)):
-            bpm_val = int(np.round(float(tempo[0])))
-        else:
-            bpm_val = int(np.round(float(tempo)))
+    # 1. Librosa Analysis for BPM (Conditional)
+    if analyze_bpm:
+        try:
+            if progress_callback: 
+                progress_callback(f"Analyzing BPM for '{base_name}'...")
+            y, sr = librosa.load(audio_path, duration=60)
+            tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
             
-        if bpm_val <= 0:
+            if isinstance(tempo, (list, np.ndarray)):
+                bpm_val = int(np.round(float(tempo[0])))
+            else:
+                bpm_val = int(np.round(float(tempo)))
+                
+            if bpm_val <= 0:
+                bpm_val = 128
+        except Exception as e:
+            print(f"BPM Analysis failed for {filename}: {e}")
             bpm_val = 128
-    except Exception as e:
-        print(f"BPM Analysis failed for {filename}: {e}")
+    else:
+        if progress_callback:
+            progress_callback(f"BPM Analysis skipped.")
         bpm_val = 128
+
 
     if progress_callback: 
         progress_callback(f"Detected BPM: {bpm_val}")

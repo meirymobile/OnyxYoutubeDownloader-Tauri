@@ -481,6 +481,21 @@ function App() {
     }
   };
 
+  const handleBrowseDirectory = async (field) => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        directory: true,
+        multiple: false,
+      });
+      if (selected) {
+        setDirectories(prev => ({ ...prev, [field]: selected }));
+      }
+    } catch (err) {
+      console.error("Failed to select directory:", err);
+    }
+  };
+
   const handleUrlLoad = async (inputUrl = url) => {
     if (!inputUrl.trim()) return
     setLoading(true)
@@ -842,9 +857,9 @@ function App() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans pb-16 md:pb-8 select-none">
       {/* macOS Window Drag Bar */}
-      <div className="h-6 shrink-0 bg-slate-950" style={{ WebkitAppRegion: 'drag' }}></div>
+      <div className="h-6 shrink-0 bg-slate-950" data-tauri-drag-region="true"></div>
 
-      <div className="flex-1 max-w-[1400px] w-full mx-auto px-3 md:px-8 space-y-4 md:space-y-6" style={{ WebkitAppRegion: 'no-drag' }}>
+      <div className="flex-1 max-w-[1400px] w-full mx-auto px-3 md:px-8 space-y-4 md:space-y-6" data-tauri-drag-region="false">
         
 
         {/* Pro DJ Studio Header & Spectrum Visualizer */}
@@ -877,6 +892,13 @@ function App() {
               >
                 <Sliders className="w-5 h-5" />
                 <span>Live Mixer</span>
+              </button>
+              <button 
+                className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-fuchsia-500 hover:from-indigo-400 hover:to-fuchsia-400 text-white text-sm font-semibold rounded-full shadow-lg shadow-indigo-900/50 transition-all hover:scale-105"
+                onClick={() => invokeTauri("open_djay_companion")}
+              >
+                <Music className="w-5 h-5" />
+                <span>djay Companion</span>
               </button>
               <button 
                 onClick={() => setShowSettings(true)} 
@@ -930,15 +952,30 @@ function App() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold text-slate-400">Audio Directory</label>
-                  <input type="text" value={directories.audio_dir} onChange={e => setDirectories({...directories, audio_dir: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none mt-1" />
+                  <div className="flex gap-2 mt-1">
+                    <input type="text" value={directories.audio_dir} onChange={e => setDirectories({...directories, audio_dir: e.target.value})} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none" />
+                    <button onClick={() => handleBrowseDirectory('audio_dir')} className="px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center shrink-0" title="Browse">
+                      <FolderOpen className="w-4 h-4 text-slate-300" />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400">Video Directory</label>
-                  <input type="text" value={directories.video_dir} onChange={e => setDirectories({...directories, video_dir: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none mt-1" />
+                  <div className="flex gap-2 mt-1">
+                    <input type="text" value={directories.video_dir} onChange={e => setDirectories({...directories, video_dir: e.target.value})} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none" />
+                    <button onClick={() => handleBrowseDirectory('video_dir')} className="px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center shrink-0" title="Browse">
+                      <FolderOpen className="w-4 h-4 text-slate-300" />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400">ONYX Projects Directory</label>
-                  <input type="text" value={directories.onyx_dir} onChange={e => setDirectories({...directories, onyx_dir: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none mt-1" />
+                  <div className="flex gap-2 mt-1">
+                    <input type="text" value={directories.onyx_dir} onChange={e => setDirectories({...directories, onyx_dir: e.target.value})} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs focus:border-purple-500 outline-none" />
+                    <button onClick={() => handleBrowseDirectory('onyx_dir')} className="px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center shrink-0" title="Browse">
+                      <FolderOpen className="w-4 h-4 text-slate-300" />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-400">Concurrent Downloads Limit (Batch Size)</label>
@@ -970,8 +1007,21 @@ function App() {
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end">
-                <button onClick={() => setShowSettings(false)} className="glow-button py-2 text-xs">Save & Close</button>
+              <div className="pt-2 flex justify-between items-center">
+                <button 
+                  onClick={async () => {
+                    try {
+                      const { invoke } = await import('@tauri-apps/api/core');
+                      await invoke('open_logs_folder');
+                    } catch(err) {
+                      console.error(err);
+                    }
+                  }}
+                  className="text-xs text-slate-400 hover:text-slate-200 border border-slate-800 bg-slate-900 rounded px-3 py-2 flex items-center gap-1"
+                >
+                  <FolderOpen className="w-4 h-4" /> Open Logs Folder
+                </button>
+                <button onClick={() => setShowSettings(false)} className="glow-button py-2 text-xs px-4">Save & Close</button>
               </div>
             </div>
           </div>

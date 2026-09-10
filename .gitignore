@@ -20,3 +20,7 @@ port.json
 
 # Environment
 .env
+src-tauri/binaries/
+src-tauri/bin/
+backend/djay_reader_bin
+src-tauri/djay_reader.dylib

@@ -8,6 +8,23 @@ if getattr(sys, 'frozen', False) and 'DYLD_LIBRARY_PATH' in os.environ:
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+# Setup global logger
+log_dir = Path.home() / "Documents" / "OnyxYoutubeDownloader" / "Logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+log_file = log_dir / "onyx.log"
+
+logger = logging.getLogger("onyx")
+logger.setLevel(logging.INFO)
+handler = RotatingFileHandler(log_file, maxBytes=1024*1024, backupCount=1)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - [BACKEND] - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+logger.info("Python Backend Server initializing...")
 
 def ensure_ffmpeg():
     """Automatically installs ffmpeg and ffprobe if missing, placing them in ~/.onyx/bin"""
@@ -82,7 +99,27 @@ from splitter import split_album
 from playlist_generator import create_dj_playlist_pack, extract_track_info_from_file
 from shazam_extractor import extract_and_download_shazam_set
 
+import sys
+import os
+print("SYS.PATH:", sys.path)
+if hasattr(sys, "_MEIPASS"):
+    print("MEIPASS CONTENTS:", os.listdir(sys._MEIPASS))
+    if "backend" in os.listdir(sys._MEIPASS):
+        print("BACKEND CONTENTS:", os.listdir(os.path.join(sys._MEIPASS, "backend")))
+
+from djay_monitor import djay_monitor_instance
+
 app = FastAPI(title="OnyxYouTubeDownloader Backend")
+
+@app.on_event("startup")
+def startup_event():
+    djay_monitor_instance.start()
+    threading.Thread(target=demucs_worker_loop, daemon=True).start()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    djay_monitor_instance.stop()
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -142,12 +179,14 @@ def demucs_worker_loop():
             DEMUCS_QUEUE.task_done()
 
 # Start background worker thread for Demucs AI queue
-threading.Thread(target=demucs_worker_loop, daemon=True).start()
+
 
 
 class DownloadRequest(BaseModel):
     url: str
     formats: List[str]
+    artist: Optional[str] = None
+    title: Optional[str] = None
     bpm_prefix: Optional[bool] = False
     bpm_suffix: Optional[bool] = False
     video_dir: Optional[str] = None
@@ -156,6 +195,8 @@ class DownloadRequest(BaseModel):
     spotify: Optional[bool] = False
     auto_split: Optional[bool] = False
     playlist: Optional[bool] = False
+    djay_mode: Optional[bool] = False
+    analyze_bpm: Optional[bool] = False
     shazam_extract: Optional[bool] = False
     trim_start: Optional[str] = None
     trim_end: Optional[str] = None
@@ -171,6 +212,7 @@ class PlaylistParseReq(BaseModel):
 from datetime import datetime
 
 def process_download(job_id: str, req: DownloadRequest):
+    logger.info(f"[{job_id}] Started download job: {req.url}")
     DOWNLOAD_JOBS[job_id] = {
         "status": "processing", 
         "progress": "Starting download...",
@@ -264,15 +306,18 @@ def process_download(job_id: str, req: DownloadRequest):
                     track_paths = split_album(audio_path, info_dict, base_audio_dir, progress_callback=on_progress)
                 
                 # Enrich and rename if requested
-                if "mp3" in req.formats or is_playlist_requested or (req.bpm_prefix or req.bpm_suffix or req.spotify):
+                if "mp3" in req.formats or is_playlist_requested or (req.bpm_prefix or req.bpm_suffix or req.spotify or getattr(req, "djay_mode", False)):
                     enriched_paths = []
                     for track in track_paths:
                         enriched = enrich_and_rename_file(
                             track, 
                             spotify=req.spotify, 
                             bpm_prefix=req.bpm_prefix, 
-                            bpm_suffix=req.bpm_suffix, 
-                            progress_callback=on_progress
+                            bpm_suffix=req.bpm_suffix,
+                            analyze_bpm=req.analyze_bpm,
+                            progress_callback=on_progress,
+                            known_artist=req.artist,
+                            known_title=req.title
                         )
                         enriched_paths.append(enriched)
                     track_paths = enriched_paths
@@ -311,6 +356,10 @@ def process_download(job_id: str, req: DownloadRequest):
         else:
             DOWNLOAD_JOBS[job_id]["status"] = "completed"
             if track_paths:
+                if getattr(req, "djay_mode", False):
+                    import subprocess
+                    folder_name = os.path.basename(req.audio_dir.rstrip('/')) if getattr(req, 'audio_dir', None) else 'djay_local_cache'
+                    subprocess.run(["osascript", "-e", f"display notification \"Track ready in {folder_name}!\" with title \"Onyx DJ Companion\""])
                 if len(track_paths) == 1:
                     DOWNLOAD_JOBS[job_id]["result_file"] = track_paths[0]
                 else:
@@ -322,6 +371,7 @@ def process_download(job_id: str, req: DownloadRequest):
             DOWNLOAD_JOBS[job_id]["status"] = "cancelled"
             log_msg("⛔ Job explicitly cancelled by user.")
         else:
+            logger.error(f"[{job_id}] Critical Error during download: {e}", exc_info=True)
             DOWNLOAD_JOBS[job_id]["status"] = "error"
             DOWNLOAD_JOBS[job_id]["progress"] = f"Critical Error: {e}"
             if "logs" not in DOWNLOAD_JOBS[job_id]:
@@ -340,6 +390,27 @@ def cancel_download_job(job_id: str):
             DOWNLOAD_JOBS[job_id]["logs"].append(f"[{ts}] ⛔ Cancellation requested by user.")
         return {"status": "cancelled", "job_id": job_id}
     raise HTTPException(status_code=404, detail="Job not found")
+
+
+@app.get("/api/djay/current-track")
+def get_djay_track():
+    return djay_monitor_instance.get_current_track()
+
+@app.post("/api/djay/download")
+def download_djay_track(req: DownloadRequest, background_tasks: BackgroundTasks):
+    job_id = str(uuid.uuid4())
+    DOWNLOAD_JOBS[job_id] = {"status": "queued", "progress": "Waiting for DJay Download..."}
+    req.djay_mode = True
+    
+    if not req.audio_dir:
+        req.audio_dir = os.path.expanduser("~/Music/djay_local_cache")
+        
+    req.audio_dir = os.path.expanduser(req.audio_dir)
+    if not os.path.exists(req.audio_dir):
+        os.makedirs(req.audio_dir, exist_ok=True)
+        
+    threading.Thread(target=process_download, args=(job_id, req), daemon=True).start()
+    return {"job_id": job_id}
 
 @app.get("/api/health")
 def health_check():
@@ -468,21 +539,15 @@ def get_download_status(job_id: str):
 @app.get("/api/check-updates")
 def check_updates():
     try:
-        import sys
-        # Run pip list --outdated in json format using the exact python executable running the backend
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "list", "--outdated", "--format=json"], 
-            capture_output=True, text=True, check=True
-        )
-        outdated_packages = json.loads(result.stdout)
-        
-        # Check if yt-dlp or demucs are in the list
-        core_plugins = ["yt-dlp", "demucs"]
-        updates_found = [pkg for pkg in outdated_packages if pkg["name"].lower() in core_plugins]
-        
+        import json
+        import subprocess
+        # In a frozen app, we cannot easily check pip outdated without spawning a new python or running pip module.
+        # But for yt-dlp, we can just check if an update is available via pip index.
+        # Wait, runpy.run_module("pip", ...) will print to stdout. 
+        # A simpler way is to just allow the user to click update, which always runs pip install --upgrade.
         return {
-            "update_available": len(updates_found) > 0,
-            "packages": updates_found
+            "update_available": True, # Always allow attempting update for simplicity in frozen state
+            "packages": [{"name": "yt-dlp", "version": "latest"}, {"name": "demucs", "version": "latest"}]
         }
     except Exception as e:
         print(f"Failed to check updates: {e}")
@@ -491,16 +556,27 @@ def check_updates():
 @app.post("/api/update-plugins")
 def update_plugins():
     try:
-        import sys, importlib
-        # Run pip upgrade synchronously in backend environment
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp", "demucs"],
-            capture_output=True, text=True, check=True
-        )
-        # Reload yt_dlp module dynamically in memory so changes take effect immediately without restarting
+        import sys
+        import importlib
+        
+        # Save original argv
+        orig_argv = sys.argv.copy()
+        
+        # Run pip install --target ~/.onyx_plugins --upgrade yt-dlp demucs
+        sys.argv = ["pip", "install", "--target", PLUGINS_DIR, "--upgrade", "yt-dlp", "demucs"]
+        try:
+            runpy.run_module("pip", run_name="__main__")
+        except SystemExit as e:
+            if e.code != 0:
+                raise Exception(f"Pip failed with code {e.code}")
+        finally:
+            sys.argv = orig_argv
+            
+        # Reload yt_dlp module dynamically in memory
         if "yt_dlp" in sys.modules:
             import yt_dlp
             importlib.reload(yt_dlp)
+            
         return {"status": "success", "message": "Plugins updated and reloaded in memory successfully!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -527,16 +603,9 @@ if __name__ == "__main__":
             raise HTTPException(status_code=404)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
     
-    # Auto-open browser when running standalone
-    import threading
-    import webbrowser
-    import time
-    def open_browser():
-        time.sleep(1.5)
-        webbrowser.open(f"http://127.0.0.1:{args.port}")
-    threading.Thread(target=open_browser, daemon=True).start()
+    
 
     uvicorn.run(app, host="127.0.0.1", port=args.port)

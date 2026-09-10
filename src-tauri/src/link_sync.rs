@@ -12,10 +12,13 @@ pub fn toggle_link(enabled: bool) -> Result<String, String> {
     
     if enabled {
         if state.is_none() {
-            let mut link = AblLink::new(120.0);
-            link.enable(true);
-            *state = Some(link);
-            println!("Ableton Link Enabled!");
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(async {
+                let link = AblLink::new(120.0);
+                link.enable(true);
+                *state = Some(link);
+                println!("Ableton Link Enabled!");
+            });
         }
     } else {
         *state = None;
