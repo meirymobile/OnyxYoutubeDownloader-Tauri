@@ -32,6 +32,33 @@ const DjayCompanion = () => {
   const [dlStates, setDlStates] = useState({})
   const [bpmToggles, setBpmToggles] = useState({})
   
+  // Sync global status for the floating icon
+  useEffect(() => {
+    let globalStatus = 'idle';
+    let progressStr = '';
+    const states = Object.values(dlStates);
+    if (states.length > 0) {
+      if (states.some(s => s.status === 'Error')) {
+        globalStatus = 'error';
+      } else if (states.some(s => s.status === 'Downloading')) {
+        globalStatus = 'downloading';
+        // Extract percentage if possible
+        const dlState = states.find(s => s.status === 'Downloading');
+        if (dlState && dlState.progress) {
+          const match = dlState.progress.match(/(\d+\.?\d*)%/);
+          if (match) {
+            progressStr = match[1];
+          } else {
+            progressStr = dlState.progress;
+          }
+        }
+      } else if (states.some(s => s.status === 'Finished')) {
+        globalStatus = 'success';
+      }
+    }
+    localStorage.setItem('djay_global_status', JSON.stringify({ status: globalStatus, progress: progressStr }));
+  }, [dlStates]);
+  
   // Fetch current tracks from backend API
   useEffect(() => {
     const fetchTrack = async () => {
