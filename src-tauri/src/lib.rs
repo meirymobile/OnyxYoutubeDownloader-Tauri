@@ -396,6 +396,46 @@ fn minimize_djay_to_tray(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("djay") {
         let _ = window.hide();
     }
+    
+    // Create or show the float window
+    if app.get_webview_window("djay_float").is_none() {
+        tauri::WebviewWindowBuilder::new(&app, "djay_float", tauri::WebviewUrl::App("index.html?djay_float=true".into()))
+            .title("djay Float")
+            .inner_size(60.0, 60.0)
+            .min_inner_size(60.0, 60.0)
+            .max_inner_size(60.0, 60.0)
+            .resizable(false)
+            .always_on_top(true)
+            .decorations(false)
+            .build()
+            .map_err(|e| e.to_string())?;
+    } else {
+        let window = app.get_webview_window("djay_float").unwrap();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn restore_djay_companion(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("djay_float") {
+        let _ = window.hide();
+    }
+    if let Some(window) = app.get_webview_window("djay") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn start_djay_float_drag(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("djay_float") {
+        let _ = window.start_dragging();
+    }
     Ok(())
 }
 
@@ -490,6 +530,8 @@ pub fn run() {
             start_djay_drag,
             close_djay_window,
             minimize_djay_to_tray,
+            restore_djay_companion,
+            start_djay_float_drag,
             audio_engine::get_audio_devices, audio_engine::start_audio_routing, audio_engine::install_blackhole,
             link_sync::toggle_link, link_sync::get_link_status, link_sync::get_link_phase
         ])

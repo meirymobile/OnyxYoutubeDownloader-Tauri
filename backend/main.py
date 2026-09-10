@@ -109,16 +109,16 @@ if hasattr(sys, "_MEIPASS"):
 
 from djay_monitor import djay_monitor_instance
 
-app = FastAPI(title="OnyxYouTubeDownloader Backend")
+from contextlib import asynccontextmanager
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     djay_monitor_instance.start()
     threading.Thread(target=demucs_worker_loop, daemon=True).start()
-
-@app.on_event("shutdown")
-def shutdown_event():
+    yield
     djay_monitor_instance.stop()
+
+app = FastAPI(title="OnyxYouTubeDownloader Backend", lifespan=lifespan)
 
 
 app.add_middleware(
