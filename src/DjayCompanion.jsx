@@ -1,6 +1,30 @@
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { Download, Music, RefreshCw, X, HardDrive, AlertTriangle, ChevronUp, FolderOpen, Activity } from "lucide-react"
+
+const CompanionHeader = React.memo(({ onDrag, onOpenFolder, onMinimize, onClose }) => {
+  return (
+    <div onPointerDown={onDrag} onTouchStart={onDrag} className="flex justify-between items-center mb-2 cursor-move shrink-0">
+      <div className="flex items-center gap-1.5 pointer-events-none">
+        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center shadow-lg">
+          <Music className="w-2 h-2 text-white" />
+        </div>
+        <span className="font-bold text-xs tracking-tight text-white/90">DJ Companion</span>
+      </div>
+      <div className="flex gap-1 items-center">
+        <button onClick={onOpenFolder} onPointerDown={(e)=>e.stopPropagation()} className="hover:bg-slate-800 p-0.5 rounded transition-colors active:scale-95" title="Open Downloads Folder">
+          <FolderOpen className="w-3.5 h-3.5 text-emerald-400 pointer-events-none" />
+        </button>
+        <button onClick={onMinimize} onPointerDown={(e)=>e.stopPropagation()} className="hover:bg-slate-800 p-0.5 rounded transition-colors active:scale-95" title="Minimize to Tray">
+          <ChevronUp className="w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+        </button>
+        <button onClick={onClose} onPointerDown={(e)=>e.stopPropagation()} className="hover:bg-slate-800 p-0.5 rounded transition-colors active:scale-95" title="Close">
+          <X className="w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+        </button>
+      </div>
+    </div>
+  );
+});
 
 const DjayCompanion = () => {
   const [decks, setDecks] = useState([])
@@ -128,30 +152,32 @@ const DjayCompanion = () => {
     }
   };
   
-  const handleDrag = async (e) => {
+
+
+  const handleDrag = useCallback(async (e) => {
     if (e.buttons === 1 || e.type === "touchstart") {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         await invoke("start_djay_drag");
       } catch (e) {}
     }
-  };
+  }, []);
 
-  const closeWindow = async () => {
+  const closeWindow = useCallback(async () => {
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke("close_djay_window");
     } catch (e) {}
-  };
+  }, []);
 
-  const minimizeToTray = async () => {
+  const minimizeToTray = useCallback(async () => {
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke("minimize_djay_to_tray");
     } catch (e) {}
-  };
+  }, []);
 
-  const handleOpenPath = async (path) => {
+  const handleOpenPath = useCallback(async (path) => {
     if (!path) return;
     try {
       const port = localStorage.getItem("onyx_server_port") || 8001;
@@ -163,9 +189,9 @@ const DjayCompanion = () => {
     } catch (err) {
       console.error('Failed to open path', err);
     }
-  };
+  }, []);
 
-  const handleOpenDownloadsFolder = () => {
+  const handleOpenDownloadsFolder = useCallback(() => {
     const savedDirs = localStorage.getItem('onyx_dirs');
     let audioDir = '~/Music/djay_local_cache';
     if (savedDirs) {
@@ -177,29 +203,16 @@ const DjayCompanion = () => {
       } catch (e) {}
     }
     handleOpenPath(audioDir);
-  };
+  }, [handleOpenPath]);
 
   return (
     <div className="h-screen w-screen bg-slate-950/80 backdrop-blur-md rounded-xl border border-slate-800 text-white p-3 flex flex-col font-sans overflow-y-auto overflow-x-hidden select-none custom-scrollbar">
-      <div className="flex justify-between items-center mb-2 cursor-move shrink-0" onPointerDown={handleDrag} onTouchStart={handleDrag}>
-        <div className="flex items-center gap-1.5 pointer-events-none">
-          <div className="w-4 h-4 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center shadow-lg">
-            <Music className="w-2 h-2 text-white" />
-          </div>
-          <span className="font-bold text-xs tracking-tight text-white/90">DJ Companion</span>
-        </div>
-        <div className="flex gap-1 items-center">
-          <button onClick={handleOpenDownloadsFolder} className="hover:bg-slate-800 p-0.5 rounded transition-colors active:scale-95" title="Open Downloads Folder">
-            <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
-          </button>
-          <button onClick={minimizeToTray} className="hover:bg-slate-800 p-0.5 rounded transition-colors active:scale-95" title="Minimize to Tray">
-            <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-          <button onClick={closeWindow} className="hover:bg-slate-800 p-0.5 rounded transition-colors active:scale-95" title="Close">
-            <X className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-        </div>
-      </div>
+      <CompanionHeader 
+        onDrag={handleDrag}
+        onOpenFolder={handleOpenDownloadsFolder} 
+        onMinimize={minimizeToTray} 
+        onClose={closeWindow} 
+      />
       
       <div className="flex-1 flex flex-col gap-2">
         {errorMsg ? (
