@@ -207,9 +207,51 @@ export default function GuestRequestsModal({
     }
   };
 
-  // Check incoming requests (Firebase / LocalStorage Sync)
+  // Check incoming requests (Cloud Realtime Relay + Firebase + LocalStorage)
   useEffect(() => {
-    const handleStorage = () => {
+    const cleanRoom = (roomCode || 'SHAZZ-SONIC').toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'default';
+    const relayTopic = 'onyx_req_' + cleanRoom;
+
+    // 1. Live Server-Sent Events (SSE) listener for instantaneous reception (< 0.1s)
+    let sseSource = null;
+    try {
+      sseSource = new EventSource(`https://ntfy.sh/${relayTopic}/sse`);
+      sseSource.onmessage = (event) => {
+        try {
+          const envelope = JSON.parse(event.data);
+          if (envelope.event === 'message' && envelope.message) {
+            const req = JSON.parse(envelope.message);
+            processIncomingRequest(req);
+          }
+        } catch (e) {}
+      };
+    } catch (e) {
+      console.warn("SSE init error", e);
+    }
+
+    // 2. Polling fallback every 2.5 seconds (catches any missed network packets)
+    let lastCheckedTime = Math.floor(Date.now() / 1000) - 30;
+    const pollRelay = async () => {
+      try {
+        const res = await fetch(`https://ntfy.sh/${relayTopic}/json?poll=1&since=${lastCheckedTime}`);
+        if (res.ok) {
+          const text = await res.text();
+          const lines = text.trim().split('\n');
+          for (const line of lines) {
+            if (!line) continue;
+            try {
+              const msgObj = JSON.parse(line);
+              if (msgObj.time) lastCheckedTime = Math.max(lastCheckedTime, msgObj.time);
+              if (msgObj.event === 'message' && msgObj.message) {
+                const req = JSON.parse(msgObj.message);
+                processIncomingRequest(req);
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+
+      // Also check local storage for same-machine testing
       const storageKey = 'onyx_requests_' + roomCode;
       const stored = localStorage.getItem(storageKey);
       if (stored) {
@@ -223,10 +265,10 @@ export default function GuestRequestsModal({
       }
     };
 
-    window.addEventListener('storage', handleStorage);
-    const interval = setInterval(handleStorage, 1500);
+    const interval = setInterval(pollRelay, 2500);
+
     return () => {
-      window.removeEventListener('storage', handleStorage);
+      if (sseSource) sseSource.close();
       clearInterval(interval);
     };
   }, [roomCode, requestCounter, autoDownload]);

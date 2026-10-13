@@ -984,18 +984,34 @@
       };
 
       try {
-        if (roomRef) {
-          // Push to Firebase Realtime Database under events/{roomId}/requests
-          await roomRef.child('requests').push(payload);
-        } else {
-          // LocalStorage fallback for testing
-          const key = 'onyx_requests_' + roomId;
-          const current = JSON.parse(localStorage.getItem(key) || '[]');
-          current.push({ ...payload, id: 'req_' + Date.now() });
-          localStorage.setItem(key, JSON.stringify(current));
-          // Dispatch storage event for same-browser testing
-          window.dispatchEvent(new Event('storage'));
+        // 1. Send live request to DJ Laptop via Realtime Cloud Relay (<0.1s, zero-setup)
+        const cleanRoom = roomId.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'default';
+        const relayTopic = 'onyx_req_' + cleanRoom;
+        try {
+          await fetch('https://ntfy.sh/' + relayTopic, {
+            method: 'POST',
+            headers: {
+              'Title': 'Song Request: ' + payload.title.slice(0, 50)
+            },
+            body: JSON.stringify(payload)
+          });
+        } catch(relayErr) {
+          console.warn('Realtime cloud relay notice:', relayErr);
         }
+
+        // 2. Also push to Firebase Realtime Database if configured
+        if (roomRef) {
+          try {
+            await roomRef.child('requests').push(payload);
+          } catch(e) {}
+        }
+
+        // 3. LocalStorage for same-browser testing
+        const key = 'onyx_requests_' + roomId;
+        const current = JSON.parse(localStorage.getItem(key) || '[]');
+        current.push({ ...payload, id: 'req_' + Date.now() });
+        localStorage.setItem(key, JSON.stringify(current));
+        window.dispatchEvent(new Event('storage'));
 
         // Show Ticket on UI
         document.getElementById('success-banner').style.display = 'block';
