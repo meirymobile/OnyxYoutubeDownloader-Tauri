@@ -11,6 +11,7 @@ build/
 src-tauri/target/
 src-tauri/gen/
 src-tauri/bin/
+*.dmg
 
 # Python
 backend/venv/
