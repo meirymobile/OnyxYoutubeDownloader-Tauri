@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DJ Shazz & DJ Sonic | See You At The Next Event</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: #030008;
+      font-family: 'Heebo', sans-serif;
+      min-height: 100vh;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      overflow-x: hidden;
+      position: relative;
+      padding: 24px 16px 36px;
+    }
+    
+    /* Neon Glow Background Elements */
+    .glow-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.55;
+      animation: pulseBlob 6s ease-in-out infinite alternate;
+    }
+    .blob-1 {
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+      top: -40px;
+      left: -50px;
+    }
+    .blob-2 {
+      width: 320px;
+      height: 320px;
+      background: radial-gradient(circle, #06b6d4 0%, transparent 70%);
+      bottom: 20px;
+      right: -60px;
+      animation-delay: -3s;
+    }
+    @keyframes pulseBlob {
+      0% { transform: scale(1) translate(0, 0); opacity: 0.45; }
+      100% { transform: scale(1.2) translate(15px, 20px); opacity: 0.7; }
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin: auto 0;
+    }
+
+    /* Live Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(168, 85, 247, 0.12);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #e9d5ff;
+      margin-bottom: 22px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.25);
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #c084fc;
+      box-shadow: 0 0 10px #c084fc;
+      animation: blink 2s infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+
+    /* DJ Main Title */
+    .dj-names {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(32px, 8.5vw, 42px);
+      font-weight: 900;
+      letter-spacing: 1px;
+      line-height: 1.15;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ffffff 10%, #d8b4fe 45%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 25px rgba(168, 85, 247, 0.45));
+    }
+
+    .dj-subtitle {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #38bdf8;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+    }
+
+    /* Hero Card */
+    .party-card {
+      background: rgba(15, 10, 26, 0.7);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      border-radius: 28px;
+      padding: 32px 24px;
+      width: 100%;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 
+                  inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                  0 0 35px rgba(147, 51, 234, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+    .party-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #a855f7, #38bdf8, transparent);
+    }
+
+    .headphones-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 18px;
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(56, 189, 248, 0.2));
+      border: 1px solid rgba(168, 85, 247, 0.5);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 25px rgba(168, 85, 247, 0.35);
+      animation: floatIcon 3.5s ease-in-out infinite alternate;
+    }
+    @keyframes floatIcon {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-7px); }
+    }
+    .headphones-icon svg {
+      width: 32px;
+      height: 32px;
+      color: #c084fc;
+      filter: drop-shadow(0 0 8px #c084fc);
+    }
+
+    .main-message {
+      font-size: 26px;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+    .sub-message {
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.5;
+      font-weight: 400;
+      margin-bottom: 24px;
+    }
+
+    /* Equalizer Animation */
+    .eq-container {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 5px;
+      height: 34px;
+      margin-bottom: 8px;
+    }
+    .eq-bar {
+      width: 5px;
+      background: linear-gradient(to top, #38bdf8, #a855f7);
+      border-radius: 4px;
+      animation: eqDance 1.2s ease-in-out infinite alternate;
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+    }
+    .eq-bar:nth-child(1) { height: 12px; animation-delay: 0.1s; }
+    .eq-bar:nth-child(2) { height: 24px; animation-delay: 0.3s; }
+    .eq-bar:nth-child(3) { height: 32px; animation-delay: 0.15s; }
+    .eq-bar:nth-child(4) { height: 18px; animation-delay: 0.4s; }
+    .eq-bar:nth-child(5) { height: 28px; animation-delay: 0.25s; }
+    .eq-bar:nth-child(6) { height: 14px; animation-delay: 0.5s; }
+    @keyframes eqDance {
+      0% { transform: scaleY(0.3); opacity: 0.6; }
+      100% { transform: scaleY(1); opacity: 1; }
+    }
+
+    /* Social / Contact Grid */
+    .social-section {
+      width: 100%;
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .social-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 13px 20px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      color: #fff;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+    .social-btn:hover, .social-btn:active {
+      background: rgba(168, 85, 247, 0.2);
+      border-color: rgba(168, 85, 247, 0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(168, 85, 247, 0.25);
+    }
+    .social-btn.primary {
+      background: linear-gradient(135deg, #9333ea, #6366f1);
+      border: none;
+      box-shadow: 0 8px 24px rgba(147, 51, 234, 0.4);
+    }
+    .social-btn.primary:hover {
+      box-shadow: 0 10px 30px rgba(147, 51, 234, 0.6);
+    }
+
+    footer {
+      position: relative;
+      z-index: 2;
+      font-size: 11px;
+      color: #64748b;
+      letter-spacing: 1px;
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-blob blob-1"></div>
+  <div class="glow-blob blob-2"></div>
+
+  <div class="container">
+    <div class="status-badge">
+      <span class="status-dot"></span>
+      Guest Requests Closed
+    </div>
+
+    <h1 class="dj-names">DJ SHAZZ<br><span style="font-size: 0.7em; font-weight: 400; opacity: 0.85;">×</span> DJ SONIC</h1>
+    <div class="dj-subtitle">Live DJ Experience</div>
+
+    <div class="party-card">
+      <div class="headphones-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+        </svg>
+      </div>
+
+      <div class="eq-container">
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+      </div>
+
+      <h2 class="main-message">נתראה באירוע הבא! 🎧</h2>
+      <p class="sub-message">
+        תודה רבה לכל מי שלקח חלק ברחבה והקפיץ את האווירה! עמדת בקשות השירים סגורה כרגע.
+      </p>
+
+      <div class="social-section">
+        <a class="social-btn primary" href="#">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+          עקבו אחרינו באינסטגרם
+        </a>
+        <a class="social-btn" href="#">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+          האזינו לסטים שלנו ברשת
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    POWERED BY ONYX LIVE REQUESTS &bull; DJ SHAZZ &amp; DJ SONIC
+  </footer>
+</body>
+</html>

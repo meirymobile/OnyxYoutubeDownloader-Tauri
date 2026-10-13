@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>גלריית חלופות עמוד המסיבה | DJ Shazz & DJ Sonic</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #0b0c10;
+      color: #fff;
+      font-family: 'Heebo', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Control Bar */
+    header {
+      background: #12141a;
+      border-bottom: 1px solid #1f2430;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      z-index: 10;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-title {
+      font-size: 15px;
+      font-weight: 900;
+      background: linear-gradient(90deg, #c084fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 0.5px;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 0;
+    }
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 12px;
+      border: 1px solid #272d3d;
+      background: #181c26;
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tab-btn:hover {
+      background: #232938;
+      color: #fff;
+      border-color: #3b4459;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, #9333ea, #6366f1);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 15px rgba(147, 51, 234, 0.4);
+    }
+
+    .view-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .view-btn {
+      padding: 7px 12px;
+      border-radius: 10px;
+      background: #181c26;
+      border: 1px solid #272d3d;
+      color: #94a3b8;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .view-btn.active {
+      background: #2d3748;
+      color: #38bdf8;
+      border-color: #38bdf8;
+    }
+
+    /* Preview Stage */
+    .stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: radial-gradient(circle at 50% 50%, #151821 0%, #090a0d 100%);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Phone Device Frame */
+    .device-frame {
+      width: 395px;
+      height: 810px;
+      max-height: 90vh;
+      background: #000;
+      border-radius: 46px;
+      border: 10px solid #222634;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.8), 
+                  0 0 0 1px rgba(255, 255, 255, 0.1),
+                  0 0 40px rgba(168, 85, 247, 0.15);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .device-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 24px;
+      background: #222634;
+      border-bottom-left-radius: 16px;
+      border-bottom-right-radius: 16px;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .device-frame.fullscreen {
+      width: 100%;
+      height: 100%;
+      max-height: 100%;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+    }
+    .device-frame.fullscreen .device-notch {
+      display: none;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span style="font-size: 20px;">🎧</span>
+      <div>
+        <div class="brand-title">DJ Shazz & DJ Sonic &bull; חלופות עמוד מסיבה</div>
+        <div class="brand-sub">בחר חלופה לצפייה חיה בתצוגת סמארטפון</div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchOption('option1_neon.html', this)">
+        <span>💜</span> חלופה 1: ניאון מועדונים
+      </button>
+      <button class="tab-btn" onclick="switchOption('option2_gold.html', this)">
+        <span>✨</span> חלופה 2: פסטיבל זהב VIP
+      </button>
+      <button class="tab-btn" onclick="switchOption('option3_vinyl.html', this)">
+        <span>💿</span> חלופה 3: תקליט ויניל
+      </button>
+      <button class="tab-btn" onclick="switchOption('option4_laser.html', this)">
+        <span>⚡</span> חלופה 4: רייב ולייזרים
+      </button>
+    </div>
+
+    <div class="view-controls">
+      <button id="btn-phone" class="view-btn active" onclick="setViewMode('phone')">📱 סמארטפון</button>
+      <button id="btn-full" class="view-btn" onclick="setViewMode('full')">🖥️ מסך מלא</button>
+      <a id="btn-newtab" class="view-btn" href="option1_neon.html" target="_blank" style="text-decoration:none;">↗ פתח בלשונית</a>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="device-frame" id="device">
+      <div class="device-notch"></div>
+      <iframe id="preview-frame" src="option1_neon.html"></iframe>
+    </div>
+  </div>
+
+  <script>
+    let currentSrc = 'option1_neon.html';
+
+    function switchOption(src, btn) {
+      currentSrc = src;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('preview-frame').src = src;
+      document.getElementById('btn-newtab').href = src;
+    }
+
+    function setViewMode(mode) {
+      const device = document.getElementById('device');
+      const btnPhone = document.getElementById('btn-phone');
+      const btnFull = document.getElementById('btn-full');
+
+      if (mode === 'full') {
+        device.classList.add('fullscreen');
+        btnFull.classList.add('active');
+        btnPhone.classList.remove('active');
+      } else {
+        device.classList.remove('fullscreen');
+        btnPhone.classList.add('active');
+        btnFull.classList.remove('active');
+      }
+    }
+  </script>
+</body>
+</html>

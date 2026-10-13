@@ -33,7 +33,7 @@ export default function MobileApp() {
   // Default Target Formats
   const [defaultFormats, setDefaultFormats] = useState({ 
     mp3: true, video: false, onyx: false, playlist: false, shazam: false, spotify: false, 
-    prefix: false, suffix: true, autoSplit: false 
+    prefix: false, suffix: true, autoSplit: false, autoCue: false 
   })
 
   // Queue & Active Jobs
@@ -301,7 +301,7 @@ export default function MobileApp() {
   const clearAllFormats = () => {
     setQueue(prev => prev.map(item => ({
       ...item,
-      formats: { mp3: false, video: false, onyx: false, playlist: false, shazam: false, spotify: false, prefix: false, suffix: false, autoSplit: false }
+      formats: { mp3: false, video: false, onyx: false, playlist: false, shazam: false, spotify: false, prefix: false, suffix: false, autoSplit: false, autoCue: false }
     })))
   }
 
@@ -334,6 +334,7 @@ export default function MobileApp() {
         trim_start: item.trimStart || null,
         trim_end: item.trimEnd || null,
         auto_split: item.formats.autoSplit,
+      auto_cue: item.formats.autoCue,
         playlist: item.formats.playlist,
         shazam_extract: item.formats.shazam
       }
@@ -447,7 +448,7 @@ export default function MobileApp() {
               <iframe 
                 width="100%" 
                 height="100%" 
-                src={`https://www.youtube.com/embed/${previewVideoId}?autoplay=1`}
+                src={`https://www.youtube-nocookie.com/embed/${previewVideoId}?autoplay=1&origin=https://localhost`}
                 frameBorder="0" 
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                 allowFullScreen
@@ -471,7 +472,8 @@ export default function MobileApp() {
             <div className="aspect-video w-full bg-black rounded-xl overflow-hidden border border-slate-800">
               <YouTube 
                 videoId={extractVideoId(trimModalItem.url)} 
-                opts={{ width: '100%', height: '100%', playerVars: { autoplay: 1 } }} 
+                opts={{ width: '100%', height: '100%', host: 'https://www.youtube-nocookie.com',
+                    playerVars: { autoplay: 1 } }} 
                 onReady={(e) => setYtPlayer(e.target)}
                 className="w-full h-full"
               />

@@ -3,8 +3,54 @@ import requests
 import librosa
 import numpy as np
 from typing import Optional
-from mutagen.id3 import ID3, TIT2, TPE1, TBPM, TKEY, APIC, TALB
+from mutagen.id3 import ID3, TIT2, TPE1, TBPM, TKEY, APIC, TALB, GEOB
 from mutagen.mp3 import MP3
+import base64
+import struct
+
+def generate_serato_markers2_payload(cues: list) -> bytes:
+    """
+    Generates the Base64 payload for a Serato Markers2 GEOB tag.
+    cues is a list of dicts: {'index': 0, 'posMs': 15000, 'color': (r,g,b), 'name': 'Drop'}
+    """
+    payload = bytearray()
+    
+    for cue in cues:
+        # CUE string (latin1) + null terminator
+        payload.extend(b"CUE\x00")
+        
+        # Build the body
+        index = cue.get('index', 0)
+        pos_ms = int(cue.get('posMs', 0))
+        r, g, b = cue.get('color', (204, 0, 0)) # default red
+        name = cue.get('name', 'Cue').encode('utf-8')
+        
+        # body: 0x00, index(1), pos(uint32 BE ms), 0x00, color(3), 0x00 0x00, name(null-term)
+        body = bytearray()
+        body.append(0x00)
+        body.append(index & 0xFF)
+        body.extend(struct.pack(">I", pos_ms))
+        body.append(0x00)
+        body.append(r & 0xFF)
+        body.append(g & 0xFF)
+        body.append(b & 0xFF)
+        body.append(0x00)
+        body.append(0x00)
+        body.extend(name)
+        body.append(0x00)
+        
+        # length of body
+        payload.extend(struct.pack(">I", len(body)))
+        
+        # append body
+        payload.extend(body)
+        
+    # base64 encode payload
+    b64_str = base64.b64encode(payload).decode('ascii')
+    
+    # Outer structure: 0x01 0x01 followed by base64
+    final_data = b'\x01\x01' + b64_str.encode('ascii')
+    return final_data
 
 def fetch_metadata_online(query: str) -> dict:
     """Fetch official track metadata and high-res cover art without requiring API keys."""
@@ -54,9 +100,11 @@ def enrich_and_rename_file(
     bpm_prefix: bool, 
     bpm_suffix: bool, 
     analyze_bpm: bool = True,
+    extract_drop_cue: bool = False,
     known_artist: Optional[str] = None,
     known_title: Optional[str] = None,
-    progress_callback=None
+    progress_callback=None,
+    custom_prefix: Optional[str] = None
 ) -> str:
     if not os.path.exists(audio_path) or not audio_path.endswith('.mp3'):
         print(f"File not found or not mp3: {audio_path}")
@@ -115,7 +163,58 @@ def enrich_and_rename_file(
             if progress_callback:
                 progress_callback(f"Metadata found: {metadata.get('artist')} - {metadata.get('title')}")
 
-    # 3. Write ID3 Tags
+    # 3. Extract Drop Cue if requested (Do this before saving ID3 so we can embed the GEOB tag)
+    serato_cues = []
+    if extract_drop_cue:
+        try:
+            if progress_callback: progress_callback("Analyzing Audio Drop for Hot-Cue...")
+            y, sr = librosa.load(audio_path, sr=22050)
+            rms = librosa.feature.rms(y=y)[0]
+            times = librosa.frames_to_time(np.arange(len(rms)), sr=sr)
+            max_rms = np.max(rms)
+            threshold = max_rms * 0.8
+            drop_frames = np.where(rms > threshold)[0]
+            if len(drop_frames) > 0:
+                drop_time = times[drop_frames[0]]
+                # Refine to nearest beat
+                _, beats = librosa.beat.beat_track(y=y, sr=sr)
+                beat_times = librosa.frames_to_time(beats, sr=sr)
+                if len(beat_times) > 0:
+                    closest_beat_idx = np.argmin(np.abs(beat_times - drop_time))
+                    refined_drop_time = beat_times[closest_beat_idx]
+                else:
+                    refined_drop_time = drop_time
+                
+                # Format to mm:ss:ff (frames are 1/75 sec)
+                minutes = int(refined_drop_time // 60)
+                seconds = int(refined_drop_time % 60)
+                frames = int((refined_drop_time % 1) * 75)
+                time_str = f"{minutes:02d}:{seconds:02d}:{frames:02d}"
+                
+                # Write standard .cue file
+                cue_content = f"""FILE "{os.path.basename(audio_path)}" MP3
+  TRACK 01 AUDIO
+    TITLE "{metadata.get('title', base_name)}"
+    PERFORMER "{metadata.get('artist', 'Unknown Artist')}"
+    INDEX 01 00:00:00
+    INDEX 02 {time_str}
+"""
+                cue_filepath = os.path.splitext(audio_path)[0] + ".cue"
+                with open(cue_filepath, "w", encoding="utf-8") as f:
+                    f.write(cue_content)
+                if progress_callback: progress_callback(f"Created Hot-Cue at {time_str}")
+
+                # Prepare for Serato Tags embedding
+                serato_cues.append({
+                    'index': 0,
+                    'posMs': int(refined_drop_time * 1000),
+                    'color': (204, 0, 0),
+                    'name': 'Drop'
+                })
+        except Exception as e:
+            print(f"Failed to generate drop cue: {e}")
+
+    # 4. Write ID3 Tags
     try:
         audio = MP3(audio_path, ID3=ID3)
         if audio.tags is None:
@@ -146,12 +245,28 @@ def enrich_and_rename_file(
                     )
                 except Exception as img_err:
                     print(f"Failed to fetch cover art: {img_err}")
+                    
+        # Embed Serato Markers2 if we have cues
+        if serato_cues:
+            try:
+                serato_payload = generate_serato_markers2_payload(serato_cues)
+                audio.tags.add(
+                    GEOB(
+                        encoding=0,
+                        mime='application/octet-stream',
+                        filename='',
+                        desc='Serato Markers2',
+                        data=serato_payload
+                    )
+                )
+            except Exception as serato_err:
+                print(f"Failed to encode Serato Markers: {serato_err}")
 
         audio.save()
     except Exception as e:
         print(f"Failed to write ID3 tags: {e}")
 
-    # 4. Format & Rename File
+    # 5. Format & Rename File
     if metadata.get('artist') and metadata.get('title'):
         title_part = f"{metadata['artist']} - {metadata['title']}"
     else:
@@ -159,7 +274,9 @@ def enrich_and_rename_file(
 
     new_name = title_part
 
-    if bpm_prefix:
+    if custom_prefix:
+        new_name = f"{custom_prefix} - {new_name}"
+    elif bpm_prefix:
         new_name = f"[{bpm_val} BPM] {new_name}"
     if bpm_suffix:
         new_name = f"{new_name} ({bpm_val} BPM)"
@@ -173,6 +290,17 @@ def enrich_and_rename_file(
         if os.path.exists(new_filepath):
             os.remove(new_filepath)
         os.rename(audio_path, new_filepath)
-        return new_filepath
+        audio_path = new_filepath
         
+        # Also rename the .cue file if we generated one
+        old_cue = os.path.splitext(audio_path)[0] + ".cue" # Wait, audio_path was updated above. I need to be careful!
+        
+        # Let's cleanly rename .cue:
+        old_cue_path = os.path.join(dir_name, f"{base_name}.cue")
+        new_cue_path = os.path.splitext(new_filepath)[0] + ".cue"
+        if os.path.exists(old_cue_path) and old_cue_path != new_cue_path:
+            if os.path.exists(new_cue_path):
+                os.remove(new_cue_path)
+            os.rename(old_cue_path, new_cue_path)
+
     return audio_path

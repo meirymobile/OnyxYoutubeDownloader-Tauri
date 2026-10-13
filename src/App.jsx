@@ -8,6 +8,7 @@ import YouTube from 'react-youtube'
 import OnyxPlayer from './OnyxPlayer'
 import AudioSettings from './AudioSettings'
 import MixerScreen from './MixerScreen'
+import GuestRequestsModal from './GuestRequestsModal'
 
 // Tauri IPC Invoker Helper (Works on both Native Mobile & Desktop Web Server)
 const isTauri = () => typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.__TAURI__)
@@ -249,7 +250,7 @@ function App() {
   // Default Target Formats
   const [defaultFormats, setDefaultFormats] = useState({ 
     mp3: true, video: false, onyx: false, playlist: false, shazam: false, spotify: false, 
-    prefix: false, suffix: true, autoSplit: false 
+    prefix: false, suffix: true, autoSplit: false, autoCue: false 
   })
 
   const [shazamSettings, setShazamSettings] = useState(() => {
@@ -268,6 +269,30 @@ function App() {
   // Core Tools Updates
   const [updatesAvailable, setUpdatesAvailable] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [showGuestRequests, setShowGuestRequests] = useState(false)
+  const [guestPendingCount, setGuestPendingCount] = useState(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('onyx_guest_requests_list') || '[]');
+      return list.filter(r => r.status !== 'played').length;
+    } catch {
+      return 0;
+    }
+  })
+
+  useEffect(() => {
+    const updateCount = () => {
+      try {
+        const list = JSON.parse(localStorage.getItem('onyx_guest_requests_list') || '[]');
+        setGuestPendingCount(list.filter(r => r.status !== 'played').length);
+      } catch {}
+    };
+    window.addEventListener('storage', updateCount);
+    const timer = setInterval(updateCount, 2000);
+    return () => {
+      window.removeEventListener('storage', updateCount);
+      clearInterval(timer);
+    };
+  }, [])
 
   // Settings & Directories
   const [showSettings, setShowSettings] = useState(false)
@@ -695,7 +720,7 @@ function App() {
   const clearAllFormats = () => {
     setQueue(prev => prev.map(item => ({
       ...item,
-      formats: { mp3: false, video: false, onyx: false, playlist: false, shazam: false, spotify: false, prefix: false, suffix: false, autoSplit: false }
+      formats: { mp3: false, video: false, onyx: false, playlist: false, shazam: false, spotify: false, prefix: false, suffix: false, autoSplit: false, autoCue: false }
     })))
   }
 
@@ -737,6 +762,7 @@ function App() {
       trim_start: item.trimStart || null,
       trim_end: item.trimEnd || null,
       auto_split: item.formats.autoSplit,
+      auto_cue: item.formats.autoCue,
       playlist: item.formats.playlist,
       shazam_extract: item.formats.shazam,
       shazam_sample_duration: parseInt(shazamSettings.sampleDuration) || 10,
@@ -901,6 +927,19 @@ function App() {
                 <span>djay Companion</span>
               </button>
               <button 
+                onClick={() => setShowGuestRequests(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs md:text-sm rounded-full shadow-lg shadow-amber-900/40 transition-all hover:scale-105 active:scale-95 shrink-0"
+                title="Guest Requests & Live Event QR"
+              >
+                <Radio className="w-4 h-4 text-slate-950 animate-pulse" />
+                <span>Guest Requests</span>
+                {guestPendingCount > 0 && (
+                  <span className="bg-slate-950 text-amber-300 font-mono text-[10px] font-black px-1.5 py-0.5 rounded-full border border-amber-400/40">
+                    {guestPendingCount}
+                  </span>
+                )}
+              </button>
+              <button 
                 onClick={() => setShowSettings(true)} 
                 className="p-2 bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-all active:scale-95"
               >
@@ -938,6 +977,16 @@ function App() {
             </button>
           </div>
         )}
+
+        {/* Guest Requests Modal */}
+        <GuestRequestsModal 
+          isOpen={showGuestRequests}
+          onClose={() => setShowGuestRequests(false)}
+          serverPort={serverPort}
+          onPlayInternal={playInternalAudio}
+          onOpenPath={handleOpenPath}
+          directories={directories}
+        />
 
         {/* Settings Modal */}
         {showSettings && (
@@ -1039,7 +1088,7 @@ function App() {
                 <iframe 
                   width="100%" 
                   height="100%" 
-                  src={`https://www.youtube.com/embed/${previewVideoId}?autoplay=1`}
+                  src={`https://www.youtube-nocookie.com/embed/${previewVideoId}?autoplay=1&origin=https://localhost`}
                   frameBorder="0" 
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                   allowFullScreen
@@ -1066,6 +1115,7 @@ function App() {
                   opts={{
                     width: '100%', 
                     height: '100%', 
+                    host: 'https://www.youtube-nocookie.com',
                     playerVars: { autoplay: 1 }
                   }} 
                   onReady={(e) => setYtPlayer(e.target)}
@@ -1246,6 +1296,9 @@ function App() {
                   <button onClick={() => toggleDefaultFormat('autoSplit')} className={`pill-tab ${defaultFormats.autoSplit ? 'pill-tab-active-purple' : 'pill-tab-inactive'}`}>
                     Auto-Split 🔪
                   </button>
+                  <button onClick={() => toggleDefaultFormat('autoCue')} className={`pill-tab ${defaultFormats.autoCue ? 'pill-tab-active-emerald' : 'pill-tab-inactive'}`}>
+                    Auto-Cue 🎯
+                  </button>
                 </div>
               </div>
             </div>
@@ -1368,6 +1421,9 @@ function App() {
                   <button onClick={() => applyToAll('autoSplit')} className="text-[10px] font-semibold bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 px-2 py-0.5 rounded-md border border-slate-800">
                     + Auto-Split 🔪
                   </button>
+                  <button onClick={() => applyToAll('autoCue')} className="text-[10px] font-semibold bg-slate-900 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 px-2 py-0.5 rounded-md border border-slate-800">
+                    + Auto-Cue 🎯
+                  </button>
                   <button onClick={clearAllFormats} className="text-[10px] font-semibold bg-slate-900 hover:bg-red-500/20 text-slate-300 hover:text-red-300 px-2 py-0.5 rounded-md border border-slate-800 ml-auto">
                     Clear
                   </button>
@@ -1458,6 +1514,9 @@ function App() {
                               </button>
                               <button onClick={() => toggleQueueItemFormat(item.internalId, 'autoSplit')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.autoSplit ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
                                 Auto-Split 🔪
+                              </button>
+                              <button onClick={() => toggleQueueItemFormat(item.internalId, 'autoCue')} className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors ${item.formats.autoCue ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'}`}>
+                                Auto-Cue 🎯
                               </button>
                             </div>
                           </div>

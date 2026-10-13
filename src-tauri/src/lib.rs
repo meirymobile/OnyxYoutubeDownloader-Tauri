@@ -88,6 +88,7 @@ struct DownloadReq {
     shazam_extract: Option<bool>,
     shazam_sample_duration: Option<u32>,
     shazam_sample_interval: Option<u32>,
+    auto_cue: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -334,6 +335,34 @@ fn close_mixer_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_qr_stage_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if app.get_webview_window("qr_stage").is_none() {
+        tauri::WebviewWindowBuilder::new(&app, "qr_stage", tauri::WebviewUrl::App("index.html?qr_stage=true".into()))
+            .title("Onyx - Stage QR Display (Guest Requests)")
+            .inner_size(1024.0, 768.0)
+            .min_inner_size(600.0, 500.0)
+            .resizable(true)
+            .build()
+            .map_err(|e| e.to_string())?;
+    } else {
+        let window = app.get_webview_window("qr_stage").unwrap();
+        let _ = window.show();
+        window.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn close_qr_stage_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("qr_stage") {
+        window.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn write_log(message: String) -> Result<(), String> {
     use std::fs::{OpenOptions, metadata, create_dir_all};
     use std::io::Write;
@@ -527,6 +556,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_djay_tracks_native,
             search_youtube, get_info, start_download, check_updates, update_plugins, open_path, check_shared_intent, write_log, print_log, read_log, open_mixer_window, close_mixer_window, open_djay_companion, open_logs_folder,
+            open_qr_stage_window,
+            close_qr_stage_window,
             start_djay_drag,
             close_djay_window,
             minimize_djay_to_tray,

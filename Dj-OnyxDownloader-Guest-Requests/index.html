@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DJ Shazz & DJ Sonic | Guest Requests</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: #07020d;
+      font-family: 'Heebo', sans-serif;
+      min-height: 100vh;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Loading Screen */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      background: #07020d;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      gap: 16px;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid rgba(245, 158, 11, 0.2);
+      border-top-color: #f59e0b;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ======================================================== */
+    /* STATE 1: CLOSED / ALTERNATIVE 3 (RETRO VINYL LOUNGE)     */
+    /* ======================================================== */
+    #state-closed {
+      display: none;
+      width: 100%;
+      min-height: 100vh;
+      background: radial-gradient(circle at 50% 20%, #2a1138 0%, #11071a 55%, #07020d 100%);
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 16px 36px;
+      position: relative;
+    }
+    .warm-glow {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, rgba(244, 63, 94, 0.1) 40%, transparent 70%);
+      top: 25%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      filter: blur(50px);
+      z-index: 0;
+    }
+    .closed-container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin: auto 0;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #fcd34d;
+      margin-bottom: 20px;
+      backdrop-filter: blur(10px);
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #f59e0b;
+      box-shadow: 0 0 10px #f59e0b;
+    }
+    .dj-names {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(30px, 8vw, 40px);
+      font-weight: 700;
+      letter-spacing: 1px;
+      line-height: 1.15;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff 20%, #fed7aa 60%, #fb7185 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 20px rgba(245, 158, 11, 0.35));
+    }
+    .dj-subtitle {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #fb923c;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .vinyl-wrapper {
+      position: relative;
+      width: 210px;
+      height: 210px;
+      margin: 0 auto 24px;
+    }
+    .vinyl-disc {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: 
+        repeating-radial-gradient(circle, #111 0px, #111 2px, #1f1f1f 3px, #111 4px),
+        radial-gradient(circle at 50% 50%, #151515, #000);
+      box-shadow: 0 12px 35px rgba(0,0,0,0.8),
+                  inset 0 0 15px rgba(255,255,255,0.1),
+                  0 0 30px rgba(244, 63, 94, 0.25);
+      position: relative;
+      animation: spinVinyl 16s linear infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .vinyl-disc::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 35%, rgba(255,255,255,0.08) 50%, transparent 70%, rgba(255,255,255,0.15) 100%);
+      pointer-events: none;
+    }
+    @keyframes spinVinyl {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .vinyl-label {
+      width: 78px;
+      height: 78px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #f97316 0%, #db2777 100%);
+      border: 3px solid #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px rgba(0,0,0,0.6);
+      text-align: center;
+      padding: 6px;
+      position: relative;
+    }
+    .vinyl-hole {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #030008;
+      border: 2px solid #555;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .label-text-top {
+      font-size: 7px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+    .label-text-bot {
+      font-size: 6px;
+      font-weight: 700;
+      color: #ffedd5;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      margin-top: 12px;
+      text-transform: uppercase;
+    }
+    .tonearm {
+      position: absolute;
+      top: -15px;
+      right: -10px;
+      width: 70px;
+      height: 110px;
+      pointer-events: none;
+      transform: rotate(18deg);
+      transform-origin: top right;
+      filter: drop-shadow(2px 8px 6px rgba(0,0,0,0.7));
+    }
+    .party-card {
+      background: rgba(22, 11, 33, 0.75);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 28px;
+      padding: 30px 24px;
+      width: 100%;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(245, 158, 11, 0.12);
+    }
+    .main-message {
+      font-size: 25px;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .sub-message {
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.55;
+      font-weight: 300;
+      margin-bottom: 22px;
+    }
+    .social-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 13px 20px;
+      background: linear-gradient(135deg, #f97316, #db2777);
+      border-radius: 16px;
+      color: #fff;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      box-shadow: 0 8px 25px rgba(249, 115, 22, 0.35);
+      transition: all 0.25s ease;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .secondary-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: 16px;
+      color: #fed7aa;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.25s ease;
+    }
+
+    /* ======================================================== */
+    /* STATE 2: ACTIVE GUEST REQUESTS PAGE                     */
+    /* ======================================================== */
+    #state-active {
+      display: none;
+      width: 100%;
+      max-width: 480px;
+      min-height: 100vh;
+      flex-direction: column;
+      padding: 20px 16px 40px;
+      position: relative;
+    }
+    .active-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 14px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #34d399;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+    .live-pulse {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 10px #10b981;
+      animation: pulseGreen 1.5s infinite;
+    }
+    @keyframes pulseGreen {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+    .active-dj-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 26px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    .active-subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    /* Search Box */
+    .search-box-card {
+      background: #130a1c;
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 20px;
+      padding: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+    }
+    .input-wrapper {
+      display: flex;
+      gap: 8px;
+      position: relative;
+    }
+    .search-input {
+      flex: 1;
+      background: #09030e;
+      border: 1px solid #2d183f;
+      border-radius: 14px;
+      padding: 13px 16px;
+      font-size: 14px;
+      color: #fff;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      border-color: #f59e0b;
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.25);
+    }
+    .search-btn {
+      padding: 0 18px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border: none;
+      border-radius: 14px;
+      color: #000;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .search-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Results List */
+    .results-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .result-item {
+      background: #150b20;
+      border: 1px solid #29153a;
+      border-radius: 16px;
+      padding: 12px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .result-item:hover {
+      border-color: rgba(245, 158, 11, 0.4);
+      background: #1c0f2a;
+    }
+    .result-thumb {
+      width: 76px;
+      height: 52px;
+      border-radius: 10px;
+      object-cover: cover;
+      background: #000;
+      shrink-0;
+    }
+    .result-info {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .result-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f1f5f9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .result-channel {
+      font-size: 11px;
+      color: #94a3b8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .request-btn {
+      padding: 8px 14px;
+      background: linear-gradient(135deg, #9333ea, #6366f1);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
+      transition: all 0.2s;
+    }
+    .request-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Submission Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 500;
+    }
+    .modal-card {
+      background: #180d24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 24px;
+      padding: 24px;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+      position: relative;
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .modal-song-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0d0615;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px solid #2d183f;
+      margin: 16px 0 20px;
+      text-align: right;
+    }
+    .modal-song-thumb {
+      width: 56px;
+      height: 40px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    .modal-field {
+      text-align: right;
+      margin-bottom: 14px;
+    }
+    .modal-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+      display: block;
+    }
+    .modal-input {
+      width: 100%;
+      background: #0d0615;
+      border: 1px solid #2d183f;
+      border-radius: 12px;
+      padding: 11px 14px;
+      font-size: 13px;
+      color: #fff;
+      font-family: inherit;
+      outline: none;
+    }
+    .modal-input:focus {
+      border-color: #f59e0b;
+    }
+    .submit-request-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border: none;
+      border-radius: 14px;
+      color: #000;
+      font-size: 15px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
+      margin-top: 8px;
+    }
+
+    /* Success Card */
+    .success-card {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 78, 59, 0.2));
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 20px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .success-number {
+      font-size: 32px;
+      font-weight: 900;
+      color: #34d399;
+      margin: 4px 0;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading State -->
+  <div id="loading-screen">
+    <div class="spinner"></div>
+    <div style="font-size: 13px; color: #94a3b8; font-weight: 600;">מתחבר לסט...</div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- STATE 1: EVENT CLOSED (ALTERNATIVE 3: RETRO VINYL LOUNGE) -->
+  <!-- ======================================================== -->
+  <div id="state-closed">
+    <div class="warm-glow"></div>
+
+    <div class="closed-container">
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        The Set Has Finished
+      </div>
+
+      <h1 class="dj-names" id="closed-dj-title">DJ SHAZZ &amp; DJ SONIC</h1>
+      <div class="dj-subtitle">Vinyl &amp; Live Mashups</div>
+
+      <!-- Realistic Turntable Vinyl -->
+      <div class="vinyl-wrapper">
+        <div class="vinyl-disc">
+          <div class="vinyl-label">
+            <div class="label-text-top">SHAZZ &amp; SONIC</div>
+            <div class="vinyl-hole"></div>
+            <div class="label-text-bot">TRACK ENDED</div>
+          </div>
+        </div>
+        <!-- SVG Lifted Tonearm -->
+        <svg class="tonearm" viewBox="0 0 70 110" fill="none">
+          <circle cx="55" cy="15" r="12" fill="#333" stroke="#888" stroke-width="2"/>
+          <path d="M55 27 L45 80 L35 95" stroke="#aaa" stroke-width="3.5" stroke-linecap="round"/>
+          <rect x="26" y="90" width="16" height="14" rx="2" fill="#f97316" stroke="#fff" stroke-width="1.5" transform="rotate(-25 34 97)"/>
+        </svg>
+      </div>
+
+      <div class="party-card">
+        <h2 class="main-message">המוזיקה נחה, אבל הקצב לא מפסיק... 💿</h2>
+        <p class="sub-message">
+          תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!
+        </p>
+
+        <a class="social-btn" href="https://instagram.com" target="_blank">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path></svg>
+          עקבו אחרינו באינסטגרם
+        </a>
+
+        <a class="secondary-btn" href="https://soundcloud.com" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+          שמעו את הסטים שלנו ברשת
+        </a>
+      </div>
+    </div>
+
+    <footer style="font-size: 11px; color: #64748b; letter-spacing: 1px; text-align: center; margin-top: 20px;">
+      GUEST REQUESTS &bull; DJ SHAZZ &amp; DJ SONIC &bull; ONYX
+    </footer>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- STATE 2: ACTIVE EVENT (GUEST REQUESTS SEARCH & SUBMIT)  -->
+  <!-- ======================================================== -->
+  <div id="state-active">
+    <div class="active-header">
+      <div class="live-badge">
+        <span class="live-pulse"></span>
+        עמדת בקשות שירים פעילה
+      </div>
+      <h1 class="active-dj-title" id="active-dj-title">DJ SHAZZ &amp; DJ SONIC</h1>
+      <p class="active-subtitle">חפשו שיר והדיג'יי ינגן אותו ברחבה!</p>
+    </div>
+
+    <!-- Active Success Confirmation Card (if already submitted) -->
+    <div id="success-banner" class="success-card">
+      <div style="font-size: 13px; color: #a7f3d0; font-weight: 700;">הבקשה שלך התקבלה בהצלחה! 🎉</div>
+      <div class="success-number" id="ticket-number">#01</div>
+      <div style="font-size: 12px; color: #6ee7b7;" id="ticket-track-name">Track Name</div>
+    </div>
+
+    <!-- Search Card -->
+    <div class="search-box-card">
+      <div class="input-wrapper">
+        <input type="text" id="query-input" class="search-input" placeholder="חפשו שיר, אמן או הדביקו קישור יוטיוב..." />
+        <button id="search-btn" class="search-btn" onclick="performSearch()">חפש</button>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-list" class="results-container"></div>
+  </div>
+
+  <!-- Request Details Modal -->
+  <div id="request-modal" class="modal-overlay">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <h3 style="font-size: 18px; font-weight: 900; color: #fff;">בקשת שיר לדיג'יי 🎧</h3>
+
+      <div class="modal-song-preview">
+        <img id="modal-thumb" class="modal-song-thumb" src="" alt="" />
+        <div style="flex: 1; overflow: hidden;">
+          <div id="modal-title" style="font-size: 13px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+          <div id="modal-channel" style="font-size: 11px; color: #94a3b8;"></div>
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label">השם שלך:</label>
+        <input type="text" id="requester-name" class="modal-input" placeholder="למשל: דניאל" />
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label">הקדשה או ברכה (אופציונלי):</label>
+        <input type="text" id="requester-note" class="modal-input" placeholder="למשל: מזל טוב לחתן והכלה!" />
+      </div>
+
+      <button id="modal-submit-btn" class="submit-request-btn" onclick="submitRequest()">שלח בקשה עכשיו 🚀</button>
+    </div>
+  </div>
+
+  <script>
+    // Extract Room from URL query string ?room=XYZ
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = (urlParams.get('room') || 'default-session').toUpperCase();
+    
+    let selectedTrack = null;
+    let roomRef = null;
+
+    // Optional Firebase Config (supports localStorage injection from DJ app or default free relay)
+    const savedConfig = localStorage.getItem('onyx_firebase_config');
+    let firebaseConfig = null;
+    try {
+      if (savedConfig) firebaseConfig = JSON.parse(savedConfig);
+    } catch(e) {}
+
+    // Initialize Firebase if configured
+    let db = null;
+    if (firebaseConfig && firebaseConfig.apiKey) {
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        roomRef = db.ref('events/' + roomId);
+      } catch(e) {
+        console.warn('Firebase init error', e);
+      }
+    }
+
+    // Monitor Event Status
+    function checkStatus() {
+      if (roomRef) {
+        roomRef.on('value', (snapshot) => {
+          const data = snapshot.val();
+          document.getElementById('loading-screen').style.display = 'none';
+          if (data && data.isActive) {
+            showActiveState(data);
+          } else {
+            showClosedState();
+          }
+        });
+      } else {
+        // Fallback / Demonstration Mode based on URL param or LocalStorage
+        const localActive = localStorage.getItem('onyx_room_active_' + roomId);
+        const isActive = localActive === 'true' || urlParams.get('live') === 'true';
+        setTimeout(() => {
+          document.getElementById('loading-screen').style.display = 'none';
+          if (isActive) {
+            showActiveState({ djName: 'DJ Shazz & DJ Sonic' });
+          } else {
+            showClosedState();
+          }
+        }, 500);
+      }
+    }
+
+    function showClosedState() {
+      document.getElementById('state-closed').style.display = 'flex';
+      document.getElementById('state-active').style.display = 'none';
+    }
+
+    function showActiveState(data) {
+      document.getElementById('state-closed').style.display = 'none';
+      document.getElementById('state-active').style.display = 'flex';
+      if (data && data.djName) {
+        document.getElementById('active-dj-title').innerText = data.djName;
+        document.getElementById('closed-dj-title').innerText = data.djName;
+      }
+    }
+
+    // YouTube Search (Supports Direct oEmbed + YouTube Public Scraping API)
+    async function performSearch() {
+      const query = document.getElementById('query-input').value.trim();
+      if (!query) return;
+
+      const searchBtn = document.getElementById('search-btn');
+      searchBtn.innerText = '...';
+      searchBtn.disabled = true;
+
+      const resultsList = document.getElementById('results-list');
+      resultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 20px;">מחפש שירים...</div>';
+
+      try {
+        // 1. If user pasted direct YouTube link
+        if (query.includes('youtube.com') || query.includes('youtu.be')) {
+          const res = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(query)}`);
+          const data = await res.json();
+          if (data && data.title) {
+            renderResults([{
+              id: query,
+              url: query,
+              title: data.title,
+              channel: data.author_name || 'YouTube',
+              thumbnail: data.thumbnail_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150'
+            }]);
+            return;
+          }
+        }
+
+        // 2. Fast public search relay (Invidious / Piped API or direct JSON search)
+        const searchApiUrl = `https://invidious.private.coffee/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
+        const resp = await fetch(searchApiUrl);
+        if (resp.ok) {
+          const items = await resp.json();
+          const cleanTracks = items.slice(0, 10).map(v => ({
+            id: v.videoId,
+            url: `https://youtube.com/watch?v=${v.videoId}`,
+            title: v.title,
+            channel: v.author,
+            thumbnail: v.videoThumbnails ? v.videoThumbnails[0].url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`
+          }));
+          renderResults(cleanTracks);
+        } else {
+          fallbackMockSearch(query);
+        }
+      } catch (err) {
+        console.warn('Online search API error, applying resilient search fallback', err);
+        fallbackMockSearch(query);
+      } finally {
+        searchBtn.innerText = 'חפש';
+        searchBtn.disabled = false;
+      }
+    }
+
+    function fallbackMockSearch(query) {
+      renderResults([
+        {
+          id: 'yt_1',
+          url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+          title: query,
+          channel: 'YouTube Audio',
+          thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=150'
+        }
+      ]);
+    }
+
+    function renderResults(tracks) {
+      const container = document.getElementById('results-list');
+      if (!tracks.length) {
+        container.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 20px;">לא נמצאו תוצאות. נסו חיפוש אחר.</div>';
+        return;
+      }
+
+      container.innerHTML = tracks.map((t, idx) => `
+        <div class="result-item">
+          <img src="${t.thumbnail}" class="result-thumb" alt="" />
+          <div class="result-info">
+            <div class="result-title" title="${t.title}">${t.title}</div>
+            <div class="result-channel">${t.channel}</div>
+          </div>
+          <button class="request-btn" onclick='openModal(${JSON.stringify(t)})'>בקש שיר</button>
+        </div>
+      `).join('');
+    }
+
+    function openModal(track) {
+      selectedTrack = track;
+      document.getElementById('modal-thumb').src = track.thumbnail;
+      document.getElementById('modal-title').innerText = track.title;
+      document.getElementById('modal-channel').innerText = track.channel;
+      document.getElementById('request-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('request-modal').style.display = 'none';
+      selectedTrack = null;
+    }
+
+    async function submitRequest() {
+      if (!selectedTrack) return;
+      const requester = document.getElementById('requester-name').value.trim() || 'אורח אנונימי';
+      const note = document.getElementById('requester-note').value.trim();
+
+      const btn = document.getElementById('modal-submit-btn');
+      btn.innerText = 'שולח...';
+      btn.disabled = true;
+
+      const payload = {
+        title: selectedTrack.title,
+        channel: selectedTrack.channel,
+        url: selectedTrack.url,
+        thumbnail: selectedTrack.thumbnail,
+        requester: requester,
+        note: note,
+        timestamp: Date.now(),
+        status: 'pending'
+      };
+
+      try {
+        if (roomRef) {
+          // Push to Firebase Realtime Database under events/{roomId}/requests
+          await roomRef.child('requests').push(payload);
+        } else {
+          // LocalStorage fallback for testing
+          const key = 'onyx_requests_' + roomId;
+          const current = JSON.parse(localStorage.getItem(key) || '[]');
+          current.push({ ...payload, id: 'req_' + Date.now() });
+          localStorage.setItem(key, JSON.stringify(current));
+          // Dispatch storage event for same-browser testing
+          window.dispatchEvent(new Event('storage'));
+        }
+
+        // Show Ticket on UI
+        document.getElementById('success-banner').style.display = 'block';
+        document.getElementById('ticket-track-name').innerText = selectedTrack.title;
+        closeModal();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        alert('שגיאה בשליחת הבקשה: ' + err.message);
+      } finally {
+        btn.innerText = 'שלח בקשה עכשיו 🚀';
+        btn.disabled = false;
+      }
+    }
+
+    // Enter Key Search Support
+    document.getElementById('query-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') performSearch();
+    });
+
+    // Start
+    checkStatus();
+  </script>
+</body>
+</html>

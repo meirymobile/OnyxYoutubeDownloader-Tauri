@@ -7,6 +7,9 @@ if getattr(sys, 'frozen', False) and 'DYLD_LIBRARY_PATH' in os.environ:
     del os.environ['DYLD_LIBRARY_PATH']
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+PLUGINS_DIR = os.path.expanduser("~/.onyx_plugins")
+os.makedirs(PLUGINS_DIR, exist_ok=True)
+sys.path.insert(0, PLUGINS_DIR)
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -189,6 +192,7 @@ class DownloadRequest(BaseModel):
     title: Optional[str] = None
     bpm_prefix: Optional[bool] = False
     bpm_suffix: Optional[bool] = False
+    custom_prefix: Optional[str] = None
     video_dir: Optional[str] = None
     audio_dir: Optional[str] = None
     onyx_dir: Optional[str] = None
@@ -203,6 +207,7 @@ class DownloadRequest(BaseModel):
     shazam_sample_duration: Optional[int] = 10
     shazam_sample_interval: Optional[int] = 30
     download_delay: Optional[int] = 0
+    auto_cue: Optional[bool] = False
 
 class PlaylistParseReq(BaseModel):
     url: str
@@ -306,7 +311,7 @@ def process_download(job_id: str, req: DownloadRequest):
                     track_paths = split_album(audio_path, info_dict, base_audio_dir, progress_callback=on_progress)
                 
                 # Enrich and rename if requested
-                if "mp3" in req.formats or is_playlist_requested or (req.bpm_prefix or req.bpm_suffix or req.spotify or getattr(req, "djay_mode", False)):
+                if "mp3" in req.formats or is_playlist_requested or (req.bpm_prefix or req.bpm_suffix or req.spotify or getattr(req, "djay_mode", False) or getattr(req, "custom_prefix", None)):
                     enriched_paths = []
                     for track in track_paths:
                         enriched = enrich_and_rename_file(
@@ -315,9 +320,11 @@ def process_download(job_id: str, req: DownloadRequest):
                             bpm_prefix=req.bpm_prefix, 
                             bpm_suffix=req.bpm_suffix,
                             analyze_bpm=req.analyze_bpm,
+                            extract_drop_cue=req.auto_cue,
                             progress_callback=on_progress,
                             known_artist=req.artist,
-                            known_title=req.title
+                            known_title=req.title,
+                            custom_prefix=getattr(req, "custom_prefix", None)
                         )
                         enriched_paths.append(enriched)
                     track_paths = enriched_paths
@@ -556,28 +563,47 @@ def check_updates():
 @app.post("/api/update-plugins")
 def update_plugins():
     try:
+        import urllib.request
+        import json
+        import zipfile
+        import io
+        import os
         import sys
         import importlib
         
-        # Save original argv
-        orig_argv = sys.argv.copy()
+        # 1. Get latest yt-dlp version info from PyPI
+        req = urllib.request.Request("https://pypi.org/pypi/yt-dlp/json", headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode("utf-8"))
         
-        # Run pip install --target ~/.onyx_plugins --upgrade yt-dlp demucs
-        sys.argv = ["pip", "install", "--target", PLUGINS_DIR, "--upgrade", "yt-dlp", "demucs"]
-        try:
-            runpy.run_module("pip", run_name="__main__")
-        except SystemExit as e:
-            if e.code != 0:
-                raise Exception(f"Pip failed with code {e.code}")
-        finally:
-            sys.argv = orig_argv
+        # 2. Find the wheel url
+        wheel_url = None
+        for file_info in data["urls"]:
+            if file_info["filename"].endswith(".whl"):
+                wheel_url = file_info["url"]
+                break
+                
+        if not wheel_url:
+            raise Exception("Could not find yt-dlp wheel url")
+            
+        # 3. Download and extract wheel to PLUGINS_DIR
+        req = urllib.request.Request(wheel_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req) as response:
+            wheel_data = response.read()
+            
+        with zipfile.ZipFile(io.BytesIO(wheel_data)) as z:
+            z.extractall(PLUGINS_DIR)
+            
+        # 4. Insert into sys.path (it should already be there from startup, but just in case)
+        if PLUGINS_DIR not in sys.path:
+            sys.path.insert(0, PLUGINS_DIR)
             
         # Reload yt_dlp module dynamically in memory
         if "yt_dlp" in sys.modules:
             import yt_dlp
             importlib.reload(yt_dlp)
             
-        return {"status": "success", "message": "Plugins updated and reloaded in memory successfully!"}
+        return {"status": "success", "message": "yt-dlp updated and reloaded successfully!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
-import { Download, Music, RefreshCw, X, HardDrive, AlertTriangle, ChevronUp, FolderOpen, Activity } from "lucide-react"
+import { Download, Music, RefreshCw, X, HardDrive, AlertTriangle, ChevronUp, FolderOpen, Activity, MapPin } from "lucide-react"
 
 const CompanionHeader = React.memo(({ onDrag, onOpenFolder, onMinimize, onClose }) => {
   return (
@@ -31,6 +31,7 @@ const DjayCompanion = () => {
   const [errorMsg, setErrorMsg] = useState(null)
   const [dlStates, setDlStates] = useState({})
   const [bpmToggles, setBpmToggles] = useState({})
+  const [autoCueToggles, setAutoCueToggles] = useState({})
   
   // Sync global status for the floating icon
   useEffect(() => {
@@ -112,6 +113,7 @@ const DjayCompanion = () => {
         formats: ["mp3"],
         djay_mode: true,
         analyze_bpm: bpmToggles[deckId] || false,
+        auto_cue: autoCueToggles[deckId] || false,
         audio_dir: audioDir,
         artist: track.artist || undefined,
         title: track.title || undefined
@@ -265,6 +267,17 @@ const DjayCompanion = () => {
                     <span className="text-xs font-bold text-slate-100 truncate">{deck.title || "Unknown Track"}</span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <button 
+                      onClick={() => setAutoCueToggles(prev => ({ ...prev, [deck.deck]: !prev[deck.deck] }))}
+                      className={`text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors border ${
+                        autoCueToggles[deck.deck] 
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
+                          : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
+                      }`}
+                      title="Auto Hot-Cue on Drop"
+                    >
+                      <MapPin className="w-2.5 h-2.5" /> Cue
+                    </button>
                     <button 
                       onClick={() => setBpmToggles(prev => ({ ...prev, [deck.deck]: !prev[deck.deck] }))}
                       className={`text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors border ${

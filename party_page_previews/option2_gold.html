@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DJ Shazz × DJ Sonic | Luxury VIP Night</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Heebo:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: #050507;
+      font-family: 'Heebo', sans-serif;
+      min-height: 100vh;
+      color: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      overflow-x: hidden;
+      position: relative;
+      padding: 24px 16px 36px;
+    }
+
+    /* Ambient Gold Light */
+    .gold-light {
+      position: absolute;
+      width: 380px;
+      height: 380px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.18) 0%, rgba(212, 175, 55, 0.05) 45%, transparent 70%);
+      top: 15%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    #particles-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin: auto 0;
+    }
+
+    /* Golden Crown / VIP Badge */
+    .vip-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 18px;
+      background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(0, 0, 0, 0.4));
+      border: 1px solid rgba(212, 175, 55, 0.45);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #fde047;
+      margin-bottom: 24px;
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.2);
+    }
+    .vip-star {
+      color: #eab308;
+      font-size: 14px;
+      animation: sparkle 2s infinite ease-in-out;
+    }
+    @keyframes sparkle {
+      0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.8; }
+      50% { transform: scale(1.3) rotate(45deg); opacity: 1; }
+    }
+
+    /* DJ Main Title */
+    .dj-names {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(28px, 7.5vw, 38px);
+      font-weight: 900;
+      letter-spacing: 3px;
+      line-height: 1.2;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #fff3b0 0%, #ca9e43 35%, #ffd700 70%, #996515 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 4px 15px rgba(202, 158, 67, 0.4));
+    }
+
+    .dj-subtitle {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      color: #a1a1aa;
+      text-transform: uppercase;
+      margin-bottom: 30px;
+    }
+
+    /* VIP Party Card */
+    .party-card {
+      background: linear-gradient(180deg, rgba(18, 18, 22, 0.8) 0%, rgba(9, 9, 12, 0.95) 100%);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      border-radius: 28px;
+      padding: 36px 24px;
+      width: 100%;
+      backdrop-filter: blur(25px);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8),
+                  inset 0 1px 1px rgba(253, 224, 71, 0.2),
+                  0 0 40px rgba(202, 158, 67, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+    .party-card::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .champagne-emblem {
+      width: 68px;
+      height: 68px;
+      margin: 0 auto 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.25) 0%, rgba(0, 0, 0, 0.4) 100%);
+      border: 1.5px solid rgba(212, 175, 55, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 30px rgba(212, 175, 55, 0.35);
+    }
+    .champagne-emblem svg {
+      width: 32px;
+      height: 32px;
+      color: #ffd700;
+      filter: drop-shadow(0 0 6px #ffd700);
+    }
+
+    .main-message {
+      font-size: 25px;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 10px;
+      letter-spacing: -0.2px;
+    }
+    .sub-message {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.6;
+      font-weight: 300;
+      margin-bottom: 28px;
+    }
+
+    /* VIP Action Button */
+    .vip-action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 15px 24px;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+      color: #1a1304;
+      background: linear-gradient(135deg, #fff2a3 0%, #eab308 50%, #ca8a04 100%);
+      box-shadow: 0 10px 30px rgba(202, 138, 4, 0.4);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .vip-action-btn::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -60%;
+      width: 40%;
+      height: 200%;
+      background: rgba(255, 255, 255, 0.5);
+      transform: rotate(25deg);
+      animation: shine 4s infinite;
+    }
+    @keyframes shine {
+      0% { left: -60%; }
+      30%, 100% { left: 140%; }
+    }
+    .vip-action-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 35px rgba(202, 138, 4, 0.6);
+    }
+
+    .secondary-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 13px 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(212, 175, 55, 0.25);
+      border-radius: 16px;
+      color: #e2e8f0;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.25s ease;
+    }
+    .secondary-btn:hover {
+      background: rgba(212, 175, 55, 0.1);
+      border-color: rgba(212, 175, 55, 0.5);
+    }
+
+    footer {
+      position: relative;
+      z-index: 2;
+      font-size: 10px;
+      color: #64748b;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="gold-light"></div>
+  <canvas id="particles-canvas"></canvas>
+
+  <div class="container">
+    <div class="vip-badge">
+      <span class="vip-star">✦</span>
+      Guest Requests Concluded
+      <span class="vip-star">✦</span>
+    </div>
+
+    <h1 class="dj-names">DJ SHAZZ<br><span style="font-size: 0.6em; opacity: 0.75; font-family: 'Heebo';">&amp;</span> DJ SONIC</h1>
+    <div class="dj-subtitle">Exclusive Live DJ Set</div>
+
+    <div class="party-card">
+      <div class="champagne-emblem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+      </div>
+
+      <h2 class="main-message">תודה על לילה בלתי נשכח! ✨</h2>
+      <p class="sub-message">
+        הרחבה הייתה באש בזכותכם! עמדת בקשות האורחים סגורה לסבב הנוכחי. נתראה בשמחות ובאירוע הבא.
+      </p>
+
+      <a class="vip-action-btn" href="#">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        שמירת קשר / הזמנת אירועים
+      </a>
+
+      <a class="secondary-btn" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path></svg>
+        עקבו אחרינו באינסטגרם
+      </a>
+    </div>
+  </div>
+
+  <footer>
+    EXCLUSIVE PRODUCTION &bull; DJ SHAZZ &amp; DJ SONIC &bull; ONYX
+  </footer>
+
+  <script>
+    // Floating Gold Sparkles Canvas
+    const canvas = document.getElementById('particles-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    class Particle {
+      constructor() {
+        this.reset();
+      }
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = canvas.height + Math.random() * 20;
+        this.size = Math.random() * 2.2 + 0.6;
+        this.speedY = Math.random() * 0.8 + 0.3;
+        this.speedX = (Math.random() - 0.5) * 0.4;
+        this.alpha = Math.random() * 0.7 + 0.3;
+        this.decay = Math.random() * 0.003 + 0.001;
+      }
+      update() {
+        this.y -= this.speedY;
+        this.x += this.speedX;
+        this.alpha -= this.decay;
+        if (this.alpha <= 0 || this.y < 0) {
+          this.reset();
+        }
+      }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(253, 224, 71, ${this.alpha})`;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#eab308';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    for (let i = 0; i < 40; i++) {
+      const p = new Particle();
+      p.y = Math.random() * canvas.height;
+      particles.push(p);
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      requestAnimationFrame(animate);
+    }
+    animate();
+  </script>
+</body>
+</html>
