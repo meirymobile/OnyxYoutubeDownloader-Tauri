@@ -84,6 +84,61 @@ export default function GuestRequestsModal({
   const [isCopied, setIsCopied] = useState(false);
   const [isBigQr, setIsBigQr] = useState(false);
 
+  // Synchronized Refs to avoid stale closures in MQTT listeners
+  const isActiveRef = useRef(isActive);
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
+
+  const autoDownloadRef = useRef(autoDownload);
+  useEffect(() => {
+    autoDownloadRef.current = autoDownload;
+  }, [autoDownload]);
+
+  const djNamesRef = useRef(djNames);
+  useEffect(() => {
+    djNamesRef.current = djNames;
+  }, [djNames]);
+
+  const hiveClientRef = useRef(null);
+  const emqxClientRef = useRef(null);
+
+  // Broadcast Real-time Room Active/Closed Status to all guests via Retained MQTT
+  const broadcastRoomStatus = (activeState, customRoomCode) => {
+    const currentState = typeof activeState === 'boolean' ? activeState : isActiveRef.current;
+    const targetRoom = customRoomCode || roomCode;
+    const cleanRoom = (targetRoom || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+    const statusTopic = `onyx/status/${cleanRoom}`;
+    const payloadStr = JSON.stringify({
+      active: currentState,
+      room: cleanRoom,
+      djNames: djNamesRef.current || 'DJ Shazz & DJ Sonic',
+      timestamp: Date.now()
+    });
+
+    const MqttMessage = Paho?.Message || (Paho?.default && Paho.default.Message) || (window.Paho && window.Paho.Message);
+    if (!MqttMessage) return;
+
+    const sendToClient = (client, name) => {
+      try {
+        if (client && client.isConnected()) {
+          const msg = new MqttMessage(payloadStr);
+          msg.destinationName = statusTopic;
+          msg.qos = 0;
+          msg.retained = true;
+          client.send(msg);
+          console.log(`[Onyx MQTT] Broadcasted status (${currentState ? 'ACTIVE' : 'CLOSED'}) to ${name} on ${statusTopic} with retain=true`);
+        }
+      } catch (err) {
+        console.warn(`[Onyx MQTT] Failed to broadcast status to ${name}:`, err);
+      }
+    };
+
+    sendToClient(hiveClientRef.current, 'HiveMQ');
+    sendToClient(emqxClientRef.current, 'EMQX');
+  };
+
+
   // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('onyx_guest_active', String(isActive));
@@ -157,7 +212,11 @@ export default function GuestRequestsModal({
         : 'https://dj-onyxdownloader-guest-requests.vercel.app';
       const url = new URL(validBase);
       url.searchParams.set('room', roomCode || 'SHAZZ-SONIC');
-      url.searchParams.set('live', 'true');
+      if (!isActive) {
+        url.searchParams.set('closed', 'true');
+      } else {
+        url.searchParams.set('live', 'true');
+      }
       if (geoEnabled && djLat !== null && djLon !== null) {
         url.searchParams.set('lat', String(djLat));
         url.searchParams.set('lon', String(djLon));
@@ -165,7 +224,7 @@ export default function GuestRequestsModal({
       }
       return url.toString();
     } catch (e) {
-      return `https://dj-onyxdownloader-guest-requests.vercel.app?room=${encodeURIComponent(roomCode || 'SHAZZ-SONIC')}&live=true`;
+      return `https://dj-onyxdownloader-guest-requests.vercel.app?room=${encodeURIComponent(roomCode || 'SHAZZ-SONIC')}${!isActive ? '&closed=true' : '&live=true'}`;
     }
   };
 
@@ -252,7 +311,9 @@ export default function GuestRequestsModal({
           cleanSession: true,
           onSuccess: () => {
             console.log('Onyx connected to HiveMQ WSS topic:', topic);
+            hiveClientRef.current = hiveClient;
             try { hiveClient.subscribe(topic, { qos: 0 }); } catch(e) {}
+            broadcastRoomStatus(isActiveRef.current);
           },
           onFailure: () => {
             if (!isUnmounted) hiveReconnectTimer = setTimeout(initHive, 4000);
@@ -284,7 +345,9 @@ export default function GuestRequestsModal({
           cleanSession: true,
           onSuccess: () => {
             console.log('Onyx connected to EMQX WSS topic:', topic);
+            emqxClientRef.current = emqxClient;
             try { emqxClient.subscribe(topic, { qos: 0 }); } catch(e) {}
+            broadcastRoomStatus(isActiveRef.current);
           },
           onFailure: () => {
             if (!isUnmounted) emqxReconnectTimer = setTimeout(initEmqx, 4000);
@@ -313,19 +376,33 @@ export default function GuestRequestsModal({
       }
     }, 1500);
 
+    // Heartbeat: Republish room status every 15s to maintain broker retained state
+    const heartbeatInterval = setInterval(() => {
+      broadcastRoomStatus(isActiveRef.current);
+    }, 15000);
+
     return () => {
       isUnmounted = true;
       if (hiveReconnectTimer) clearTimeout(hiveReconnectTimer);
       if (emqxReconnectTimer) clearTimeout(emqxReconnectTimer);
+      clearInterval(heartbeatInterval);
       clearInterval(pollLocal);
+      hiveClientRef.current = null;
+      emqxClientRef.current = null;
       try { if (hiveClient && hiveClient.isConnected()) hiveClient.disconnect(); } catch(e) {}
       try { if (emqxClient && emqxClient.isConnected()) emqxClient.disconnect(); } catch(e) {}
     };
-  }, [roomCode, requestCounter, autoDownload]);
+  }, [roomCode, requestCounter]);
 
   // Process a newly received song request
   const processIncomingRequest = async (reqItem) => {
     if (!reqItem || !reqItem.title) return;
+
+    // Hard reject if DJ station is turned OFF (inactive)
+    if (!isActiveRef.current) {
+      console.warn(`[Onyx] Blocked incoming request "${reqItem.title}" because requests station is CLOSED (OFF).`);
+      return;
+    }
 
     setRequests(prev => {
       // Robust deduplication by id or by url/title received within 20s
@@ -361,7 +438,7 @@ export default function GuestRequestsModal({
       playChime();
 
       // Trigger auto-download if active
-      if (autoDownload && isActive) {
+      if (autoDownloadRef.current && isActiveRef.current) {
         setTimeout(() => triggerDownload(newRequest), 100);
       }
 
@@ -510,12 +587,17 @@ export default function GuestRequestsModal({
         return;
       }
     }
+    // Broadcast CLOSED state for the retiring room code immediately
+    broadcastRoomStatus(false, roomCode);
+
     const newCode = `SHAZZ-${Math.floor(1000 + Math.random() * 9000)}`;
     setRoomCode(newCode);
     setRequestCounter(0);
     setRequests([]);
     setIsActive(true);
     localStorage.setItem('onyx_room_active_' + newCode, 'true');
+    // Broadcast ACTIVE state for new room
+    setTimeout(() => broadcastRoomStatus(true, newCode), 500);
   };
 
   // Toggle active/inactive
@@ -523,6 +605,7 @@ export default function GuestRequestsModal({
     const nextState = !isActive;
     setIsActive(nextState);
     localStorage.setItem('onyx_room_active_' + roomCode, String(nextState));
+    broadcastRoomStatus(nextState);
   };
 
   const copyLink = () => {

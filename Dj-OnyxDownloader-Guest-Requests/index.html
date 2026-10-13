@@ -774,12 +774,93 @@
       }
     }
 
+    // Global Event Room State
+    let isRoomActive = true;
+    let mqttStatusClient = null;
+
+    function initMqttStatusListener() {
+      const cleanRoom = (roomId || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+      const statusTopic = `onyx/status/${cleanRoom}`;
+      const PahoLib = window.Paho;
+      const Client = (PahoLib && PahoLib.MQTT && PahoLib.MQTT.Client) || (PahoLib && PahoLib.Client);
+      if (!Client) return;
+
+      const handleStatusMessage = (msg) => {
+        try {
+          const statusInfo = JSON.parse(msg.payloadString);
+          console.log('[Guest MQTT] Received room status update:', statusInfo);
+          const loadScreen = document.getElementById('loading-screen');
+          if (loadScreen) loadScreen.style.display = 'none';
+
+          if (statusInfo.active === false) {
+            isRoomActive = false;
+            showClosedState({ reason: 'inactive' });
+            closeModal();
+          } else if (statusInfo.active === true) {
+            isRoomActive = true;
+            showActiveState(statusInfo);
+          }
+        } catch(e) {
+          console.warn('[Guest MQTT] Error parsing status payload:', e);
+        }
+      };
+
+      // Try HiveMQ first
+      try {
+        const clientId = 'guest_status_' + Math.random().toString(36).substring(2, 9);
+        mqttStatusClient = new Client('broker.hivemq.com', 8884, '/mqtt', clientId);
+        mqttStatusClient.onMessageArrived = handleStatusMessage;
+        mqttStatusClient.onConnectionLost = () => {
+          setTimeout(initMqttStatusListener, 3500);
+        };
+        mqttStatusClient.connect({
+          useSSL: true,
+          timeout: 4,
+          cleanSession: true,
+          onSuccess: () => {
+            console.log('[Guest MQTT] Subscribed to status on HiveMQ:', statusTopic);
+            mqttStatusClient.subscribe(statusTopic, { qos: 0 });
+          },
+          onFailure: () => {
+            tryEmqxFallback();
+          }
+        });
+      } catch(e) {
+        tryEmqxFallback();
+      }
+
+      function tryEmqxFallback() {
+        try {
+          const fbId = 'guest_status_fb_' + Math.random().toString(36).substring(2, 9);
+          const emqx = new Client('broker.emqx.io', 8084, '/mqtt', fbId);
+          emqx.onMessageArrived = handleStatusMessage;
+          emqx.connect({
+            useSSL: true,
+            timeout: 4,
+            cleanSession: true,
+            onSuccess: () => {
+              console.log('[Guest MQTT] Subscribed to status on EMQX fallback:', statusTopic);
+              emqx.subscribe(statusTopic, { qos: 0 });
+            }
+          });
+        } catch(e) {}
+      }
+    }
+
     // Monitor Event Status & Location
     async function checkStatus() {
       const loadScreen = document.getElementById('loading-screen');
       if (loadScreen) loadScreen.style.display = 'flex';
 
-      // 1. Verify Geofence first if configured
+      // 1. Explicitly closed in URL query param:
+      if (urlParams.get('closed') === 'true') {
+        isRoomActive = false;
+        if (loadScreen) loadScreen.style.display = 'none';
+        showClosedState({ reason: 'inactive' });
+        return;
+      }
+
+      // 2. Verify Geofence first if configured
       if (hasGeofence) {
         const geoCheck = await verifyGuestLocation();
         if (!geoCheck.allowed) {
@@ -789,33 +870,44 @@
         }
       }
 
-      // 2. Check Event Active Status
+      // 3. Connect real-time status listener via MQTT retained channel
+      initMqttStatusListener();
+
+      // 4. Also check Firebase if configured
       if (roomRef) {
         roomRef.on('value', (snapshot) => {
           const data = snapshot.val();
           if (loadScreen) loadScreen.style.display = 'none';
           if (data && data.isActive) {
+            isRoomActive = true;
             showActiveState(data);
           } else {
+            isRoomActive = false;
             showClosedState({ reason: 'inactive' });
+            closeModal();
           }
         });
-      } else {
-        const localActive = localStorage.getItem('onyx_room_active_' + roomId);
-        const isExplicitlyClosed = urlParams.get('closed') === 'true' || localActive === 'false';
-        const isActive = !isExplicitlyClosed;
-        setTimeout(() => {
-          if (loadScreen) loadScreen.style.display = 'none';
-          if (isActive) {
-            showActiveState({ djName: 'DJ Shazz & DJ Sonic' });
-          } else {
-            showClosedState({ reason: 'inactive' });
-          }
-        }, 500);
       }
+
+      // Fallback timeout in case MQTT status hasn't arrived within 1.2s
+      setTimeout(() => {
+        if (loadScreen && loadScreen.style.display !== 'none') {
+          loadScreen.style.display = 'none';
+          if (isRoomActive) {
+            showActiveState({ djName: 'DJ Shazz & DJ Sonic' });
+          }
+        }
+      }, 1200);
     }
 
     function showClosedState(info) {
+      isRoomActive = false;
+      closeModal();
+      const results = document.getElementById('search-results');
+      if (results) results.innerHTML = '';
+      const input = document.getElementById('search-input');
+      if (input) input.value = '';
+
       document.getElementById('state-closed').style.display = 'flex';
       document.getElementById('state-active').style.display = 'none';
 
@@ -848,6 +940,7 @@
     }
 
     function showActiveState(data) {
+      isRoomActive = true;
       document.getElementById('state-closed').style.display = 'none';
       document.getElementById('state-active').style.display = 'flex';
 
@@ -860,10 +953,11 @@
         }
       }
 
-      if (data && data.djName) {
-        document.getElementById('active-dj-title').innerText = data.djName;
-        document.getElementById('closed-dj-title').innerText = data.djName;
-      }
+      const names = (data && (data.djNames || data.djName)) || 'DJ Shazz & DJ Sonic';
+      const activeTitle = document.getElementById('active-dj-title');
+      const closedTitle = document.getElementById('closed-dj-title');
+      if (activeTitle) activeTitle.innerText = names;
+      if (closedTitle) closedTitle.innerText = names;
     }
 
     // YouTube Search (Supports Direct oEmbed + YouTube Public Scraping API)
@@ -1062,6 +1156,12 @@
     }
 
     async function submitRequest() {
+      if (!isRoomActive) {
+        alert('עמדת בקשת השירים סגורה כרגע על ידי הדיג\'יי. נתראה בסט הבא! 🎧');
+        closeModal();
+        showClosedState({ reason: 'inactive' });
+        return;
+      }
       if (!selectedTrack) return;
       const requester = document.getElementById('requester-name').value.trim() || 'אורח אנונימי';
       const note = document.getElementById('requester-note').value.trim();
