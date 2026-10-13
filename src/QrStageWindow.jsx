@@ -4,9 +4,11 @@ import { Maximize, Minimize, Music, Sparkles, X, Radio, Disc, MapPin } from 'luc
 
 export default function QrStageWindow() {
   const [roomCode, setRoomCode] = useState(() => localStorage.getItem('onyx_guest_room') || 'SHAZZ-SONIC');
-  const [djNames, setDjNames] = useState(() => localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic');
-  const [webHostUrl, setWebHostUrl] = useState(() => localStorage.getItem('onyx_guest_host_url') || window.location.origin + '/Dj-OnyxDownloader-Guest-Requests/index.html');
-  const [isActive, setIsActive] = useState(() => localStorage.getItem('onyx_guest_active') === 'true');
+  const [webHostUrl, setWebHostUrl] = useState(() => {
+    const saved = localStorage.getItem('onyx_guest_host_url');
+    if (saved && (saved.startsWith('http://') || saved.startsWith('https://'))) return saved;
+    return 'https://onyx-requests.vercel.app';
+  });
   const [geoEnabled, setGeoEnabled] = useState(() => localStorage.getItem('onyx_guest_geo_enabled') !== 'false');
   const [geoRadius, setGeoRadius] = useState(() => localStorage.getItem('onyx_guest_geo_radius') || '30');
   const [djLat, setDjLat] = useState(() => localStorage.getItem('onyx_guest_lat'));
@@ -19,8 +21,8 @@ export default function QrStageWindow() {
   useEffect(() => {
     const syncState = () => {
       setRoomCode(localStorage.getItem('onyx_guest_room') || 'SHAZZ-SONIC');
-      setDjNames(localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic');
-      setWebHostUrl(localStorage.getItem('onyx_guest_host_url') || window.location.origin + '/Dj-OnyxDownloader-Guest-Requests/index.html');
+      const savedHost = localStorage.getItem('onyx_guest_host_url');
+      setWebHostUrl((savedHost && (savedHost.startsWith('http://') || savedHost.startsWith('https://'))) ? savedHost : 'https://onyx-requests.vercel.app');
       setIsActive(localStorage.getItem('onyx_guest_active') === 'true');
       setGeoEnabled(localStorage.getItem('onyx_guest_geo_enabled') !== 'false');
       setGeoRadius(localStorage.getItem('onyx_guest_geo_radius') || '30');

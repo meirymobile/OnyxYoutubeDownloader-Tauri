@@ -979,14 +979,16 @@ function App() {
         )}
 
         {/* Guest Requests Modal */}
-        <GuestRequestsModal 
-          isOpen={showGuestRequests}
-          onClose={() => setShowGuestRequests(false)}
-          serverPort={serverPort}
-          onPlayInternal={playInternalAudio}
-          onOpenPath={handleOpenPath}
-          directories={directories}
-        />
+        {showGuestRequests && (
+          <GuestRequestsModal 
+            isOpen={showGuestRequests}
+            onClose={() => setShowGuestRequests(false)}
+            serverPort={serverPort}
+            onPlayInternal={playInternalAudio}
+            onOpenPath={handleOpenPath}
+            directories={directories}
+          />
+        )}
 
         {/* Settings Modal */}
         {showSettings && (

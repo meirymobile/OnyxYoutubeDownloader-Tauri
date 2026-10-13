@@ -26,7 +26,11 @@ export default function GuestRequestsModal({
     return localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic';
   });
   const [webHostUrl, setWebHostUrl] = useState(() => {
-    return localStorage.getItem('onyx_guest_host_url') || window.location.origin + '/Dj-OnyxDownloader-Guest-Requests/index.html';
+    const saved = localStorage.getItem('onyx_guest_host_url');
+    if (saved && (saved.startsWith('http://') || saved.startsWith('https://'))) {
+      return saved;
+    }
+    return 'https://onyx-requests.vercel.app';
   });
   const [autoDownload, setAutoDownload] = useState(() => {
     const saved = localStorage.getItem('onyx_guest_auto_download');
@@ -136,14 +140,21 @@ export default function GuestRequestsModal({
 
   // Target Guest URL (includes room + geofence if active)
   const buildGuestUrl = () => {
-    const url = new URL(webHostUrl);
-    url.searchParams.set('room', roomCode);
-    if (geoEnabled && djLat !== null && djLon !== null) {
-      url.searchParams.set('lat', String(djLat));
-      url.searchParams.set('lon', String(djLon));
-      url.searchParams.set('rad', String(geoRadius));
+    try {
+      const validBase = (webHostUrl && (webHostUrl.startsWith('http://') || webHostUrl.startsWith('https://')))
+        ? webHostUrl
+        : 'https://onyx-requests.vercel.app';
+      const url = new URL(validBase);
+      url.searchParams.set('room', roomCode || 'SHAZZ-SONIC');
+      if (geoEnabled && djLat !== null && djLon !== null) {
+        url.searchParams.set('lat', String(djLat));
+        url.searchParams.set('lon', String(djLon));
+        url.searchParams.set('rad', String(geoRadius));
+      }
+      return url.toString();
+    } catch (e) {
+      return `https://onyx-requests.vercel.app?room=${encodeURIComponent(roomCode || 'SHAZZ-SONIC')}`;
     }
-    return url.toString();
   };
 
   const targetGuestUrl = buildGuestUrl();
