@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
-import { Maximize, Minimize, Music, Sparkles, X, Radio, Disc } from 'lucide-react';
+import { Maximize, Minimize, Music, Sparkles, X, Radio, Disc, MapPin } from 'lucide-react';
 
 export default function QrStageWindow() {
   const [roomCode, setRoomCode] = useState(() => localStorage.getItem('onyx_guest_room') || 'SHAZZ-SONIC');
   const [djNames, setDjNames] = useState(() => localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic');
   const [webHostUrl, setWebHostUrl] = useState(() => localStorage.getItem('onyx_guest_host_url') || window.location.origin + '/Dj-OnyxDownloader-Guest-Requests/index.html');
   const [isActive, setIsActive] = useState(() => localStorage.getItem('onyx_guest_active') === 'true');
+  const [geoEnabled, setGeoEnabled] = useState(() => localStorage.getItem('onyx_guest_geo_enabled') !== 'false');
+  const [geoRadius, setGeoRadius] = useState(() => localStorage.getItem('onyx_guest_geo_radius') || '30');
+  const [djLat, setDjLat] = useState(() => localStorage.getItem('onyx_guest_lat'));
+  const [djLon, setDjLon] = useState(() => localStorage.getItem('onyx_guest_lon'));
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasRef = useRef(null);
@@ -18,6 +22,10 @@ export default function QrStageWindow() {
       setDjNames(localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic');
       setWebHostUrl(localStorage.getItem('onyx_guest_host_url') || window.location.origin + '/Dj-OnyxDownloader-Guest-Requests/index.html');
       setIsActive(localStorage.getItem('onyx_guest_active') === 'true');
+      setGeoEnabled(localStorage.getItem('onyx_guest_geo_enabled') !== 'false');
+      setGeoRadius(localStorage.getItem('onyx_guest_geo_radius') || '30');
+      setDjLat(localStorage.getItem('onyx_guest_lat'));
+      setDjLon(localStorage.getItem('onyx_guest_lon'));
     };
 
     window.addEventListener('storage', syncState);
@@ -28,7 +36,22 @@ export default function QrStageWindow() {
     };
   }, []);
 
-  const targetUrl = `${webHostUrl}${webHostUrl.includes('?') ? '&' : '?'}room=${encodeURIComponent(roomCode)}`;
+  const buildTargetUrl = () => {
+    try {
+      const url = new URL(webHostUrl);
+      url.searchParams.set('room', roomCode);
+      if (geoEnabled && djLat && djLon) {
+        url.searchParams.set('lat', String(djLat));
+        url.searchParams.set('lon', String(djLon));
+        url.searchParams.set('rad', String(geoRadius));
+      }
+      return url.toString();
+    } catch {
+      return `${webHostUrl}${webHostUrl.includes('?') ? '&' : '?'}room=${encodeURIComponent(roomCode)}`;
+    }
+  };
+
+  const targetUrl = buildTargetUrl();
 
   // Generate ultra high resolution QR code for big screens
   useEffect(() => {
@@ -132,6 +155,13 @@ export default function QrStageWindow() {
           <div className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/30">
             ROOM: {roomCode}
           </div>
+
+          {geoEnabled && djLat && djLon && (
+            <div className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>GEOFENCE: {geoRadius}M</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

@@ -564,7 +564,7 @@
   <!-- Loading State -->
   <div id="loading-screen">
     <div class="spinner"></div>
-    <div style="font-size: 13px; color: #94a3b8; font-weight: 600;">מתחבר לסט...</div>
+    <div id="loading-text" style="font-size: 13px; color: #f59e0b; font-weight: 700;">מתחבר לסט...</div>
   </div>
 
   <!-- ======================================================== -->
@@ -600,10 +600,14 @@
       </div>
 
       <div class="party-card">
-        <h2 class="main-message">המוזיקה נחה, אבל הקצב לא מפסיק... 💿</h2>
-        <p class="sub-message">
+        <h2 class="main-message" id="closed-main-msg">המוזיקה נחה, אבל הקצב לא מפסיק... 💿</h2>
+        <p class="sub-message" id="closed-sub-msg">
           תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!
         </p>
+
+        <button id="retry-location-btn" style="display: none; width: 100%; padding: 12px; background: linear-gradient(135deg, #f59e0b, #ec4899); border: none; border-radius: 14px; color: #fff; font-weight: 800; font-size: 13px; margin-bottom: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);" onclick="checkStatus()">
+          בדוק מיקום שוב 🔄
+        </button>
 
         <a class="social-btn" href="https://instagram.com" target="_blank">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path></svg>
@@ -630,6 +634,10 @@
       <div class="live-badge">
         <span class="live-pulse"></span>
         עמדת בקשות שירים פעילה
+      </div>
+      <div id="geofence-badge" style="display: none; font-size: 11px; color: #34d399; font-weight: 700; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 12px; border-radius: 20px; margin-top: 6px; align-items: center; justify-content: center; gap: 6px;">
+        <span>📍 בתוך רחבת המסיבה</span>
+        <span id="geofence-dist-txt" style="color: #a7f3d0; font-family: monospace;"></span>
       </div>
       <h1 class="active-dj-title" id="active-dj-title">DJ SHAZZ &amp; DJ SONIC</h1>
       <p class="active-subtitle">חפשו שיר והדיג'יי ינגן אותו ברחבה!</p>
@@ -683,12 +691,66 @@
   </div>
 
   <script>
-    // Extract Room from URL query string ?room=XYZ
+    // Extract Room & Geofence params from URL
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = (urlParams.get('room') || 'default-session').toUpperCase();
-    
+    const targetLat = parseFloat(urlParams.get('lat'));
+    const targetLon = parseFloat(urlParams.get('lon'));
+    const allowedRadius = parseFloat(urlParams.get('rad') || '30');
+    const hasGeofence = !isNaN(targetLat) && !isNaN(targetLon);
+
+    let guestDistance = 0;
     let selectedTrack = null;
     let roomRef = null;
+
+    // Haversine distance formula in meters
+    function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371e3; // Earth radius in meters
+      const phi1 = lat1 * Math.PI / 180;
+      const phi2 = lat2 * Math.PI / 180;
+      const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+      const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+                Math.cos(phi1) * Math.cos(phi2) *
+                Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return Math.round(R * c);
+    }
+
+    // Verify Guest Device Location against Event Geofence
+    async function verifyGuestLocation() {
+      if (!hasGeofence) return { allowed: true, distance: 0 };
+
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          resolve({ allowed: false, reason: 'unsupported' });
+          return;
+        }
+
+        const loadText = document.getElementById('loading-text');
+        if (loadText) loadText.innerText = 'מאמת נוכחות ברחבת המסיבה... 📍';
+
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const guestLat = pos.coords.latitude;
+            const guestLon = pos.coords.longitude;
+            const dist = calculateDistanceMeters(targetLat, targetLon, guestLat, guestLon);
+            guestDistance = dist;
+
+            if (dist <= allowedRadius) {
+              resolve({ allowed: true, distance: dist });
+            } else {
+              resolve({ allowed: false, reason: 'outside', distance: dist, allowedRadius: allowedRadius });
+            }
+          },
+          (err) => {
+            console.warn('Geolocation permission error:', err);
+            resolve({ allowed: false, reason: 'denied', error: err.message });
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+        );
+      });
+    }
 
     // Optional Firebase Config (supports localStorage injection from DJ app or default free relay)
     const savedConfig = localStorage.getItem('onyx_firebase_config');
@@ -709,41 +771,91 @@
       }
     }
 
-    // Monitor Event Status
-    function checkStatus() {
+    // Monitor Event Status & Location
+    async function checkStatus() {
+      const loadScreen = document.getElementById('loading-screen');
+      if (loadScreen) loadScreen.style.display = 'flex';
+
+      // 1. Verify Geofence first if configured
+      if (hasGeofence) {
+        const geoCheck = await verifyGuestLocation();
+        if (!geoCheck.allowed) {
+          if (loadScreen) loadScreen.style.display = 'none';
+          showClosedState(geoCheck);
+          return;
+        }
+      }
+
+      // 2. Check Event Active Status
       if (roomRef) {
         roomRef.on('value', (snapshot) => {
           const data = snapshot.val();
-          document.getElementById('loading-screen').style.display = 'none';
+          if (loadScreen) loadScreen.style.display = 'none';
           if (data && data.isActive) {
             showActiveState(data);
           } else {
-            showClosedState();
+            showClosedState({ reason: 'inactive' });
           }
         });
       } else {
-        // Fallback / Demonstration Mode based on URL param or LocalStorage
         const localActive = localStorage.getItem('onyx_room_active_' + roomId);
-        const isActive = localActive === 'true' || urlParams.get('live') === 'true';
+        const isActive = localActive === 'true' || urlParams.get('live') === 'true' || (!localActive && !urlParams.get('closed'));
         setTimeout(() => {
-          document.getElementById('loading-screen').style.display = 'none';
+          if (loadScreen) loadScreen.style.display = 'none';
           if (isActive) {
             showActiveState({ djName: 'DJ Shazz & DJ Sonic' });
           } else {
-            showClosedState();
+            showClosedState({ reason: 'inactive' });
           }
         }, 500);
       }
     }
 
-    function showClosedState() {
+    function showClosedState(info) {
       document.getElementById('state-closed').style.display = 'flex';
       document.getElementById('state-active').style.display = 'none';
+
+      const mainMsg = document.getElementById('closed-main-msg');
+      const subMsg = document.getElementById('closed-sub-msg');
+      const retryBtn = document.getElementById('retry-location-btn');
+
+      if (info && info.reason === 'outside') {
+        const distTxt = info.distance >= 1000 
+          ? (info.distance / 1000).toFixed(1) + ' ק"מ' 
+          : info.distance + ' מטר';
+        if (mainMsg) mainMsg.innerHTML = 'הגישה מותרת רק מתוך רחבת המסיבה 📍';
+        if (subMsg) subMsg.innerHTML = `עמדת בקשת השירים פתוחה רק למי שנמצא ברדיוס של <b>${info.allowedRadius} מטר</b> מעמדת הדיג'יי.<br/>מרחקך כרגע: <b>כ-${distTxt}</b>.<br/>התקרבו לעמדה ונסו שוב!`;
+        if (retryBtn) {
+          retryBtn.style.display = 'block';
+          retryBtn.innerText = 'בדוק מיקום שוב 🔄';
+        }
+      } else if (info && info.reason === 'denied') {
+        if (mainMsg) mainMsg.innerHTML = 'נדרש אישור מיקום לבקשת שירים 📍';
+        if (subMsg) subMsg.innerHTML = 'כדי לוודא שאתה נמצא במסיבה ולמנוע בקשות מבחוץ, יש לאשר גישה למיקום הדפדפן בסמארטפון.';
+        if (retryBtn) {
+          retryBtn.style.display = 'block';
+          retryBtn.innerText = 'אשר מיקום ונסה שוב 🎯';
+        }
+      } else {
+        if (mainMsg) mainMsg.innerHTML = 'המוזיקה נחה, אבל הקצב לא מפסיק... 💿';
+        if (subMsg) subMsg.innerHTML = 'תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!';
+        if (retryBtn) retryBtn.style.display = 'none';
+      }
     }
 
     function showActiveState(data) {
       document.getElementById('state-closed').style.display = 'none';
       document.getElementById('state-active').style.display = 'flex';
+
+      if (hasGeofence) {
+        const badge = document.getElementById('geofence-badge');
+        const distSpan = document.getElementById('geofence-dist-txt');
+        if (badge && distSpan) {
+          badge.style.display = 'inline-flex';
+          distSpan.innerText = `(${guestDistance} מטר מהעמדה)`;
+        }
+      }
+
       if (data && data.djName) {
         document.getElementById('active-dj-title').innerText = data.djName;
         document.getElementById('closed-dj-title').innerText = data.djName;

@@ -3,7 +3,8 @@ import QRCode from 'qrcode';
 import { 
   X, Radio, Power, RefreshCw, Copy, Check, ExternalLink, Play, 
   FolderOpen, Music, CheckCircle2, AlertCircle, Clock, Volume2, 
-  QrCode, Maximize2, Minimize2, Settings2, User, MessageSquareHeart, Monitor
+  QrCode, Maximize2, Minimize2, Settings2, User, MessageSquareHeart, Monitor,
+  MapPin, Navigation, Compass
 } from 'lucide-react';
 
 export default function GuestRequestsModal({ 
@@ -44,6 +45,25 @@ export default function GuestRequestsModal({
     }
   });
 
+  // Geofencing State
+  const [geoEnabled, setGeoEnabled] = useState(() => {
+    const saved = localStorage.getItem('onyx_guest_geo_enabled');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [geoRadius, setGeoRadius] = useState(() => {
+    return parseInt(localStorage.getItem('onyx_guest_geo_radius') || '30', 10);
+  });
+  const [djLat, setDjLat] = useState(() => {
+    const saved = localStorage.getItem('onyx_guest_lat');
+    return saved ? parseFloat(saved) : null;
+  });
+  const [djLon, setDjLon] = useState(() => {
+    const saved = localStorage.getItem('onyx_guest_lon');
+    return saved ? parseFloat(saved) : null;
+  });
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [locationStatus, setLocationStatus] = useState('');
+
   // UI States
   const [activeTab, setActiveTab] = useState('list'); // 'list', 'qr', 'settings'
   const [qrDataUrl, setQrDataUrl] = useState('');
@@ -59,10 +79,74 @@ export default function GuestRequestsModal({
     localStorage.setItem('onyx_guest_auto_download', String(autoDownload));
     localStorage.setItem('onyx_guest_counter', String(requestCounter));
     localStorage.setItem('onyx_guest_requests_list', JSON.stringify(requests));
-  }, [isActive, roomCode, djNames, webHostUrl, autoDownload, requestCounter, requests]);
+    localStorage.setItem('onyx_guest_geo_enabled', String(geoEnabled));
+    localStorage.setItem('onyx_guest_geo_radius', String(geoRadius));
+    if (djLat !== null) localStorage.setItem('onyx_guest_lat', String(djLat));
+    if (djLon !== null) localStorage.setItem('onyx_guest_lon', String(djLon));
+  }, [isActive, roomCode, djNames, webHostUrl, autoDownload, requestCounter, requests, geoEnabled, geoRadius, djLat, djLon]);
 
-  // Target Guest URL
-  const targetGuestUrl = `${webHostUrl}${webHostUrl.includes('?') ? '&' : '?'}room=${encodeURIComponent(roomCode)}`;
+  // Fetch DJ computer location
+  const fetchDjLocation = () => {
+    setIsFetchingLocation(true);
+    setLocationStatus('דוגם מיקום נוכחי...');
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = parseFloat(pos.coords.latitude.toFixed(6));
+          const lon = parseFloat(pos.coords.longitude.toFixed(6));
+          setDjLat(lat);
+          setDjLon(lon);
+          setIsFetchingLocation(false);
+          setLocationStatus(`נדגם מיקום GPS: ${lat}, ${lon} (דיוק: ±${Math.round(pos.coords.accuracy)} מ')`);
+        },
+        async (err) => {
+          console.warn("Navigator geolocation failed, using IP fallback:", err);
+          try {
+            const res = await fetch('https://ipapi.co/json/');
+            const data = await res.json();
+            if (data && data.latitude && data.longitude) {
+              const lat = parseFloat(data.latitude.toFixed(6));
+              const lon = parseFloat(data.longitude.toFixed(6));
+              setDjLat(lat);
+              setDjLon(lon);
+              setLocationStatus(`מיקום רשת: ${lat}, ${lon} (${data.city || 'מחשב דיג\'יי'})`);
+            } else {
+              setLocationStatus('לא ניתן לאתר מיקום');
+            }
+          } catch (e) {
+            setLocationStatus('שגיאה בזיהוי מיקום');
+          } finally {
+            setIsFetchingLocation(false);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+      );
+    } else {
+      setIsFetchingLocation(false);
+      setLocationStatus('דפדפן אינו תומך במיקום');
+    }
+  };
+
+  // Auto-fetch location on first load if not present
+  useEffect(() => {
+    if (!djLat || !djLon) {
+      fetchDjLocation();
+    }
+  }, []);
+
+  // Target Guest URL (includes room + geofence if active)
+  const buildGuestUrl = () => {
+    const url = new URL(webHostUrl);
+    url.searchParams.set('room', roomCode);
+    if (geoEnabled && djLat !== null && djLon !== null) {
+      url.searchParams.set('lat', String(djLat));
+      url.searchParams.set('lon', String(djLon));
+      url.searchParams.set('rad', String(geoRadius));
+    }
+    return url.toString();
+  };
+
+  const targetGuestUrl = buildGuestUrl();
 
   // Generate QR Code
   useEffect(() => {
@@ -577,6 +661,47 @@ export default function GuestRequestsModal({
                 <p className="text-xs text-slate-400 mt-1">סרקו כדי לבקש שיר ישירות מהסמארטפון</p>
               </div>
 
+              {/* Geofence Status Badge in QR Tab */}
+              <div className="w-full p-3 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5 text-right">
+                  <div className={`p-2 rounded-xl ${geoEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-500'}`}>
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white flex items-center gap-2">
+                      <span>הגבלת רדיוס הגעה:</span>
+                      <span className={geoEnabled ? 'text-emerald-400 font-mono font-black' : 'text-slate-500'}>
+                        {geoEnabled ? `${geoRadius} מטר` : 'מבוטל (פתוח לכולם)'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {geoEnabled 
+                        ? (locationStatus || (djLat ? `GPS דיג'יי: ${djLat}, ${djLon}` : 'לא נדגם מיקום'))
+                        : 'כל מי שמחזיק בקישור יכול לבקש שירים'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {geoEnabled && (
+                    <button
+                      onClick={fetchDjLocation}
+                      disabled={isFetchingLocation}
+                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
+                      title="דגום מיקום נוכחי מחדש"
+                    >
+                      <Navigation className={`w-3.5 h-3.5 ${isFetchingLocation ? 'animate-spin text-amber-400' : ''}`} />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setActiveTab('settings')}
+                    className="px-2.5 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition-all"
+                  >
+                    שנה רדיוס
+                  </button>
+                </div>
+              </div>
+
               {/* External Screen / Projector Launch Buttons */}
               <div className="w-full flex flex-col sm:flex-row gap-2.5">
                 <button
@@ -664,6 +789,89 @@ export default function GuestRequestsModal({
                 <p className="text-[10px] text-slate-500 mt-1">
                   הכתובת הציבורית אליה מועלה פרויקט ה-Dj-OnyxDownloader-Guest-Requests (Vercel / Firebase Hosting / Netlify).
                 </p>
+              </div>
+
+              {/* GEOFENCING CONFIGURATION CARD */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-purple-500/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-white">הגבלת מיקום גאוגרפי (Geofencing)</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={geoEnabled} 
+                      onChange={(e) => setGeoEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  מנע מאנשים מחוץ למסיבה לבקש שירים. רק אורחים שנמצאים פיזית ברדיוס שהוגדר יוכלו לגשת לעמוד החיפוש. מי שמחוץ לרדיוס יקבל עמוד סגור ("נתראה באירוע הבא").
+                </p>
+
+                {geoEnabled && (
+                  <div className="space-y-3 pt-2 border-t border-slate-800/80">
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="text-xs font-bold text-slate-300">רדיוס מורשה במטרים:</label>
+                        <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                          {geoRadius} מטר
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="range" 
+                          min="10" 
+                          max="200" 
+                          step="5"
+                          value={geoRadius}
+                          onChange={(e) => setGeoRadius(parseInt(e.target.value, 10))}
+                          className="w-full accent-purple-500 cursor-pointer"
+                        />
+                      </div>
+
+                      {/* Quick Radius Buttons */}
+                      <div className="flex gap-1.5 mt-2">
+                        {[20, 30, 50, 100].map((r) => (
+                          <button
+                            key={r}
+                            onClick={() => setGeoRadius(r)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                              geoRadius === r 
+                                ? 'bg-purple-600 text-white shadow' 
+                                : 'bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700/60'
+                            }`}
+                          >
+                            {r} מטר {r === 30 ? '(ברירת מחדל)' : ''}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* DJ Location Status */}
+                    <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs">
+                      <div>
+                        <div className="font-semibold text-slate-300">מיקום עמדת הדיג'יי (מרכז המסיבה):</div>
+                        <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                          {locationStatus || (djLat ? `${djLat}, ${djLon}` : 'טרם נדגם מיקום')}
+                        </div>
+                      </div>
+                      <button
+                        onClick={fetchDjLocation}
+                        disabled={isFetchingLocation}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs font-bold border border-slate-700 transition-all shrink-0"
+                      >
+                        <Navigation className={`w-3.5 h-3.5 ${isFetchingLocation ? 'animate-spin' : ''}`} />
+                        <span>דגום מיקום נוכחי 🎯</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-800">
