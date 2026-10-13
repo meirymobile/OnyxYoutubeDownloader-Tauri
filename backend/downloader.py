@@ -29,11 +29,20 @@ def get_video_info(url: str):
         return info
 
 def download_video(url: str, output_dir: str, format_type: str = "video", progress_callback=None, trim_start=None, trim_end=None, download_delay: int = 0):
-    if not url.startswith("http") and not url.startswith("ytsearch"):
+    if "results?search_query=" in url:
+        from urllib.parse import urlparse, parse_qs, unquote
+        parsed = urlparse(url)
+        q = parse_qs(parsed.query).get('search_query', [''])[0]
+        if q:
+            url = f"ytsearch1:{unquote(q)}"
+        else:
+            url = f"ytsearch1:{url}"
+    elif not url.startswith("http") and not url.startswith("ytsearch"):
         url = f"ytsearch1:{url}"
     # format_type can be 'video' or 'audio'
     
     ydl_opts = {
+        'playlist_items': '1',
         'retries': 20,
         'fragment_retries': 20,
         'file_access_retries': 20,

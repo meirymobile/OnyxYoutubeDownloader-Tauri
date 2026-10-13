@@ -903,7 +903,7 @@
           if (data && data.results && data.results.length > 0) {
             const cleanTracks = data.results.map(t => ({
               id: String(t.trackId),
-              url: `https://www.youtube.com/results?search_query=${encodeURIComponent(t.artistName + ' ' + t.trackName)}`,
+              url: `ytsearch1:${t.artistName} ${t.trackName}`,
               title: `${t.artistName} - ${t.trackName}`,
               channel: t.collectionName || t.artistName,
               thumbnail: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '300x300bb') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150'
@@ -926,7 +926,7 @@
       renderResults([
         {
           id: 'yt_1',
-          url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+          url: `ytsearch1:${query}`,
           title: query,
           channel: 'YouTube Audio',
           thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=150'

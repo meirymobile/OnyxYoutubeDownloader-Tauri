@@ -360,15 +360,33 @@ export default function GuestRequestsModal({
     });
   };
 
-  // Trigger Local Download with Sequential Number Prefix
+  // Trigger Local Download with Sequential Number Prefix & Real-time Progress Tracking
   const triggerDownload = async (item) => {
-    setRequests(prev => prev.map(r => r.id === item.id ? { ...r, status: 'downloading' } : r));
+    // Sanitize URL: if it is a search results URL, convert to ytsearch1:
+    let downloadUrl = (item.url || '').trim();
+    if (downloadUrl.includes('results?search_query=')) {
+      try {
+        const q = new URL(downloadUrl).searchParams.get('search_query');
+        if (q) downloadUrl = `ytsearch1:${decodeURIComponent(q)}`;
+      } catch(e) {
+        downloadUrl = `ytsearch1:${item.title}`;
+      }
+    } else if (!downloadUrl.startsWith('http') && !downloadUrl.startsWith('ytsearch')) {
+      downloadUrl = `ytsearch1:${item.title}`;
+    }
+
+    setRequests(prev => prev.map(r => r.id === item.id ? { 
+      ...r, 
+      status: 'downloading',
+      percent: 5,
+      progressText: 'מתחיל הורדה...'
+    } : r));
 
     try {
       const audioDir = directories?.audio_dir ? `${directories.audio_dir}/GuestRequests` : '~/Downloads/OnyxAudio/GuestRequests';
       
       const payload = {
-        url: item.url,
+        url: downloadUrl,
         formats: ['mp3'],
         audio_dir: audioDir,
         custom_prefix: item.formattedNum,
@@ -387,32 +405,71 @@ export default function GuestRequestsModal({
         const jobId = data.job_id;
         setRequests(prev => prev.map(r => r.id === item.id ? { ...r, jobId } : r));
 
-        // Poll for completion
+        // Poll for progress percentage and completion every 600ms
         const pollTimer = setInterval(async () => {
           try {
             const statusRes = await fetch(`http://127.0.0.1:${serverPort}/api/download/${jobId}`);
             if (statusRes.ok) {
               const statusData = await statusRes.json();
+              
+              let pct = 0;
+              let progText = statusData.progress || 'מוריד...';
+
+              if (statusData.status === 'completed') {
+                pct = 100;
+                progText = 'ההורדה הושלמה!';
+              } else if (statusData.progress) {
+                const match = statusData.progress.match(/(\d+\.?\d*)%/);
+                if (match) {
+                  pct = Math.min(100, Math.max(0, Math.round(parseFloat(match[1]))));
+                } else if (statusData.progress.includes('Metadata') || statusData.progress.includes('BPM') || statusData.progress.includes('Renaming')) {
+                  pct = 95;
+                  progText = 'מעבד BPM ותגיות...';
+                } else if (statusData.progress.includes('Audio') || statusData.progress.includes('Starting')) {
+                  pct = 15;
+                  progText = 'מתחבר ליוטיוב...';
+                } else if (statusData.status === 'processing') {
+                  pct = 25;
+                }
+              }
+
               if (statusData.status === 'completed') {
                 clearInterval(pollTimer);
                 setRequests(prev => prev.map(r => r.id === item.id ? { 
                   ...r, 
                   status: 'ready', 
+                  percent: 100,
+                  progressText: 'הושלם',
                   filePath: statusData.result_file 
                 } : r));
               } else if (statusData.status === 'error') {
                 clearInterval(pollTimer);
-                setRequests(prev => prev.map(r => r.id === item.id ? { ...r, status: 'error' } : r));
+                setRequests(prev => prev.map(r => r.id === item.id ? { 
+                  ...r, 
+                  status: 'error',
+                  progressText: statusData.progress || 'שגיאה בהורדה'
+                } : r));
+              } else {
+                // Active download state - update percentage and label smoothly
+                setRequests(prev => prev.map(r => r.id === item.id ? { 
+                  ...r, 
+                  percent: pct,
+                  progressText: progText
+                } : r));
               }
             }
           } catch (e) {
             clearInterval(pollTimer);
           }
-        }, 1500);
+        }, 600);
       }
     } catch (err) {
       console.error("Failed to start download for guest request:", err);
-      setRequests(prev => prev.map(r => r.id === item.id ? { ...r, status: 'error' } : r));
+      setRequests(prev => prev.map(r => r.id === item.id ? { 
+        ...r, 
+        status: 'error',
+        progressText: 'שגיאת שרת מקומי'
+      } : r));
     }
   };
 
@@ -676,6 +733,27 @@ export default function GuestRequestsModal({
                             </span>
                           )}
                         </div>
+
+                        {/* Live Download Progress Bar & Status Text */}
+                        {item.status === 'downloading' && (
+                          <div className="mt-2.5 w-full bg-slate-950/80 p-2.5 rounded-xl border border-amber-500/30 shadow-inner">
+                            <div className="flex justify-between items-center text-[11px] font-mono mb-1.5">
+                              <span className="text-amber-300 font-bold truncate flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+                                {item.progressText || 'מוריד קובץ שמע...'}
+                              </span>
+                              <span className="text-amber-400 font-black text-xs font-mono ml-2 shrink-0">
+                                {item.percent || 0}%
+                              </span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
+                              <div 
+                                className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-400 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(245,158,11,0.6)]" 
+                                style={{ width: `${Math.max(5, item.percent || 0)}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -683,8 +761,9 @@ export default function GuestRequestsModal({
                     <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                       {/* Status Indicator */}
                       {item.status === 'downloading' && (
-                        <span className="text-[11px] font-mono font-bold text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30">
-                          <RefreshCw className="w-3 h-3 animate-spin" /> מוריד...
+                        <span className="text-xs font-mono font-black text-amber-300 flex items-center gap-1.5 bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-500/40 shadow-sm animate-pulse">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                          <span>{item.percent ? `${item.percent}%` : 'מוריד...'}</span>
                         </span>
                       )}
 
