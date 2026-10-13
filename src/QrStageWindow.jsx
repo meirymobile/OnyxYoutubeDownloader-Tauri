@@ -4,6 +4,7 @@ import { Maximize, Minimize, Music, Sparkles, X, Radio, Disc, MapPin } from 'luc
 
 export default function QrStageWindow() {
   const [roomCode, setRoomCode] = useState(() => localStorage.getItem('onyx_guest_room') || 'SHAZZ-SONIC');
+  const [djNames, setDjNames] = useState(() => localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic');
   const [webHostUrl, setWebHostUrl] = useState(() => {
     const saved = localStorage.getItem('onyx_guest_host_url');
     if (saved && (saved.startsWith('http://') || saved.startsWith('https://'))) return saved;
@@ -22,6 +23,7 @@ export default function QrStageWindow() {
   useEffect(() => {
     const syncState = () => {
       setRoomCode(localStorage.getItem('onyx_guest_room') || 'SHAZZ-SONIC');
+      setDjNames(localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic');
       const savedHost = localStorage.getItem('onyx_guest_host_url');
       setWebHostUrl((savedHost && (savedHost.startsWith('http://') || savedHost.startsWith('https://'))) ? savedHost : 'https://onyx-requests.vercel.app');
       setIsActive(localStorage.getItem('onyx_guest_active') === 'true');
