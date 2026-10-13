@@ -195,11 +195,11 @@ export default function QrStageWindow() {
       </div>
 
       {/* Center Stage Presentation */}
-      <div className="flex-1 flex flex-col items-center justify-center text-center z-10 max-w-2xl my-auto animate-fadeIn">
+      <div className="flex-1 flex flex-col items-center justify-center text-center z-10 w-full max-w-4xl my-auto animate-fadeIn px-2 md:px-4">
         
         {/* DJ Main Title */}
-        <div className="mb-4 md:mb-6">
-          <h1 className="text-4xl md:text-6xl font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(168,85,247,0.5)]">
+        <div className="mb-3 md:mb-5">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(168,85,247,0.5)]">
             {djNames}
           </h1>
           <p className="text-xs md:text-sm font-bold tracking-[6px] text-cyan-400 uppercase mt-1">
@@ -208,21 +208,21 @@ export default function QrStageWindow() {
         </div>
 
         {isActive ? (
-          /* ACTIVE EVENT: HUGE QR CODE CARD */
+          /* ACTIVE EVENT: OPTIMIZED STAGE QR CODE CARD */
           <div className="relative group">
             {/* Luminous Neon Frame */}
-            <div className="absolute -inset-3 bg-gradient-to-r from-purple-600 via-pink-500 to-amber-500 rounded-[38px] blur-xl opacity-70 group-hover:opacity-100 transition-opacity animate-pulse duration-1000" />
+            <div className="absolute -inset-3 bg-gradient-to-r from-purple-600 via-pink-500 to-amber-500 rounded-[34px] blur-xl opacity-75 group-hover:opacity-100 transition-opacity animate-pulse duration-1000" />
             
-            <div className="relative p-6 md:p-8 bg-white rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.9)] flex flex-col items-center">
+            <div className="relative p-4 sm:p-5 md:p-6 bg-white rounded-[28px] shadow-[0_20px_60px_rgba(0,0,0,0.9)] flex flex-col items-center">
               {qrDataUrl && (
                 <img 
                   src={qrDataUrl} 
-                  className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 object-contain" 
+                  className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 object-contain" 
                   alt="Guest Requests QR" 
                 />
               )}
               
-              <div className="mt-4 pt-3 border-t border-slate-200/80 w-full flex justify-between items-center text-slate-900 font-mono font-bold text-xs md:text-sm">
+              <div className="mt-2.5 pt-2 border-t border-slate-200/80 w-full flex justify-between items-center text-slate-900 font-mono font-bold text-xs sm:text-sm">
                 <span>ONYX STAGE DISPLAY</span>
                 <span className="text-amber-600 tracking-wider">#{roomCode}</span>
               </div>
@@ -241,16 +241,30 @@ export default function QrStageWindow() {
           </div>
         )}
 
-        {/* Bottom Callout Instructions */}
+        {/* Bottom Callout Instructions - Enriched, Huge Font & Crystal-Clear for Dancefloor Crowd */}
         {isActive && (
-          <div className="mt-6 md:mt-8 space-y-1">
-            <h3 className="text-lg md:text-2xl font-black text-white flex items-center justify-center gap-2">
-              <span>סרקו מהטלפון ובקשו שיר ישירות לדיג'יי</span>
-              <Music className="w-5 h-5 text-amber-400" />
-            </h3>
-            <p className="text-xs md:text-sm text-slate-400 font-medium">
-              השיר שתבחרו ביוטיוב ייכנס מיידית לעמדת הדיג'יי
+          <div className="mt-5 md:mt-7 space-y-2 md:space-y-3 w-full max-w-3xl px-2" dir="rtl">
+            {/* Primary Action Title */}
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white flex items-center justify-center gap-2 md:gap-3 drop-shadow-[0_4px_20px_rgba(245,158,11,0.6)]">
+              <Music className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 text-amber-400 shrink-0 animate-bounce" />
+              <span className="bg-gradient-to-r from-amber-300 via-orange-300 to-yellow-100 bg-clip-text text-transparent">
+                סרקו מהטלפון ובקשו שיר ישירות לדיג'יי!
+              </span>
+            </h2>
+
+            {/* Explanatory Subtitle */}
+            <p className="text-base sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-cyan-200 leading-snug drop-shadow-md">
+              השיר שתבחרו ביוטיוב ייכנס מיידית לעמדת הדיג'יי 🎧
             </p>
+
+            {/* Visual Step-by-Step Pill Badge for Dancefloor Crowd */}
+            <div className="pt-1 flex justify-center">
+              <div className="inline-flex items-center gap-2 md:gap-3 px-5 py-2 md:px-8 md:py-2.5 rounded-full bg-slate-900/90 border border-amber-400/40 shadow-[0_0_25px_rgba(245,158,11,0.25)] backdrop-blur-md">
+                <span className="text-amber-400 font-black text-xs sm:text-sm md:text-base lg:text-lg tracking-wide">
+                  1. פותחים מצלמה &bull; 2. סורקים את הברקוד &bull; 3. בוחרים שיר &bull; 4. שומעים ברחבה!
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </div>

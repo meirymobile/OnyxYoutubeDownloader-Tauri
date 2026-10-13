@@ -481,14 +481,23 @@ export default function GuestRequestsModal({
             סרקו לבקשת שירים &bull; GUEST REQUESTS
           </p>
 
-          <div className="p-6 bg-white rounded-3xl shadow-[0_0_50px_rgba(245,158,11,0.5)] mb-6">
-            {qrDataUrl && <img src={qrDataUrl} className="w-72 h-72 md:w-96 md:h-96 object-contain" alt="QR Code" />}
+          <div className="p-4 sm:p-5 bg-white rounded-3xl shadow-[0_0_50px_rgba(245,158,11,0.5)] mb-4">
+            {qrDataUrl && <img src={qrDataUrl} className="w-56 h-56 md:w-72 md:h-72 object-contain" alt="QR Code" />}
           </div>
 
-          <div className="text-xl font-mono text-amber-300 font-bold bg-slate-900 border border-slate-800 px-6 py-2.5 rounded-full mb-4">
+          <div className="space-y-2 max-w-xl mx-auto mb-3" dir="rtl">
+            <h3 className="text-2xl md:text-3xl font-black text-amber-300 drop-shadow">
+              סרקו מהטלפון ובקשו שיר ישירות לדיג'יי! 🎵
+            </h3>
+            <p className="text-base md:text-xl font-bold text-slate-200">
+              השיר שתבחרו ביוטיוב ייכנס מיידית לעמדת הדיג'יי
+            </p>
+          </div>
+
+          <div className="text-sm md:text-base font-mono text-amber-300 font-bold bg-slate-900 border border-slate-800 px-6 py-2 rounded-full mb-2">
             חדר: {roomCode}
           </div>
-          <p className="text-xs text-slate-500">הקוד מפנה ישירות לעמוד החיפוש והבקשות בסמארטפון</p>
+          <p className="text-xs text-slate-400 font-medium">פותחים מצלמה &bull; סורקים &bull; בוחרים שיר &bull; שומעים ברחבה!</p>
         </div>
       )}
 
