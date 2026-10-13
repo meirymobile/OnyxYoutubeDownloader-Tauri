@@ -13,6 +13,7 @@ export default function QrStageWindow() {
   const [geoRadius, setGeoRadius] = useState(() => localStorage.getItem('onyx_guest_geo_radius') || '30');
   const [djLat, setDjLat] = useState(() => localStorage.getItem('onyx_guest_lat'));
   const [djLon, setDjLon] = useState(() => localStorage.getItem('onyx_guest_lon'));
+  const [isActive, setIsActive] = useState(() => localStorage.getItem('onyx_guest_active') === 'true');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasRef = useRef(null);

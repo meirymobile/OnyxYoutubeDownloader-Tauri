@@ -8,6 +8,22 @@ import DjayCompanion from './DjayCompanion.jsx'
 import DjayFloatingIcon from './DjayFloatingIcon.jsx'
 import QrStageWindow from './QrStageWindow.jsx'
 
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (event) => {
+    console.error("Global window error:", event.error || event.message);
+    const root = document.getElementById('root');
+    if (root && (!root.children || root.children.length === 0)) {
+      root.innerHTML = `<div style="padding:30px;color:#f43f5e;background:#07020d;font-family:sans-serif;direction:ltr;">
+        <h2>Startup Error:</h2>
+        <pre style="background:#1e112a;padding:16px;border-radius:8px;color:#fbcfe8;white-space:pre-wrap;">${event.message}\n${event.filename || ''}:${event.lineno || ''}</pre>
+      </div>`;
+    }
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error("Unhandled promise rejection:", event.reason);
+  });
+}
+
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
