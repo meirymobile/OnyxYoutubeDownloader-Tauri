@@ -39,6 +39,14 @@ export default function GuestRequestsModal({
     return saved !== null ? saved === 'true' : true;
   });
 
+  // Dedicated Guest Requests Audio Directory (Independent of global system download directory)
+  const [guestAudioDir, setGuestAudioDir] = useState(() => {
+    const saved = localStorage.getItem('onyx_guest_audio_dir');
+    if (saved) return saved;
+    if (directories?.audio_dir) return `${directories.audio_dir}/GuestRequests`;
+    return '~/Downloads/OnyxAudio/GuestRequests';
+  });
+
   // Requests Queue & Counter
   const [requestCounter, setRequestCounter] = useState(() => {
     return parseInt(localStorage.getItem('onyx_guest_counter') || '0', 10);
@@ -83,13 +91,14 @@ export default function GuestRequestsModal({
     localStorage.setItem('onyx_guest_dj_names', djNames);
     localStorage.setItem('onyx_guest_host_url', webHostUrl);
     localStorage.setItem('onyx_guest_auto_download', String(autoDownload));
+    localStorage.setItem('onyx_guest_audio_dir', guestAudioDir);
     localStorage.setItem('onyx_guest_counter', String(requestCounter));
     localStorage.setItem('onyx_guest_requests_list', JSON.stringify(requests));
     localStorage.setItem('onyx_guest_geo_enabled', String(geoEnabled));
     localStorage.setItem('onyx_guest_geo_radius', String(geoRadius));
     if (djLat !== null) localStorage.setItem('onyx_guest_lat', String(djLat));
     if (djLon !== null) localStorage.setItem('onyx_guest_lon', String(djLon));
-  }, [isActive, roomCode, djNames, webHostUrl, autoDownload, requestCounter, requests, geoEnabled, geoRadius, djLat, djLon]);
+  }, [isActive, roomCode, djNames, webHostUrl, autoDownload, guestAudioDir, requestCounter, requests, geoEnabled, geoRadius, djLat, djLon]);
 
   // Fetch DJ computer location
   const fetchDjLocation = () => {
@@ -383,7 +392,7 @@ export default function GuestRequestsModal({
     } : r));
 
     try {
-      const audioDir = directories?.audio_dir ? `${directories.audio_dir}/GuestRequests` : '~/Downloads/OnyxAudio/GuestRequests';
+      const audioDir = guestAudioDir || (directories?.audio_dir ? `${directories.audio_dir}/GuestRequests` : '~/Downloads/OnyxAudio/GuestRequests');
       
       const payload = {
         url: downloadUrl,
@@ -470,6 +479,27 @@ export default function GuestRequestsModal({
         status: 'error',
         progressText: 'שגיאת שרת מקומי'
       } : r));
+    }
+  };
+
+  // Dedicated Guest Requests Directory Picker (Affects ONLY guest requests)
+  const handleBrowseGuestDir = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        defaultPath: guestAudioDir ? guestAudioDir.replace('~', '') : undefined
+      });
+      if (selected && typeof selected === 'string') {
+        setGuestAudioDir(selected);
+      }
+    } catch (err) {
+      console.warn("Tauri directory dialog error, falling back to prompt:", err);
+      const manual = window.prompt("הזן נתיב תיקייה מקומית לשמירת בקשות האורחים (משפיע רק על בקשות הקהל):", guestAudioDir);
+      if (manual && manual.trim()) {
+        setGuestAudioDir(manual.trim());
+      }
     }
   };
 
@@ -589,15 +619,24 @@ export default function GuestRequestsModal({
               <span>מסך מקרן / במה 🖥️</span>
             </button>
 
-            {/* Open Requests Directory in Finder */}
+            {/* Set/Change Guest Requests Destination Directory (Affects ONLY Guest Requests) */}
+            <button 
+              onClick={handleBrowseGuestDir}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500/15 to-orange-500/15 hover:from-amber-500/25 hover:to-orange-500/25 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+              title={`שנה יעד שמירה ספציפי לבקשות קהל בלבד (נוכחי: ${guestAudioDir})`}
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+              <span>יעד הורדות בקשות 📂</span>
+            </button>
+
+            {/* Open Current Guest Directory in Finder */}
             {onOpenPath && (
               <button 
-                onClick={() => onOpenPath(directories?.audio_dir ? `${directories.audio_dir}/GuestRequests` : '~/Downloads/OnyxAudio/GuestRequests')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+                onClick={() => onOpenPath(guestAudioDir)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
                 title="פתח את תיקיית שירי האורחים ב-Finder"
               >
-                <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-                <span>תיקיית שירים 📁</span>
+                <span>פתח תיקייה ↗</span>
               </button>
             )}
 
@@ -953,6 +992,45 @@ export default function GuestRequestsModal({
           {/* TAB 3: SETTINGS */}
           {activeTab === 'settings' && (
             <div className="max-w-lg mx-auto space-y-4 text-right">
+              {/* DEDICATED GUEST DOWNLOAD DIRECTORY CONFIGURATION CARD */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-2.5 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-black text-white">תיקיית יעד להורדת בקשות הקהל בלבד</span>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={handleBrowseGuestDir}
+                    className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-lg text-xs transition-all shadow active:scale-95 flex items-center gap-1"
+                  >
+                    <span>בחר תיקייה 📂</span>
+                  </button>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input 
+                    type="text" 
+                    value={guestAudioDir}
+                    onChange={(e) => setGuestAudioDir(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-amber-300 outline-none focus:border-amber-400"
+                    placeholder="~/Downloads/OnyxAudio/GuestRequests"
+                  />
+                  {onOpenPath && (
+                    <button 
+                      type="button"
+                      onClick={() => onOpenPath(guestAudioDir)}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold shrink-0 transition-colors"
+                      title="פתח תיקייה זו ב-Finder"
+                    >
+                      פתח ↗
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-amber-400/90 font-semibold leading-relaxed">
+                  ⚡ הגדרה זו משפיעה <b>אך ורק על מסך בקשות הקהל</b> ולא משנה את נתיב ההורדות הראשי של המערכת!
+                </p>
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
                   שמות הדיג'יים שיוצגו בראש העמוד:
