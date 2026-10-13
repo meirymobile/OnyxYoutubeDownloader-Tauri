@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
+import Paho from 'paho-mqtt';
 import { 
   X, Radio, Power, RefreshCw, Copy, Check, ExternalLink, Play, 
   FolderOpen, Music, CheckCircle2, AlertCircle, Clock, Volume2, 
@@ -17,7 +18,8 @@ export default function GuestRequestsModal({
 }) {
   // Event State
   const [isActive, setIsActive] = useState(() => {
-    return localStorage.getItem('onyx_guest_active') === 'true';
+    const saved = localStorage.getItem('onyx_guest_active');
+    return saved !== null ? saved === 'true' : true;
   });
   const [roomCode, setRoomCode] = useState(() => {
     return localStorage.getItem('onyx_guest_room') || 'SHAZZ-SONIC';
@@ -207,52 +209,89 @@ export default function GuestRequestsModal({
     }
   };
 
-  // Check incoming requests (Cloud Realtime Relay + Firebase + LocalStorage)
+  // Subscribe to Realtime Guest Requests via MQTT WSS (HiveMQ & EMQX redundant brokers)
   useEffect(() => {
-    const cleanRoom = (roomCode || 'SHAZZ-SONIC').toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'default';
-    const relayTopic = 'onyx_req_' + cleanRoom;
+    const cleanRoom = (roomCode || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+    const topic = `onyx/requests/${cleanRoom}`;
 
-    // 1. Live Server-Sent Events (SSE) listener for instantaneous reception (< 0.1s)
-    let sseSource = null;
-    try {
-      sseSource = new EventSource(`https://ntfy.sh/${relayTopic}/sse`);
-      sseSource.onmessage = (event) => {
-        try {
-          const envelope = JSON.parse(event.data);
-          if (envelope.event === 'message' && envelope.message) {
-            const req = JSON.parse(envelope.message);
-            processIncomingRequest(req);
-          }
-        } catch (e) {}
-      };
-    } catch (e) {
-      console.warn("SSE init error", e);
-    }
+    let isUnmounted = false;
+    let hiveClient = null;
+    let emqxClient = null;
+    let hiveReconnectTimer = null;
+    let emqxReconnectTimer = null;
 
-    // 2. Polling fallback every 2.5 seconds (catches any missed network packets)
-    let lastCheckedTime = Math.floor(Date.now() / 1000) - 30;
-    const pollRelay = async () => {
+    const MqttClient = Paho?.Client || (Paho?.default && Paho.default.Client) || (window.Paho && window.Paho.Client);
+
+    const initHive = () => {
+      if (isUnmounted || !MqttClient) return;
       try {
-        const res = await fetch(`https://ntfy.sh/${relayTopic}/json?poll=1&since=${lastCheckedTime}`);
-        if (res.ok) {
-          const text = await res.text();
-          const lines = text.trim().split('\n');
-          for (const line of lines) {
-            if (!line) continue;
-            try {
-              const msgObj = JSON.parse(line);
-              if (msgObj.time) lastCheckedTime = Math.max(lastCheckedTime, msgObj.time);
-              if (msgObj.event === 'message' && msgObj.message) {
-                const req = JSON.parse(msgObj.message);
-                processIncomingRequest(req);
-              }
-            } catch (e) {}
+        const id = 'onyx_desk_h_' + Math.random().toString(36).substring(2, 9);
+        hiveClient = new MqttClient('broker.hivemq.com', 8884, '/mqtt', id);
+        hiveClient.onConnectionLost = (resp) => {
+          if (!isUnmounted) hiveReconnectTimer = setTimeout(initHive, 3000);
+        };
+        hiveClient.onMessageArrived = (msg) => {
+          try {
+            const req = JSON.parse(msg.payloadString);
+            processIncomingRequest(req);
+          } catch(e) {}
+        };
+        hiveClient.connect({
+          useSSL: true,
+          timeout: 5,
+          keepAliveInterval: 30,
+          cleanSession: true,
+          onSuccess: () => {
+            console.log('Onyx connected to HiveMQ WSS topic:', topic);
+            try { hiveClient.subscribe(topic, { qos: 0 }); } catch(e) {}
+          },
+          onFailure: () => {
+            if (!isUnmounted) hiveReconnectTimer = setTimeout(initHive, 4000);
           }
-        }
-      } catch (e) {}
+        });
+      } catch(e) {
+        if (!isUnmounted) hiveReconnectTimer = setTimeout(initHive, 5000);
+      }
+    };
 
-      // Also check local storage for same-machine testing
-      const storageKey = 'onyx_requests_' + roomCode;
+    const initEmqx = () => {
+      if (isUnmounted || !MqttClient) return;
+      try {
+        const id = 'onyx_desk_e_' + Math.random().toString(36).substring(2, 9);
+        emqxClient = new MqttClient('broker.emqx.io', 8084, '/mqtt', id);
+        emqxClient.onConnectionLost = (resp) => {
+          if (!isUnmounted) emqxReconnectTimer = setTimeout(initEmqx, 3000);
+        };
+        emqxClient.onMessageArrived = (msg) => {
+          try {
+            const req = JSON.parse(msg.payloadString);
+            processIncomingRequest(req);
+          } catch(e) {}
+        };
+        emqxClient.connect({
+          useSSL: true,
+          timeout: 5,
+          keepAliveInterval: 30,
+          cleanSession: true,
+          onSuccess: () => {
+            console.log('Onyx connected to EMQX WSS topic:', topic);
+            try { emqxClient.subscribe(topic, { qos: 0 }); } catch(e) {}
+          },
+          onFailure: () => {
+            if (!isUnmounted) emqxReconnectTimer = setTimeout(initEmqx, 4000);
+          }
+        });
+      } catch(e) {
+        if (!isUnmounted) emqxReconnectTimer = setTimeout(initEmqx, 5000);
+      }
+    };
+
+    initHive();
+    initEmqx();
+
+    // LocalStorage fallback for same-machine testing
+    const pollLocal = setInterval(() => {
+      const storageKey = 'onyx_requests_' + cleanRoom;
       const stored = localStorage.getItem(storageKey);
       if (stored) {
         try {
@@ -261,37 +300,46 @@ export default function GuestRequestsModal({
             incoming.forEach(req => processIncomingRequest(req));
             localStorage.removeItem(storageKey);
           }
-        } catch (e) {}
+        } catch(e) {}
       }
-    };
-
-    const interval = setInterval(pollRelay, 2500);
+    }, 1500);
 
     return () => {
-      if (sseSource) sseSource.close();
-      clearInterval(interval);
+      isUnmounted = true;
+      if (hiveReconnectTimer) clearTimeout(hiveReconnectTimer);
+      if (emqxReconnectTimer) clearTimeout(emqxReconnectTimer);
+      clearInterval(pollLocal);
+      try { if (hiveClient && hiveClient.isConnected()) hiveClient.disconnect(); } catch(e) {}
+      try { if (emqxClient && emqxClient.isConnected()) emqxClient.disconnect(); } catch(e) {}
     };
   }, [roomCode, requestCounter, autoDownload]);
 
   // Process a newly received song request
   const processIncomingRequest = async (reqItem) => {
-    // Avoid duplicates by URL or ID
+    if (!reqItem || !reqItem.title) return;
+
     setRequests(prev => {
-      if (prev.some(r => r.url === reqItem.url && r.timestamp === reqItem.timestamp)) {
-        return prev;
-      }
+      // Robust deduplication by id or by url/title received within 20s
+      const isDuplicate = prev.some(r => {
+        if (reqItem.id && r.id === reqItem.id) return true;
+        if (r.url && reqItem.url && r.url === reqItem.url && Math.abs((r.timestamp || 0) - (reqItem.timestamp || 0)) < 20000) return true;
+        if (r.title && reqItem.title && r.title === reqItem.title && r.requester === reqItem.requester && Math.abs((r.timestamp || 0) - (reqItem.timestamp || 0)) < 20000) return true;
+        return false;
+      });
+
+      if (isDuplicate) return prev;
 
       const nextNum = (prev.length > 0 ? Math.max(...prev.map(r => r.num || 0)) : 0) + 1;
       const formattedNum = String(nextNum).padStart(2, '0');
 
       const newRequest = {
-        id: reqItem.id || 'req_' + Date.now(),
+        id: reqItem.id || 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
         num: nextNum,
         formattedNum: formattedNum,
         title: reqItem.title,
         channel: reqItem.channel || 'YouTube',
-        url: reqItem.url,
-        thumbnail: reqItem.thumbnail,
+        url: reqItem.url || '',
+        thumbnail: reqItem.thumbnail || '',
         requester: reqItem.requester || 'אורח',
         note: reqItem.note || '',
         timestamp: reqItem.timestamp || Date.now(),

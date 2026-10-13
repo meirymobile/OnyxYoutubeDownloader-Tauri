@@ -10,6 +10,8 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- Paho MQTT WebSocket Client for Instant Cloud Delivery -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -693,7 +695,8 @@
   <script>
     // Extract Room & Geofence params from URL
     const urlParams = new URLSearchParams(window.location.search);
-    const roomId = (urlParams.get('room') || 'default-session').toUpperCase();
+    const rawRoom = (urlParams.get('room') || 'SHAZZ-SONIC').trim();
+    const roomId = (rawRoom || 'SHAZZ-SONIC').toUpperCase();
     const targetLat = parseFloat(urlParams.get('lat'));
     const targetLon = parseFloat(urlParams.get('lon'));
     const allowedRadius = parseFloat(urlParams.get('rad') || '30');
@@ -963,6 +966,101 @@
       selectedTrack = null;
     }
 
+    // Dispatch Song Request via Realtime MQTT Broker (HiveMQ & EMQX fallback)
+    function sendViaMqtt(topic, payload) {
+      return new Promise((resolve) => {
+        try {
+          const PahoLib = window.Paho;
+          const Client = (PahoLib && PahoLib.MQTT && PahoLib.MQTT.Client) || (PahoLib && PahoLib.Client);
+          const Message = (PahoLib && PahoLib.MQTT && PahoLib.MQTT.Message) || (PahoLib && PahoLib.Message);
+
+          if (!Client || !Message) {
+            console.warn('Paho MQTT library not ready');
+            resolve(false);
+            return;
+          }
+
+          const clientId = 'guest_' + Math.random().toString(36).substring(2, 9);
+          const client = new Client('broker.hivemq.com', 8884, '/mqtt', clientId);
+          let finished = false;
+
+          const timer = setTimeout(() => {
+            if (!finished) {
+              finished = true;
+              try { client.disconnect(); } catch(e) {}
+              resolve(false);
+            }
+          }, 3500);
+
+          client.connect({
+            useSSL: true,
+            timeout: 3,
+            cleanSession: true,
+            onSuccess: () => {
+              try {
+                const msg = new Message(JSON.stringify(payload));
+                msg.destinationName = topic;
+                msg.qos = 0;
+                client.send(msg);
+                setTimeout(() => {
+                  if (!finished) {
+                    finished = true;
+                    clearTimeout(timer);
+                    try { client.disconnect(); } catch(e) {}
+                    resolve(true);
+                  }
+                }, 200);
+              } catch(sendErr) {
+                if (!finished) {
+                  finished = true;
+                  clearTimeout(timer);
+                  try { client.disconnect(); } catch(e) {}
+                  resolve(false);
+                }
+              }
+            },
+            onFailure: (err) => {
+              console.warn('HiveMQ connect failed, trying EMQX fallback...', err);
+              try {
+                const fbClient = new Client('broker.emqx.io', 8084, '/mqtt', clientId + '_fb');
+                fbClient.connect({
+                  useSSL: true,
+                  timeout: 3,
+                  cleanSession: true,
+                  onSuccess: () => {
+                    try {
+                      const msg = new Message(JSON.stringify(payload));
+                      msg.destinationName = topic;
+                      msg.qos = 0;
+                      fbClient.send(msg);
+                      setTimeout(() => {
+                        if (!finished) {
+                          finished = true;
+                          clearTimeout(timer);
+                          try { fbClient.disconnect(); } catch(e) {}
+                          resolve(true);
+                        }
+                      }, 200);
+                    } catch(e) {
+                      if (!finished) { finished = true; clearTimeout(timer); resolve(false); }
+                    }
+                  },
+                  onFailure: () => {
+                    if (!finished) { finished = true; clearTimeout(timer); resolve(false); }
+                  }
+                });
+              } catch(e) {
+                if (!finished) { finished = true; clearTimeout(timer); resolve(false); }
+              }
+            }
+          });
+        } catch(err) {
+          console.warn('sendViaMqtt error:', err);
+          resolve(false);
+        }
+      });
+    }
+
     async function submitRequest() {
       if (!selectedTrack) return;
       const requester = document.getElementById('requester-name').value.trim() || 'אורח אנונימי';
@@ -973,6 +1071,7 @@
       btn.disabled = true;
 
       const payload = {
+        id: 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
         title: selectedTrack.title,
         channel: selectedTrack.channel,
         url: selectedTrack.url,
@@ -984,20 +1083,11 @@
       };
 
       try {
-        // 1. Send live request to DJ Laptop via Realtime Cloud Relay (<0.1s, zero-setup)
-        const cleanRoom = roomId.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'default';
-        const relayTopic = 'onyx_req_' + cleanRoom;
-        try {
-          await fetch('https://ntfy.sh/' + relayTopic, {
-            method: 'POST',
-            headers: {
-              'Title': 'Song Request: ' + payload.title.slice(0, 50)
-            },
-            body: JSON.stringify(payload)
-          });
-        } catch(relayErr) {
-          console.warn('Realtime cloud relay notice:', relayErr);
-        }
+        const cleanRoom = (roomId || 'SHAZZ-SONIC').toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+        const mqttTopic = 'onyx/requests/' + cleanRoom;
+
+        // 1. Deliver in <0.1s to DJ Mac via High-Speed MQTT WebSocket Broker
+        await sendViaMqtt(mqttTopic, payload);
 
         // 2. Also push to Firebase Realtime Database if configured
         if (roomRef) {
@@ -1006,12 +1096,22 @@
           } catch(e) {}
         }
 
-        // 3. LocalStorage for same-browser testing
-        const key = 'onyx_requests_' + roomId;
-        const current = JSON.parse(localStorage.getItem(key) || '[]');
-        current.push({ ...payload, id: 'req_' + Date.now() });
-        localStorage.setItem(key, JSON.stringify(current));
-        window.dispatchEvent(new Event('storage'));
+        // 3. Optional fallback to ntfy (background, ignore 429)
+        try {
+          fetch('https://ntfy.sh/onyx_req_' + cleanRoom.toLowerCase(), {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          }).catch(() => {});
+        } catch(e) {}
+
+        // 4. LocalStorage for same-browser testing
+        const key = 'onyx_requests_' + cleanRoom;
+        try {
+          const current = JSON.parse(localStorage.getItem(key) || '[]');
+          current.push(payload);
+          localStorage.setItem(key, JSON.stringify(current));
+          window.dispatchEvent(new Event('storage'));
+        } catch(e) {}
 
         // Show Ticket on UI
         document.getElementById('success-banner').style.display = 'block';

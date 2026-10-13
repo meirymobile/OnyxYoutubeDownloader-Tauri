@@ -978,17 +978,15 @@ function App() {
           </div>
         )}
 
-        {/* Guest Requests Modal */}
-        {showGuestRequests && (
-          <GuestRequestsModal 
-            isOpen={showGuestRequests}
-            onClose={() => setShowGuestRequests(false)}
-            serverPort={serverPort}
-            onPlayInternal={playInternalAudio}
-            onOpenPath={handleOpenPath}
-            directories={directories}
-          />
-        )}
+        {/* Guest Requests Modal - Mounted continuously for 24/7 background MQTT incoming requests */}
+        <GuestRequestsModal 
+          isOpen={showGuestRequests}
+          onClose={() => setShowGuestRequests(false)}
+          serverPort={serverPort}
+          onPlayInternal={playInternalAudio}
+          onOpenPath={handleOpenPath}
+          directories={directories}
+        />
 
         {/* Settings Modal */}
         {showSettings && (
