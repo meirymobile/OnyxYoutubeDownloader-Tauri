@@ -146,6 +146,7 @@ export default function GuestRequestsModal({
         : 'https://dj-onyxdownloader-guest-requests.vercel.app';
       const url = new URL(validBase);
       url.searchParams.set('room', roomCode || 'SHAZZ-SONIC');
+      url.searchParams.set('live', 'true');
       if (geoEnabled && djLat !== null && djLon !== null) {
         url.searchParams.set('lat', String(djLat));
         url.searchParams.set('lon', String(djLon));
@@ -153,7 +154,7 @@ export default function GuestRequestsModal({
       }
       return url.toString();
     } catch (e) {
-      return `https://dj-onyxdownloader-guest-requests.vercel.app?room=${encodeURIComponent(roomCode || 'SHAZZ-SONIC')}`;
+      return `https://dj-onyxdownloader-guest-requests.vercel.app?room=${encodeURIComponent(roomCode || 'SHAZZ-SONIC')}&live=true`;
     }
   };
 

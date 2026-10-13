@@ -48,6 +48,9 @@ export default function QrStageWindow() {
         : 'https://dj-onyxdownloader-guest-requests.vercel.app';
       const url = new URL(validBase);
       url.searchParams.set('room', roomCode);
+      if (isActive) {
+        url.searchParams.set('live', 'true');
+      }
       if (geoEnabled && djLat && djLon) {
         url.searchParams.set('lat', String(djLat));
         url.searchParams.set('lon', String(djLon));
@@ -55,7 +58,7 @@ export default function QrStageWindow() {
       }
       return url.toString();
     } catch {
-      return `https://dj-onyxdownloader-guest-requests.vercel.app?room=${encodeURIComponent(roomCode)}`;
+      return `https://dj-onyxdownloader-guest-requests.vercel.app?room=${encodeURIComponent(roomCode)}${isActive ? '&live=true' : ''}`;
     }
   };
 

@@ -799,7 +799,8 @@
         });
       } else {
         const localActive = localStorage.getItem('onyx_room_active_' + roomId);
-        const isActive = localActive === 'true' || urlParams.get('live') === 'true' || (!localActive && !urlParams.get('closed'));
+        const isExplicitlyClosed = urlParams.get('closed') === 'true' || localActive === 'false';
+        const isActive = !isExplicitlyClosed;
         setTimeout(() => {
           if (loadScreen) loadScreen.style.display = 'none';
           if (isActive) {
