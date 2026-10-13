@@ -14,7 +14,7 @@
    ```bash
    npx vercel Dj-OnyxDownloader-Guest-Requests --prod
    ```
-2. קבל כתובת ציבורית קבועה, לדוגמה: `https://onyx-requests.vercel.app`
+2. כתובת האתר החיה שלך ב-Vercel: `https://dj-onyxdownloader-guest-requests.vercel.app`
 3. הדבק את הכתובת בתוכנת Onyx תחת **Guest Requests -> הגדרות**.
 
 ---

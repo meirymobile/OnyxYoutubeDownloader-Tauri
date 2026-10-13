@@ -27,10 +27,10 @@ export default function GuestRequestsModal({
   });
   const [webHostUrl, setWebHostUrl] = useState(() => {
     const saved = localStorage.getItem('onyx_guest_host_url');
-    if (saved && (saved.startsWith('http://') || saved.startsWith('https://'))) {
+    if (saved && (saved.startsWith('http://') || saved.startsWith('https://')) && !saved.includes('onyx-requests.vercel.app')) {
       return saved;
     }
-    return 'https://onyx-requests.vercel.app';
+    return 'https://dj-onyxdownloader-guest-requests.vercel.app';
   });
   const [autoDownload, setAutoDownload] = useState(() => {
     const saved = localStorage.getItem('onyx_guest_auto_download');
@@ -141,9 +141,9 @@ export default function GuestRequestsModal({
   // Target Guest URL (includes room + geofence if active)
   const buildGuestUrl = () => {
     try {
-      const validBase = (webHostUrl && (webHostUrl.startsWith('http://') || webHostUrl.startsWith('https://')))
+      const validBase = (webHostUrl && (webHostUrl.startsWith('http://') || webHostUrl.startsWith('https://')) && !webHostUrl.includes('onyx-requests.vercel.app'))
         ? webHostUrl
-        : 'https://onyx-requests.vercel.app';
+        : 'https://dj-onyxdownloader-guest-requests.vercel.app';
       const url = new URL(validBase);
       url.searchParams.set('room', roomCode || 'SHAZZ-SONIC');
       if (geoEnabled && djLat !== null && djLon !== null) {
@@ -153,7 +153,7 @@ export default function GuestRequestsModal({
       }
       return url.toString();
     } catch (e) {
-      return `https://onyx-requests.vercel.app?room=${encodeURIComponent(roomCode || 'SHAZZ-SONIC')}`;
+      return `https://dj-onyxdownloader-guest-requests.vercel.app?room=${encodeURIComponent(roomCode || 'SHAZZ-SONIC')}`;
     }
   };
 

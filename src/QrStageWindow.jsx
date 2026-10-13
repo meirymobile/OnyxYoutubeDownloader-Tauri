@@ -7,8 +7,8 @@ export default function QrStageWindow() {
   const [djNames, setDjNames] = useState(() => localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic');
   const [webHostUrl, setWebHostUrl] = useState(() => {
     const saved = localStorage.getItem('onyx_guest_host_url');
-    if (saved && (saved.startsWith('http://') || saved.startsWith('https://'))) return saved;
-    return 'https://onyx-requests.vercel.app';
+    if (saved && (saved.startsWith('http://') || saved.startsWith('https://')) && !saved.includes('onyx-requests.vercel.app')) return saved;
+    return 'https://dj-onyxdownloader-guest-requests.vercel.app';
   });
   const [geoEnabled, setGeoEnabled] = useState(() => localStorage.getItem('onyx_guest_geo_enabled') !== 'false');
   const [geoRadius, setGeoRadius] = useState(() => localStorage.getItem('onyx_guest_geo_radius') || '30');
@@ -25,7 +25,7 @@ export default function QrStageWindow() {
       setRoomCode(localStorage.getItem('onyx_guest_room') || 'SHAZZ-SONIC');
       setDjNames(localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic');
       const savedHost = localStorage.getItem('onyx_guest_host_url');
-      setWebHostUrl((savedHost && (savedHost.startsWith('http://') || savedHost.startsWith('https://'))) ? savedHost : 'https://onyx-requests.vercel.app');
+      setWebHostUrl((savedHost && (savedHost.startsWith('http://') || savedHost.startsWith('https://')) && !savedHost.includes('onyx-requests.vercel.app')) ? savedHost : 'https://dj-onyxdownloader-guest-requests.vercel.app');
       setIsActive(localStorage.getItem('onyx_guest_active') === 'true');
       setGeoEnabled(localStorage.getItem('onyx_guest_geo_enabled') !== 'false');
       setGeoRadius(localStorage.getItem('onyx_guest_geo_radius') || '30');
@@ -43,7 +43,10 @@ export default function QrStageWindow() {
 
   const buildTargetUrl = () => {
     try {
-      const url = new URL(webHostUrl);
+      const validBase = (webHostUrl && (webHostUrl.startsWith('http://') || webHostUrl.startsWith('https://')) && !webHostUrl.includes('onyx-requests.vercel.app'))
+        ? webHostUrl
+        : 'https://dj-onyxdownloader-guest-requests.vercel.app';
+      const url = new URL(validBase);
       url.searchParams.set('room', roomCode);
       if (geoEnabled && djLat && djLon) {
         url.searchParams.set('lat', String(djLat));
@@ -52,7 +55,7 @@ export default function QrStageWindow() {
       }
       return url.toString();
     } catch {
-      return `${webHostUrl}${webHostUrl.includes('?') ? '&' : '?'}room=${encodeURIComponent(roomCode)}`;
+      return `https://dj-onyxdownloader-guest-requests.vercel.app?room=${encodeURIComponent(roomCode)}`;
     }
   };
 
