@@ -589,6 +589,18 @@ export default function GuestRequestsModal({
               <span>מסך מקרן / במה 🖥️</span>
             </button>
 
+            {/* Open Requests Directory in Finder */}
+            {onOpenPath && (
+              <button 
+                onClick={() => onOpenPath(directories?.audio_dir ? `${directories.audio_dir}/GuestRequests` : '~/Downloads/OnyxAudio/GuestRequests')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+                title="פתח את תיקיית שירי האורחים ב-Finder"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+                <span>תיקיית שירים 📁</span>
+              </button>
+            )}
+
             {/* Active Toggle Switch */}
             <button 
               onClick={toggleActive}
