@@ -892,24 +892,26 @@
           }
         }
 
-        // 2. Fast public search relay (Invidious / Piped API or direct JSON search)
-        const searchApiUrl = `https://invidious.private.coffee/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
-        const resp = await fetch(searchApiUrl);
+        // 2. High-speed, official music search (supports Hebrew & English, zero CORS issues)
+        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15`;
+        const resp = await fetch(itunesUrl);
         if (resp.ok) {
-          const items = await resp.json();
-          const cleanTracks = items.slice(0, 10).map(v => ({
-            id: v.videoId,
-            url: `https://youtube.com/watch?v=${v.videoId}`,
-            title: v.title,
-            channel: v.author,
-            thumbnail: v.videoThumbnails ? v.videoThumbnails[0].url : `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`
-          }));
-          renderResults(cleanTracks);
-        } else {
-          fallbackMockSearch(query);
+          const data = await resp.json();
+          if (data && data.results && data.results.length > 0) {
+            const cleanTracks = data.results.map(t => ({
+              id: String(t.trackId),
+              url: `https://www.youtube.com/results?search_query=${encodeURIComponent(t.artistName + ' ' + t.trackName)}`,
+              title: `${t.artistName} - ${t.trackName}`,
+              channel: t.collectionName || t.artistName,
+              thumbnail: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '300x300bb') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150'
+            }));
+            renderResults(cleanTracks);
+            return;
+          }
         }
+        fallbackMockSearch(query);
       } catch (err) {
-        console.warn('Online search API error, applying resilient search fallback', err);
+        console.warn('Online search error, applying fallback', err);
         fallbackMockSearch(query);
       } finally {
         searchBtn.innerText = 'חפש';
