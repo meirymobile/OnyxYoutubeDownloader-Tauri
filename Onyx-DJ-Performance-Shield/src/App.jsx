@@ -261,9 +261,15 @@ export default function App() {
       <header className="px-6 py-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3.5">
           <div className="relative">
-            <div className={`p-2.5 rounded-2xl ${isShieldActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.4)] animate-pulse' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}`}>
-              <Shield className="w-6 h-6" />
-            </div>
+            <img 
+              src="/icon.png" 
+              alt="Onyx DJ Shield" 
+              className={`w-10 h-10 rounded-xl object-cover border transition-all ${
+                isShieldActive 
+                  ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)] animate-pulse' 
+                  : 'border-slate-700/80 shadow-md'
+              }`} 
+            />
           </div>
           <div>
             <div className="flex items-center gap-2.5">
