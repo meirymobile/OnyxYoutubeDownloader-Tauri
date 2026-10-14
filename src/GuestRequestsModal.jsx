@@ -103,19 +103,38 @@ export default function GuestRequestsModal({
   const hiveClientRef = useRef(null);
   const emqxClientRef = useRef(null);
 
-  // Broadcast Real-time Room Active/Closed Status to all guests via Retained MQTT
+  // Broadcast Real-time Room Active/Closed Status to all guests via Dual-Engine (HTTPS ntfy + Retained MQTT)
   const broadcastRoomStatus = (activeState, customRoomCode) => {
     const currentState = typeof activeState === 'boolean' ? activeState : isActiveRef.current;
     const targetRoom = customRoomCode || roomCode;
     const cleanRoom = (targetRoom || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
     const statusTopic = `onyx/status/${cleanRoom}`;
-    const payloadStr = JSON.stringify({
+    const payloadObj = {
       active: currentState,
       room: cleanRoom,
       djNames: djNamesRef.current || 'DJ Shazz & DJ Sonic',
       timestamp: Date.now()
-    });
+    };
+    const payloadStr = JSON.stringify(payloadObj);
 
+    // 1. High-speed HTTP/HTTPS broadcast via ntfy (standard port 443 - zero blockages on cellular & iOS)
+    try {
+      fetch(`https://ntfy.sh/onyx_status_${cleanRoom.toLowerCase()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payloadStr
+      }).catch(err => console.warn('[Onyx ntfy status error]', err));
+
+      if (cleanRoom !== 'SHAZZ-SONIC') {
+        fetch('https://ntfy.sh/onyx_status_shazz-sonic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr
+        }).catch(() => {});
+      }
+    } catch (e) {}
+
+    // 2. Broadcast via MQTT Retained (HiveMQ + EMQX)
     const MqttMessage = Paho?.Message || (Paho?.default && Paho.default.Message) || (window.Paho && window.Paho.Message);
     if (!MqttMessage) return;
 
@@ -127,6 +146,14 @@ export default function GuestRequestsModal({
           msg.qos = 0;
           msg.retained = true;
           client.send(msg);
+
+          if (cleanRoom !== 'SHAZZ-SONIC') {
+            const fallbackMsg = new MqttMessage(payloadStr);
+            fallbackMsg.destinationName = 'onyx/status/SHAZZ-SONIC';
+            fallbackMsg.qos = 0;
+            fallbackMsg.retained = true;
+            client.send(fallbackMsg);
+          }
           console.log(`[Onyx MQTT] Broadcasted status (${currentState ? 'ACTIVE' : 'CLOSED'}) to ${name} on ${statusTopic} with retain=true`);
         }
       } catch (err) {
@@ -376,10 +403,10 @@ export default function GuestRequestsModal({
       }
     }, 1500);
 
-    // Heartbeat: Republish room status every 15s to maintain broker retained state
+    // Heartbeat: Republish room status every 4s to maintain broker retained state & instant mobile sync
     const heartbeatInterval = setInterval(() => {
       broadcastRoomStatus(isActiveRef.current);
-    }, 15000);
+    }, 4000);
 
     return () => {
       isUnmounted = true;
@@ -392,7 +419,7 @@ export default function GuestRequestsModal({
       try { if (hiveClient && hiveClient.isConnected()) hiveClient.disconnect(); } catch(e) {}
       try { if (emqxClient && emqxClient.isConnected()) emqxClient.disconnect(); } catch(e) {}
     };
-  }, [roomCode, requestCounter]);
+  }, [roomCode]);
 
   // Process a newly received song request
   const processIncomingRequest = async (reqItem) => {
@@ -604,8 +631,12 @@ export default function GuestRequestsModal({
   const toggleActive = () => {
     const nextState = !isActive;
     setIsActive(nextState);
+    isActiveRef.current = nextState;
     localStorage.setItem('onyx_room_active_' + roomCode, String(nextState));
     broadcastRoomStatus(nextState);
+    // Burst broadcasts to guarantee instant pickup on all mobile networks
+    setTimeout(() => broadcastRoomStatus(nextState), 300);
+    setTimeout(() => broadcastRoomStatus(nextState), 1000);
   };
 
   const copyLink = () => {

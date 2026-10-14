@@ -696,10 +696,16 @@
   </div>
 
   <script>
-    // Extract Room & Geofence params from URL
+    // Extract Room & Geofence params from URL or persistent localStorage
     const urlParams = new URLSearchParams(window.location.search);
-    const rawRoom = (urlParams.get('room') || 'SHAZZ-SONIC').trim();
-    const roomId = (rawRoom || 'SHAZZ-SONIC').toUpperCase();
+    let rawRoom = (urlParams.get('room') || '').trim();
+    if (!rawRoom) {
+      rawRoom = localStorage.getItem('onyx_last_guest_room') || 'SHAZZ-SONIC';
+    } else {
+      localStorage.setItem('onyx_last_guest_room', rawRoom);
+    }
+    const roomId = rawRoom.toUpperCase();
+    const cleanRoom = roomId.replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
     const targetLat = parseFloat(urlParams.get('lat'));
     const targetLon = parseFloat(urlParams.get('lon'));
     const allowedRadius = parseFloat(urlParams.get('rad') || '30');
@@ -780,53 +786,132 @@
     // Global Event Room State
     let isRoomActive = true;
     let mqttStatusClient = null;
+    let sseClient = null;
 
+    // ========================================================
+    // UNIFIED STATUS APPLIER (INSTANT PROACTIVE TRANSITION)
+    // ========================================================
+    function applyRoomStatus(statusInfo) {
+      if (!statusInfo || typeof statusInfo.active !== 'boolean') return;
+      
+      const loadScreen = document.getElementById('loading-screen');
+      if (loadScreen) loadScreen.style.display = 'none';
+
+      if (statusInfo.active === false) {
+        if (isRoomActive !== false) {
+          console.log('[Room Status Event] Station closed by DJ -> Locking screen proactively');
+          isRoomActive = false;
+          showClosedState({ reason: 'inactive', djName: statusInfo.djNames });
+        }
+      } else if (statusInfo.active === true) {
+        if (isRoomActive !== true) {
+          console.log('[Room Status Event] Station opened by DJ -> Showing request screen');
+          isRoomActive = true;
+          showActiveState(statusInfo);
+        }
+      }
+    }
+
+    // 1. REAL-TIME SERVER-SENT EVENTS (SSE) via NTFY (PORT 443 HTTPS - ZERO BLOCKING)
+    function initSseStatusListener() {
+      try {
+        const sseUrl = `https://ntfy.sh/onyx_status_${cleanRoom.toLowerCase()}/sse`;
+        sseClient = new EventSource(sseUrl);
+        sseClient.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'message') {
+              const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+              applyRoomStatus(payload);
+            }
+          } catch(e) {}
+        };
+        sseClient.onerror = () => {
+          pollStatusHttp();
+        };
+
+        if (cleanRoom !== 'SHAZZ-SONIC') {
+          const fallbackSource = new EventSource('https://ntfy.sh/onyx_status_shazz-sonic/sse');
+          fallbackSource.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.event === 'message') {
+                const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+                applyRoomStatus(payload);
+              }
+            } catch(e) {}
+          };
+        }
+      } catch (err) {
+        console.warn('[SSE] EventSource init error:', err);
+      }
+    }
+
+    // 2. ACTIVE FAST HTTP POLLING (EVERY 2.5s OVER STANDARD HTTPS 443)
+    async function pollStatusHttp() {
+      const tryFetch = async (target) => {
+        try {
+          const res = await fetch(`https://ntfy.sh/onyx_status_${target.toLowerCase()}/json?poll=1`, {
+            cache: 'no-store',
+            headers: { 'Accept': 'application/json' }
+          });
+          if (res.ok) {
+            const text = await res.text();
+            const lines = text.trim().split('\n');
+            for (let i = lines.length - 1; i >= 0; i--) {
+              try {
+                const item = JSON.parse(lines[i]);
+                if (item.event === 'message') {
+                  const payload = typeof item.message === 'string' ? JSON.parse(item.message) : item.message;
+                  if (payload && typeof payload.active === 'boolean') {
+                    applyRoomStatus(payload);
+                    return true;
+                  }
+                }
+              } catch(e) {}
+            }
+          }
+        } catch(e) {}
+        return false;
+      };
+
+      const found = await tryFetch(cleanRoom);
+      if (!found && cleanRoom !== 'SHAZZ-SONIC') {
+        await tryFetch('shazz-sonic');
+      }
+    }
+
+    // 3. MQTT WEBSOCKET BROKER LISTENER (HiveMQ + EMQX)
     function initMqttStatusListener() {
-      const cleanRoom = (roomId || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
       const statusTopic = `onyx/status/${cleanRoom}`;
       const PahoLib = window.Paho;
       const Client = (PahoLib && PahoLib.MQTT && PahoLib.MQTT.Client) || (PahoLib && PahoLib.Client);
       if (!Client) return;
 
-      const handleStatusMessage = (msg) => {
+      const handleMsg = (msg) => {
         try {
           const statusInfo = JSON.parse(msg.payloadString);
           console.log('[Guest MQTT] Received room status update:', statusInfo);
-          const loadScreen = document.getElementById('loading-screen');
-          if (loadScreen) loadScreen.style.display = 'none';
-
-          if (statusInfo.active === false) {
-            isRoomActive = false;
-            showClosedState({ reason: 'inactive' });
-            closeModal();
-          } else if (statusInfo.active === true) {
-            isRoomActive = true;
-            showActiveState(statusInfo);
-          }
+          applyRoomStatus(statusInfo);
         } catch(e) {
           console.warn('[Guest MQTT] Error parsing status payload:', e);
         }
       };
 
-      // Try HiveMQ first
       try {
-        const clientId = 'guest_status_' + Math.random().toString(36).substring(2, 9);
+        const clientId = 'guest_st_' + Math.random().toString(36).substring(2, 9);
         mqttStatusClient = new Client('broker.hivemq.com', 8884, '/mqtt', clientId);
-        mqttStatusClient.onMessageArrived = handleStatusMessage;
-        mqttStatusClient.onConnectionLost = () => {
-          setTimeout(initMqttStatusListener, 3500);
-        };
+        mqttStatusClient.onMessageArrived = handleMsg;
+        mqttStatusClient.onConnectionLost = () => setTimeout(initMqttStatusListener, 4000);
         mqttStatusClient.connect({
           useSSL: true,
           timeout: 4,
           cleanSession: true,
           onSuccess: () => {
-            console.log('[Guest MQTT] Subscribed to status on HiveMQ:', statusTopic);
             mqttStatusClient.subscribe(statusTopic, { qos: 0 });
+            if (cleanRoom !== 'SHAZZ-SONIC') mqttStatusClient.subscribe('onyx/status/SHAZZ-SONIC', { qos: 0 });
           },
-          onFailure: () => {
-            tryEmqxFallback();
-          }
+          onFailure: tryEmqxFallback
         });
       } catch(e) {
         tryEmqxFallback();
@@ -834,16 +919,16 @@
 
       function tryEmqxFallback() {
         try {
-          const fbId = 'guest_status_fb_' + Math.random().toString(36).substring(2, 9);
+          const fbId = 'guest_st_fb_' + Math.random().toString(36).substring(2, 9);
           const emqx = new Client('broker.emqx.io', 8084, '/mqtt', fbId);
-          emqx.onMessageArrived = handleStatusMessage;
+          emqx.onMessageArrived = handleMsg;
           emqx.connect({
             useSSL: true,
             timeout: 4,
             cleanSession: true,
             onSuccess: () => {
-              console.log('[Guest MQTT] Subscribed to status on EMQX fallback:', statusTopic);
               emqx.subscribe(statusTopic, { qos: 0 });
+              if (cleanRoom !== 'SHAZZ-SONIC') emqx.subscribe('onyx/status/SHAZZ-SONIC', { qos: 0 });
             }
           });
         } catch(e) {}
@@ -873,46 +958,61 @@
         }
       }
 
-      // 3. Connect real-time status listener via MQTT retained channel
+      // 3. Connect real-time status listeners (SSE streaming + Background polling + MQTT)
+      initSseStatusListener();
       initMqttStatusListener();
+      setInterval(pollStatusHttp, 2500);
 
-      // 4. Also check Firebase if configured
+      // Listen for phone wake/unlock or browser tab refocus
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') pollStatusHttp();
+      });
+      window.addEventListener('focus', pollStatusHttp);
+
+      // 4. Initial high-speed check immediately
+      await pollStatusHttp();
+
+      // 5. Firebase if configured
       if (roomRef) {
         roomRef.on('value', (snapshot) => {
           const data = snapshot.val();
-          if (loadScreen) loadScreen.style.display = 'none';
-          if (data && data.isActive) {
-            isRoomActive = true;
-            showActiveState(data);
-          } else {
-            isRoomActive = false;
-            showClosedState({ reason: 'inactive' });
-            closeModal();
+          if (data && typeof data.isActive === 'boolean') {
+            applyRoomStatus({ active: data.isActive, djNames: data.djNames });
           }
         });
       }
 
-      // Fallback timeout in case MQTT status hasn't arrived within 1.2s
+      // Fallback timeout: if still loading after 1s
       setTimeout(() => {
         if (loadScreen && loadScreen.style.display !== 'none') {
           loadScreen.style.display = 'none';
           if (isRoomActive) {
             showActiveState({ djName: 'DJ Shazz & DJ Sonic' });
+          } else {
+            showClosedState({ reason: 'inactive' });
           }
         }
-      }, 1200);
+      }, 1000);
     }
 
     function showClosedState(info) {
       isRoomActive = false;
       closeModal();
-      const results = document.getElementById('search-results');
+      const results = document.getElementById('results-list');
       if (results) results.innerHTML = '';
-      const input = document.getElementById('search-input');
-      if (input) input.value = '';
+      const input = document.getElementById('query-input');
+      if (input) {
+        input.value = '';
+        input.blur();
+      }
 
       document.getElementById('state-closed').style.display = 'flex';
       document.getElementById('state-active').style.display = 'none';
+
+      if (info && info.djName) {
+        const closedTitle = document.getElementById('closed-dj-title');
+        if (closedTitle) closedTitle.innerText = info.djName.toUpperCase();
+      }
 
       const mainMsg = document.getElementById('closed-main-msg');
       const subMsg = document.getElementById('closed-sub-msg');
@@ -965,6 +1065,10 @@
 
     // YouTube Search (Supports Direct oEmbed + YouTube Public Scraping API)
     async function performSearch() {
+      if (!isRoomActive) {
+        showClosedState({ reason: 'inactive' });
+        return;
+      }
       const query = document.getElementById('query-input').value.trim();
       if (!query) return;
 
@@ -1051,6 +1155,10 @@
     }
 
     function openModal(track) {
+      if (!isRoomActive) {
+        showClosedState({ reason: 'inactive' });
+        return;
+      }
       selectedTrack = track;
       document.getElementById('modal-thumb').src = track.thumbnail;
       document.getElementById('modal-title').innerText = track.title;
