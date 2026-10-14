@@ -180,6 +180,18 @@ export default function App() {
       .reduce((sum, a) => sum + (a.mem_mb || 0), 0);
   }, [apps, targetPidsToKill]);
 
+  const reclaimableDisplay = useMemo(() => {
+    if (reclaimableMemMb >= 1024) {
+      return `${(reclaimableMemMb / 1024).toFixed(1)} GB`;
+    }
+    return `${Math.round(reclaimableMemMb)} MB`;
+  }, [reclaimableMemMb]);
+
+  const projectedFreeGb = useMemo(() => {
+    const additionalGb = reclaimableMemMb / 1024;
+    return (sysMem.free_gb + additionalGb).toFixed(1);
+  }, [sysMem.free_gb, reclaimableMemMb]);
+
   // Toggle single app selection
   const toggleAppSelection = (pid) => {
     setSelectedPids(prev => {
@@ -361,6 +373,19 @@ export default function App() {
               <span className="font-bold text-emerald-400">{sysMem.free_gb} GB</span>
             </div>
             <div className="w-[1px] h-6 bg-slate-800" />
+            <div 
+              className="relative cursor-help text-right"
+              title={`סגירת ${targetPidsToKill.length} האפליקציות שנבחרו תפנה ${reclaimableDisplay} (ה-RAM הפנוי יגדל מ-${sysMem.free_gb} GB ל-${projectedFreeGb} GB)`}
+            >
+              <span className="text-purple-400 text-[10px] font-bold block flex items-center gap-1 justify-end">
+                <span>ניתן לפנות</span>
+                {reclaimableMemMb > 0 && <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />}
+              </span>
+              <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300">
+                {reclaimableDisplay}
+              </span>
+            </div>
+            <div className="w-[1px] h-6 bg-slate-800" />
             <div>
               <span className="text-slate-500 text-[10px] block">סה"כ</span>
               <span className="font-bold text-slate-300">{sysMem.total_gb} GB</span>
@@ -539,8 +564,16 @@ export default function App() {
             </span>
           )}
         </div>
-        <div className="font-mono text-amber-400 font-bold">
-          נמצאו {apps.length} אפליקציות GUI פעילות
+        <div className="flex items-center gap-2.5 font-mono text-xs">
+          <span className="text-slate-500">
+            {apps.length} אפליקציות
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-700" />
+          <span className="px-2.5 py-0.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 font-bold flex items-center gap-1.5 shadow-sm">
+            <span>⚡ זיכרון שיתפנה:</span>
+            <span className="text-amber-300 font-black">{reclaimableDisplay}</span>
+            <span className="text-[10px] text-purple-400">({targetPidsToKill.length} לסגירה)</span>
+          </span>
         </div>
       </div>
 
@@ -697,10 +730,13 @@ export default function App() {
         {/* Action Button & Memory Summary */}
         <div className="flex items-center gap-4">
           <div className="text-left font-mono">
-            <span className="text-[10px] text-slate-500 block">סך פינוי משוער:</span>
-            <span className="text-sm font-black text-amber-400">
-              {targetPidsToKill.length} אפליקציות &bull; {(reclaimableMemMb / 1024).toFixed(2)} GB RAM
-            </span>
+            <span className="text-[10px] text-slate-400 block">סך פינוי משוער:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-400">{targetPidsToKill.length} אפליקציות &bull;</span>
+              <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300">
+                +{reclaimableDisplay} RAM
+              </span>
+            </div>
           </div>
 
           <button
