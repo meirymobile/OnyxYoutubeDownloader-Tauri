@@ -787,13 +787,36 @@
     let isRoomActive = true;
     let mqttStatusClient = null;
     let sseClient = null;
+    let lastAppliedTimestamp = 0;
+    const pageStartTime = Date.now();
+    const isExplicitlyLive = urlParams.get('live') === 'true';
 
     // ========================================================
     // UNIFIED STATUS APPLIER (INSTANT PROACTIVE TRANSITION)
     // ========================================================
     function applyRoomStatus(statusInfo) {
       if (!statusInfo || typeof statusInfo.active !== 'boolean') return;
-      
+      const msgTime = Number(statusInfo.timestamp) || 0;
+
+      // 1. Stale Message Guard:
+      // If the guest scanned a QR code that explicitly has live=true,
+      // reject any CLOSED (active: false) message that was created BEFORE this page was opened!
+      if (isExplicitlyLive && statusInfo.active === false) {
+        if (msgTime > 0 && msgTime < pageStartTime - 3000) {
+          console.warn('[Room Status] Ignored stale CLOSED message (created before QR code was opened):', msgTime, '<', pageStartTime);
+          return;
+        }
+      }
+
+      // 2. Reject older out-of-order messages:
+      if (msgTime > 0 && msgTime < lastAppliedTimestamp) {
+        console.warn('[Room Status] Ignored older out-of-order message:', msgTime, '<', lastAppliedTimestamp);
+        return;
+      }
+      if (msgTime > 0) {
+        lastAppliedTimestamp = msgTime;
+      }
+
       const loadScreen = document.getElementById('loading-screen');
       if (loadScreen) loadScreen.style.display = 'none';
 
@@ -830,7 +853,7 @@
           pollStatusHttp();
         };
 
-        if (cleanRoom !== 'SHAZZ-SONIC') {
+        if (cleanRoom !== 'SHAZZ-SONIC' && !isExplicitlyLive) {
           const fallbackSource = new EventSource('https://ntfy.sh/onyx_status_shazz-sonic/sse');
           fallbackSource.onmessage = (event) => {
             try {
@@ -876,7 +899,7 @@
       };
 
       const found = await tryFetch(cleanRoom);
-      if (!found && cleanRoom !== 'SHAZZ-SONIC') {
+      if (!found && cleanRoom !== 'SHAZZ-SONIC' && !isExplicitlyLive) {
         await tryFetch('shazz-sonic');
       }
     }
@@ -946,6 +969,13 @@
         if (loadScreen) loadScreen.style.display = 'none';
         showClosedState({ reason: 'inactive' });
         return;
+      }
+
+      // If explicitly live in URL, show active state immediately
+      if (isExplicitlyLive) {
+        isRoomActive = true;
+        if (loadScreen) loadScreen.style.display = 'none';
+        showActiveState({ djName: 'DJ Shazz & DJ Sonic' });
       }
 
       // 2. Verify Geofence first if configured
