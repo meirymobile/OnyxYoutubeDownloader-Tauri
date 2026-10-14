@@ -572,6 +572,37 @@
   </div>
 
   <!-- ======================================================== -->
+  <!-- STATE 0: DJ GPS CALIBRATOR (SAMPLED DIRECTLY FROM SMARTPHONE) -->
+  <!-- ======================================================== -->
+  <div id="state-dj-gps" style="display: none; width: 100%; max-width: 480px; padding: 24px 20px; flex-direction: column; align-items: center; text-align: center; min-height: 100vh; justify-content: center; position: relative; z-index: 10;">
+    <div class="warm-glow"></div>
+    <div style="background: rgba(18, 10, 31, 0.9); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 28px; padding: 32px 24px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.6); backdrop-filter: blur(16px);">
+      <img src="favicon.png" alt="Onyx DJ" style="width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 14px; display: block; box-shadow: 0 0 30px rgba(168, 85, 247, 0.5);" />
+      
+      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px; border-radius: 20px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 11px; font-weight: 800; margin-bottom: 12px;">
+        <span>🎯 כיול מיקום עמדת דיג'יי</span>
+        <span id="dj-gps-room-badge" style="color: #facc15; font-family: monospace;"></span>
+      </div>
+
+      <h1 style="font-size: 22px; font-weight: 900; color: #fff; margin-bottom: 8px;">קביעת מיקום GPS אמיתי</h1>
+      <p style="font-size: 13px; color: #94a3b8; line-height: 1.6; margin-bottom: 24px;">
+        מחשבי Mac אינם מכילים רכיב GPS לווייני. לחיצה על הכפתור למטה תדגום את מיקום ה-GPS המדויק מהסמארטפון שלך ותשדר אותו ישירות לתוכנה במחשב.
+      </p>
+
+      <button id="dj-gps-trigger-btn" onclick="captureAndSendDjGps()" style="width: 100%; padding: 16px; background: linear-gradient(135deg, #a855f7, #ec4899); border: none; border-radius: 16px; color: #fff; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 6px 25px rgba(168, 85, 247, 0.45); display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <span>📍 דגום מיקום עכשיו ושדר למחשב</span>
+      </button>
+
+      <div id="dj-gps-status-box" style="margin-top: 18px; font-size: 12px; color: #cbd5e1; display: none; line-height: 1.5; padding: 12px; border-radius: 14px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);">
+      </div>
+    </div>
+
+    <footer style="font-size: 11px; color: #64748b; letter-spacing: 1px; text-align: center; margin-top: 24px;">
+      ONYX DJ SUITE &bull; SMARTPHONE GPS CALIBRATOR
+    </footer>
+  </div>
+
+  <!-- ======================================================== -->
   <!-- STATE 1: EVENT CLOSED (ALTERNATIVE 3: RETRO VINYL LOUNGE) -->
   <!-- ======================================================== -->
   <div id="state-closed">
@@ -958,10 +989,89 @@
       }
     }
 
+    const isDjGpsMode = urlParams.get('dj_gps') === 'true' || urlParams.get('dj_gps') === '1';
+
+    async function captureAndSendDjGps() {
+      const btn = document.getElementById('dj-gps-trigger-btn');
+      const box = document.getElementById('dj-gps-status-box');
+      if (!btn || !box) return;
+
+      btn.disabled = true;
+      btn.innerText = 'דוגם מיקום GPS לווייני... 🛰️';
+      box.style.display = 'block';
+      box.innerHTML = 'ממתין לקריאת לווייני GPS מהמכשיר...';
+
+      if (!navigator.geolocation) {
+        box.innerHTML = '❌ הדפדפן אינו תומך ב-GPS.';
+        btn.disabled = false;
+        btn.innerText = 'נסה שוב 🔄';
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = parseFloat(pos.coords.latitude.toFixed(6));
+          const lon = parseFloat(pos.coords.longitude.toFixed(6));
+          const accuracy = Math.round(pos.coords.accuracy || 5);
+          box.innerHTML = `🛰️ נדגם מיקום GPS: <b>${lat}, ${lon}</b> (דיוק: ±${accuracy} מטר)<br/>משדר למחשב...`;
+
+          const payload = {
+            lat: lat,
+            lon: lon,
+            accuracy: accuracy,
+            timestamp: Date.now(),
+            room: cleanRoom
+          };
+
+          // 1. Send via HTTPS ntfy (port 443)
+          try {
+            await fetch(`https://ntfy.sh/onyx_dj_location_${cleanRoom.toLowerCase()}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+          } catch(e) {}
+
+          // 2. Send via MQTT
+          try {
+            await sendViaMqtt('onyx/dj_location/' + cleanRoom, payload);
+          } catch(e) {}
+
+          box.style.background = 'rgba(16, 185, 129, 0.15)';
+          box.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+          box.style.color = '#34d399';
+          box.innerHTML = `✅ <b>המיקום נקלט בהצלחה במחשב!</b><br/>קואורדינטות: ${lat}, ${lon} (דיוק: ±${accuracy} מ')<br/>רדיוס המסיבה מכויל כעת סביב עמדה זו. אפשר לסגור חלון זה.`;
+          btn.style.background = '#059669';
+          btn.innerText = 'העמדה עודכנה בהצלחה! 🎉';
+        },
+        (err) => {
+          box.style.background = 'rgba(239, 68, 68, 0.15)';
+          box.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+          box.style.color = '#f87171';
+          box.innerHTML = `❌ שגיאה בקבלת מיקום: ${err.message}<br/>ודא שאישרת גישה למיקום (Location Services) בספארי.`;
+          btn.disabled = false;
+          btn.innerText = 'נסה שוב 🔄';
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    }
+
     // Monitor Event Status & Location
     async function checkStatus() {
       const loadScreen = document.getElementById('loading-screen');
       if (loadScreen) loadScreen.style.display = 'flex';
+
+      // 0. DJ GPS Calibration Mode from Phone:
+      if (isDjGpsMode) {
+        if (loadScreen) loadScreen.style.display = 'none';
+        document.getElementById('state-closed').style.display = 'none';
+        document.getElementById('state-active').style.display = 'none';
+        const djGpsContainer = document.getElementById('state-dj-gps');
+        if (djGpsContainer) djGpsContainer.style.display = 'flex';
+        const badge = document.getElementById('dj-gps-room-badge');
+        if (badge) badge.innerText = `• חדר: ${cleanRoom}`;
+        return;
+      }
 
       // 1. Explicitly closed in URL query param:
       if (urlParams.get('closed') === 'true') {

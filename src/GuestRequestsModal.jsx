@@ -5,8 +5,20 @@ import {
   X, Radio, Power, RefreshCw, Copy, Check, ExternalLink, Play, 
   FolderOpen, Music, CheckCircle2, AlertCircle, Clock, Volume2, 
   QrCode, Maximize2, Minimize2, Settings2, User, MessageSquareHeart, Monitor,
-  MapPin, Navigation, Compass
+  MapPin, Navigation, Compass, Smartphone, Search, Building2, CheckCircle
 } from 'lucide-react';
+
+// Popular Israeli event venues & wedding halls for 1-click DJ GPS calibration
+const POPULAR_VENUES = [
+  { name: 'חוות רונית', city: 'שרון', lat: 32.229502, lon: 34.839827 },
+  { name: 'טראסק', city: 'נמל תל אביב', lat: 32.097580, lon: 34.773320 },
+  { name: 'האחוזה', city: 'מודיעין', lat: 31.890350, lon: 34.985620 },
+  { name: 'שרונית', city: 'משמר השרון', lat: 32.358240, lon: 34.908410 },
+  { name: 'אודאון', city: 'עמק חפר', lat: 32.395120, lon: 34.912630 },
+  { name: 'קאי קולקשן (Kai)', city: 'עמק חפר', lat: 32.401200, lon: 34.904800 },
+  { name: 'גאיה (Gaia)', city: 'בית עובד / חדרה', lat: 32.441200, lon: 34.921300 },
+  { name: 'בית על הים', city: 'יפו', lat: 32.053890, lon: 34.750560 },
+];
 
 export default function GuestRequestsModal({ 
   isOpen, 
@@ -77,6 +89,27 @@ export default function GuestRequestsModal({
   });
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
+
+  // DJ Location Calibration State (Options 2 & 3)
+  const [locationTab, setLocationTab] = useState('phone'); // 'phone' | 'venue' | 'manual'
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [djGpsQrDataUrl, setDjGpsQrDataUrl] = useState('');
+  const [phoneSyncSuccess, setPhoneSyncSuccess] = useState(false);
+  const [phoneAccuracy, setPhoneAccuracy] = useState(null);
+
+  // Option 3: Venue Search State
+  const [venueSearchQuery, setVenueSearchQuery] = useState('');
+  const [venueSearchResults, setVenueSearchResults] = useState([]);
+  const [isSearchingVenue, setIsSearchingVenue] = useState(false);
+  const [venueSearchError, setVenueSearchError] = useState('');
+
+  // Manual Coordinates State
+  const [manualLat, setManualLat] = useState(() => {
+    return localStorage.getItem('onyx_guest_lat') || '';
+  });
+  const [manualLon, setManualLon] = useState(() => {
+    return localStorage.getItem('onyx_guest_lon') || '';
+  });
 
   // UI States
   const [activeTab, setActiveTab] = useState('list'); // 'list', 'qr', 'settings'
@@ -269,45 +302,417 @@ export default function GuestRequestsModal({
     }).then(setQrDataUrl).catch(console.error);
   }, [targetGuestUrl]);
 
-  // Synthesized notification chime on new incoming request
-  const playChime = () => {
+  // Target DJ GPS Calibration URL (Option 2)
+  const buildDjGpsUrl = () => {
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioCtx();
-      const now = ctx.currentTime;
-      
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(587.33, now); // D5
-      osc1.frequency.setValueAtTime(880, now + 0.12); // A5
-
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(440, now);
-      osc2.frequency.setValueAtTime(659.25, now + 0.12);
-
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-
-      osc1.connect(gain);
-      osc2.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc1.start(now);
-      osc2.start(now);
-      osc1.stop(now + 0.6);
-      osc2.stop(now + 0.6);
+      const validBase = (webHostUrl && (webHostUrl.startsWith('http://') || webHostUrl.startsWith('https://')) && !webHostUrl.includes('onyx-requests.vercel.app'))
+        ? webHostUrl
+        : 'https://dj-onyxdownloader-guest-requests.vercel.app';
+      const url = new URL(validBase);
+      url.searchParams.set('dj_gps', 'true');
+      url.searchParams.set('room', roomCode || 'SHAZZ-SONIC');
+      return url.toString();
     } catch (e) {
-      console.warn("Chime error", e);
+      return `https://dj-onyxdownloader-guest-requests.vercel.app?dj_gps=true&room=${encodeURIComponent(roomCode || 'SHAZZ-SONIC')}`;
     }
   };
+
+  const djGpsUrl = buildDjGpsUrl();
+
+  // Generate DJ GPS QR Code
+  useEffect(() => {
+    QRCode.toDataURL(djGpsUrl, {
+      width: 340,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    }).then(setDjGpsQrDataUrl).catch(console.error);
+  }, [djGpsUrl]);
+
+  // Handle incoming DJ smartphone GPS calibration (from MQTT or SSE)
+  const handleIncomingDjGps = (loc) => {
+    if (!loc || typeof loc.lat !== 'number' || typeof loc.lon !== 'number') return;
+    const lat = parseFloat(loc.lat.toFixed(6));
+    const lon = parseFloat(loc.lon.toFixed(6));
+    const acc = loc.accuracy ? Math.round(loc.accuracy) : null;
+    setDjLat(lat);
+    setDjLon(lon);
+    setManualLat(String(lat));
+    setManualLon(String(lon));
+    setPhoneAccuracy(acc);
+    setLocationStatus(`סונכרן מהסמארטפון 📱: ${lat}, ${lon}${acc ? ` (דיוק: ±${acc} מ')` : ''}`);
+    setPhoneSyncSuccess(true);
+    playChime();
+    setTimeout(() => setPhoneSyncSuccess(false), 9000);
+  };
+
+  // Option 3: Search Venue in Israel via OpenStreetMap Nominatim
+  const searchVenue = async (queryText) => {
+    const q = (queryText !== undefined ? queryText : venueSearchQuery).trim();
+    if (!q) return;
+    setIsSearchingVenue(true);
+    setVenueSearchError('');
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&countrycodes=il&format=json&limit=6&addressdetails=1`, {
+        headers: { 'Accept-Language': 'he' }
+      });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setVenueSearchResults(data);
+      } else {
+        setVenueSearchResults([]);
+        setVenueSearchError('לא נמצאו תוצאות עבור חיפוש זה. נסה שם אחר, עיר או כתובת.');
+      }
+    } catch (err) {
+      setVenueSearchError('שגיאה בחיפוש במפה. ודא שיש חיבור אינטרנט פעיל.');
+    } finally {
+      setIsSearchingVenue(false);
+    }
+  };
+
+  const selectVenue = (venue) => {
+    const lat = parseFloat(parseFloat(venue.lat).toFixed(6));
+    const lon = parseFloat(parseFloat(venue.lon).toFixed(6));
+    const name = venue.name || venue.display_name.split(',')[0];
+    setDjLat(lat);
+    setDjLon(lon);
+    setManualLat(String(lat));
+    setManualLon(String(lon));
+    setLocationStatus(`אולם: ${name} (${lat}, ${lon})`);
+    playChime();
+  };
+
+  const selectPresetVenue = (preset) => {
+    setDjLat(preset.lat);
+    setDjLon(preset.lon);
+    setManualLat(String(preset.lat));
+    setManualLon(String(preset.lon));
+    setLocationStatus(`אולם: ${preset.name} - ${preset.city} (${preset.lat}, ${preset.lon})`);
+    playChime();
+  };
+
+  const applyManualCoordinates = () => {
+    const lat = parseFloat(manualLat);
+    const lon = parseFloat(manualLon);
+    if (isNaN(lat) || isNaN(lon)) {
+      alert('נא להזין קואורדינטות מספריות תקינות');
+      return;
+    }
+    const finalLat = parseFloat(lat.toFixed(6));
+    const finalLon = parseFloat(lon.toFixed(6));
+    setDjLat(finalLat);
+    setDjLon(finalLon);
+    setLocationStatus(`הזנה ידנית: ${finalLat}, ${finalLon}`);
+    playChime();
+  };
+
+  // High-speed SSE listener for DJ phone calibration from ntfy
+  useEffect(() => {
+    const cleanRoom = (roomCode || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+    let es = null;
+    try {
+      const sseUrl = `https://ntfy.sh/onyx_dj_location_${cleanRoom.toLowerCase()}/sse`;
+      es = new EventSource(sseUrl);
+      es.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed && parsed.event === 'message' && parsed.message) {
+            const loc = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : parsed.message;
+            handleIncomingDjGps(loc);
+          }
+        } catch (err) {}
+      };
+    } catch (e) {}
+
+    return () => {
+      if (es) {
+        try { es.close(); } catch(e) {}
+      }
+    };
+  }, [roomCode]);
+
+  // Location Calibrator Component for Options 2 & 3
+  const renderLocationCalibrator = (isPopup = false) => (
+    <div className="space-y-3.5 text-right">
+      {/* Current Active Location Display */}
+      <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
+        <div>
+          <div className="font-semibold text-slate-300 flex items-center gap-1.5">
+            <Compass className="w-3.5 h-3.5 text-amber-400" />
+            <span>מרכז עמדת הדיג'יי הנבחר:</span>
+          </div>
+          <div className="text-[11px] font-mono text-amber-300 mt-0.5">
+            {locationStatus || (djLat ? `${djLat}, ${djLon}` : 'טרם הוגדר מיקום')}
+          </div>
+        </div>
+        {djLat !== null && djLon !== null && (
+          <a
+            href={`https://www.google.com/maps?q=${djLat},${djLon}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-bold border border-slate-700 transition-all shrink-0"
+            title="פתח ב-Google Maps"
+          >
+            <span>פתח במפה ↗</span>
+          </a>
+        )}
+      </div>
+
+      {/* 2 Main Choice Tabs for the DJ */}
+      <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950/90 rounded-xl border border-slate-800">
+        <button
+          type="button"
+          onClick={() => setLocationTab('phone')}
+          className={`py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+            locationTab === 'phone'
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          }`}
+        >
+          <Smartphone className="w-3.5 h-3.5" />
+          <span>אופציה 2: טלפון 📱</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setLocationTab('venue')}
+          className={`py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+            locationTab === 'venue'
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          }`}
+        >
+          <Building2 className="w-3.5 h-3.5" />
+          <span>אופציה 3: אולם 🏢</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setLocationTab('manual')}
+          className={`py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+            locationTab === 'manual'
+              ? 'bg-slate-800 text-white shadow-md border border-slate-700'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          }`}
+        >
+          <Navigation className="w-3.5 h-3.5" />
+          <span>ידני / מחשב 💻</span>
+        </button>
+      </div>
+
+      {/* OPTION 2: SMARTPHONE GPS CALIBRATION */}
+      {locationTab === 'phone' && (
+        <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/30 space-y-3">
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-purple-400" />
+            <span className="text-xs font-black text-white">אופציה 2: כיול GPS לווייני מסמארטפון הדיג'יי</span>
+            <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full font-bold border border-purple-500/40">
+              מומלץ למקבוק ⭐
+            </span>
+          </div>
+
+          <p className="text-[11px] text-slate-300 leading-relaxed">
+            מחשבי Mac אינם מכילים רכיב GPS לווייני. סרקו את הברקוד במצלמת הסמארטפון שלכם ולחצו על <b>"דגום מיקום ושדר למחשב"</b>. המחשב יקבל את ה-GPS האמיתי בזמן אמת!
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-950/80 p-3 rounded-xl border border-purple-500/20">
+            {/* Dedicated DJ GPS QR Code */}
+            <div className="p-2 bg-white rounded-xl shadow-lg border border-purple-400/40 shrink-0">
+              {djGpsQrDataUrl ? (
+                <img src={djGpsQrDataUrl} alt="DJ GPS QR" className="w-32 h-32 block" />
+              ) : (
+                <div className="w-32 h-32 flex items-center justify-center text-slate-500 text-xs">טוען...</div>
+              )}
+            </div>
+
+            <div className="flex-1 space-y-2 text-right w-full">
+              {/* Live Status indicator */}
+              {phoneSyncSuccess ? (
+                <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-bounce">
+                  <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>🎉 נקלט GPS לווייני אמיתי מהטלפון! העמדה מכוילת.</span>
+                </div>
+              ) : (
+                <div className="p-2 rounded-xl bg-slate-900 border border-purple-500/30 text-purple-300 text-[11px] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping"></span>
+                  <span>ממתין לסריקה ולחיצה מהסמארטפון... (בשידור ישיר)</span>
+                </div>
+              )}
+
+              <div className="text-[11px] text-slate-400 space-y-1">
+                <div>• חדר מחובר: <span className="font-mono text-amber-300 font-bold">{roomCode}</span></div>
+                <div>• שידור דו-ערוצי מאובטח: HTTPS Port 443 + MQTT</div>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <a
+                  href={djGpsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>פתח כיול בדפדפן</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OPTION 3: VENUE SEARCH & PRESETS */}
+      {locationTab === 'venue' && (
+        <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-black text-white">אופציה 3: בחירת אולם אירועים או חיפוש כתובת</span>
+            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold border border-amber-500/40">
+              חיפוש מהיר במפה 🏢
+            </span>
+          </div>
+
+          {/* Quick preset buttons */}
+          <div>
+            <div className="text-[11px] text-slate-300 font-bold mb-1.5">אולמות וגני אירועים נפוצים (בלחיצה אחת):</div>
+            <div className="flex flex-wrap gap-1.5">
+              {POPULAR_VENUES.map((venue) => (
+                <button
+                  key={venue.name}
+                  type="button"
+                  onClick={() => selectPresetVenue(venue)}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-amber-500/20 hover:text-amber-300 text-slate-300 border border-slate-800 hover:border-amber-500/40 text-xs font-semibold transition-all active:scale-95 flex items-center gap-1"
+                >
+                  <span>{venue.name}</span>
+                  <span className="text-[10px] text-slate-500 font-normal">({venue.city})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Search Input */}
+          <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
+            <div className="text-[11px] text-slate-400">חפש כל אולם, גן אירועים או כתובת בישראל:</div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={venueSearchQuery}
+                onChange={(e) => setVenueSearchQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') searchVenue(); }}
+                placeholder="לדוגמה: טראסק, שרונית, נמל תל אביב..."
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-amber-400"
+              />
+              <button
+                type="button"
+                onClick={() => searchVenue()}
+                disabled={isSearchingVenue || !venueSearchQuery.trim()}
+                className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1 transition-all shadow shrink-0"
+              >
+                <Search className={`w-3.5 h-3.5 ${isSearchingVenue ? 'animate-spin' : ''}`} />
+                <span>חפש</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search error */}
+          {venueSearchError && (
+            <div className="p-2 rounded-lg bg-red-950/40 border border-red-500/30 text-red-300 text-xs">
+              {venueSearchError}
+            </div>
+          )}
+
+          {/* Search Results */}
+          {venueSearchResults.length > 0 && (
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {venueSearchResults.map((res) => (
+                <div
+                  key={res.place_id}
+                  className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-amber-500/50 flex items-center justify-between gap-2 transition-all"
+                >
+                  <div className="text-right flex-1 min-w-0">
+                    <div className="font-bold text-white text-xs truncate">
+                      {res.name || res.display_name.split(',')[0]}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">
+                      {res.display_name}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => selectVenue(res)}
+                    className="px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-bold shrink-0 transition-all active:scale-95"
+                  >
+                    בחר מיקום זה ✓
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* OPTION: MANUAL COORDINATES & COMPUTER WI-FI */}
+      {locationTab === 'manual' && (
+        <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+          <div className="flex items-center gap-2">
+            <Navigation className="w-4 h-4 text-slate-400" />
+            <span className="text-xs font-bold text-white">הזנת קואורדינטות ידניות או דגימת Wi-Fi ממחשב</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[11px] text-slate-400 block mb-1">קו רוחב (Latitude):</label>
+              <input
+                type="text"
+                value={manualLat}
+                onChange={(e) => setManualLat(e.target.value)}
+                placeholder="32.229502"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs font-mono text-white outline-none focus:border-purple-500"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400 block mb-1">קו אורך (Longitude):</label>
+              <input
+                type="text"
+                value={manualLon}
+                onChange={(e) => setManualLon(e.target.value)}
+                placeholder="34.839827"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs font-mono text-white outline-none focus:border-purple-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <button
+              type="button"
+              onClick={applyManualCoordinates}
+              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow"
+            >
+              החל קואורדינטות אלו 💾
+            </button>
+
+            <button
+              type="button"
+              onClick={fetchDjLocation}
+              disabled={isFetchingLocation}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-700"
+              title="דגום לפי Wi-Fi של המחשב"
+            >
+              <Navigation className={`w-3.5 h-3.5 ${isFetchingLocation ? 'animate-spin text-amber-400' : ''}`} />
+              <span>דגום מ-Wi-Fi המחשב</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   // Subscribe to Realtime Guest Requests via MQTT WSS (HiveMQ & EMQX redundant brokers)
   useEffect(() => {
     const cleanRoom = (roomCode || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
     const topic = `onyx/requests/${cleanRoom}`;
+    const locationTopic = `onyx/dj_location/${cleanRoom}`;
 
     let isUnmounted = false;
     let hiveClient = null;
@@ -327,8 +732,12 @@ export default function GuestRequestsModal({
         };
         hiveClient.onMessageArrived = (msg) => {
           try {
-            const req = JSON.parse(msg.payloadString);
-            processIncomingRequest(req);
+            const payload = JSON.parse(msg.payloadString);
+            if (msg.destinationName && msg.destinationName.includes('dj_location')) {
+              handleIncomingDjGps(payload);
+            } else {
+              processIncomingRequest(payload);
+            }
           } catch(e) {}
         };
         hiveClient.connect({
@@ -340,6 +749,10 @@ export default function GuestRequestsModal({
             console.log('Onyx connected to HiveMQ WSS topic:', topic);
             hiveClientRef.current = hiveClient;
             try { hiveClient.subscribe(topic, { qos: 0 }); } catch(e) {}
+            try { hiveClient.subscribe(locationTopic, { qos: 0 }); } catch(e) {}
+            if (cleanRoom !== 'SHAZZ-SONIC') {
+              try { hiveClient.subscribe('onyx/dj_location/SHAZZ-SONIC', { qos: 0 }); } catch(e) {}
+            }
             broadcastRoomStatus(isActiveRef.current);
           },
           onFailure: () => {
@@ -361,8 +774,12 @@ export default function GuestRequestsModal({
         };
         emqxClient.onMessageArrived = (msg) => {
           try {
-            const req = JSON.parse(msg.payloadString);
-            processIncomingRequest(req);
+            const payload = JSON.parse(msg.payloadString);
+            if (msg.destinationName && msg.destinationName.includes('dj_location')) {
+              handleIncomingDjGps(payload);
+            } else {
+              processIncomingRequest(payload);
+            }
           } catch(e) {}
         };
         emqxClient.connect({
@@ -374,6 +791,10 @@ export default function GuestRequestsModal({
             console.log('Onyx connected to EMQX WSS topic:', topic);
             emqxClientRef.current = emqxClient;
             try { emqxClient.subscribe(topic, { qos: 0 }); } catch(e) {}
+            try { emqxClient.subscribe(locationTopic, { qos: 0 }); } catch(e) {}
+            if (cleanRoom !== 'SHAZZ-SONIC') {
+              try { emqxClient.subscribe('onyx/dj_location/SHAZZ-SONIC', { qos: 0 }); } catch(e) {}
+            }
             broadcastRoomStatus(isActiveRef.current);
           },
           onFailure: () => {
@@ -699,6 +1120,44 @@ export default function GuestRequestsModal({
             חדר: {roomCode}
           </div>
           <p className="text-xs text-slate-400 font-medium">פותחים מצלמה &bull; סורקים &bull; בוחרים שיר &bull; שומעים ברחבה!</p>
+        </div>
+      )}
+
+      {/* Location Calibration Modal (Options 2 & 3) */}
+      {showLocationModal && (
+        <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 select-none" dir="rtl">
+          <div className="bg-slate-900 border border-purple-500/30 rounded-3xl max-w-xl w-full p-4 sm:p-6 space-y-4 shadow-[0_0_50px_rgba(168,85,247,0.25)] relative text-right max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">כיול מיקום עמדת הדיג'יי (מרכז המסיבה)</h3>
+                  <p className="text-[11px] text-slate-400">בחר באפשרות 2 (טלפון) או אפשרות 3 (אולם) לקביעת מיקום מדויק</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {renderLocationCalibrator(true)}
+
+            <div className="pt-2 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(false)}
+                className="px-5 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl text-xs font-bold transition-all shadow"
+              >
+                סגור וסיים ✓
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1037,20 +1496,35 @@ export default function GuestRequestsModal({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   {geoEnabled && (
-                    <button
-                      onClick={fetchDjLocation}
-                      disabled={isFetchingLocation}
-                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
-                      title="דגום מיקום נוכחי מחדש"
-                    >
-                      <Navigation className={`w-3.5 h-3.5 ${isFetchingLocation ? 'animate-spin text-amber-400' : ''}`} />
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { setLocationTab('phone'); setShowLocationModal(true); }}
+                        className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600/30 to-pink-600/30 hover:from-purple-600/40 hover:to-pink-600/40 text-purple-200 border border-purple-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                        title="כיול GPS אמיתי מסמארטפון הדיג'יי (אופציה 2)"
+                      >
+                        <Smartphone className="w-3.5 h-3.5 text-purple-400" />
+                        <span>כייל מטלפון 📱</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { setLocationTab('venue'); setShowLocationModal(true); }}
+                        className="px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1 active:scale-95"
+                        title="חיפוש אולם אירועים או כתובת במפה (אופציה 3)"
+                      >
+                        <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                        <span>בחר אולם 🏢</span>
+                      </button>
+                    </>
                   )}
                   <button 
+                    type="button"
                     onClick={() => setActiveTab('settings')}
-                    className="px-2.5 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition-all"
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
+                    title="שנה רדיוס והגדרות מיקום"
                   >
                     שנה רדיוס
                   </button>
@@ -1247,22 +1721,17 @@ export default function GuestRequestsModal({
                       </div>
                     </div>
 
-                    {/* DJ Location Status */}
-                    <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs">
-                      <div>
-                        <div className="font-semibold text-slate-300">מיקום עמדת הדיג'יי (מרכז המסיבה):</div>
-                        <div className="text-[11px] font-mono text-slate-400 mt-0.5">
-                          {locationStatus || (djLat ? `${djLat}, ${djLon}` : 'טרם נדגם מיקום')}
+                    {/* Location Calibration Options for DJ */}
+                    <div className="pt-2 border-t border-slate-800/80">
+                      <div className="mb-2.5">
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span>כיול עמדת הדיג'יי (מרכז המסיבה):</span>
                         </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                          בחר בין כיול מסמארטפון (GPS לווייני מדויק) לבין בחירת אולם אירועים במפה:
+                        </p>
                       </div>
-                      <button
-                        onClick={fetchDjLocation}
-                        disabled={isFetchingLocation}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs font-bold border border-slate-700 transition-all shrink-0"
-                      >
-                        <Navigation className={`w-3.5 h-3.5 ${isFetchingLocation ? 'animate-spin' : ''}`} />
-                        <span>דגום מיקום נוכחי 🎯</span>
-                      </button>
+                      {renderLocationCalibrator(false)}
                     </div>
                   </div>
                 )}
