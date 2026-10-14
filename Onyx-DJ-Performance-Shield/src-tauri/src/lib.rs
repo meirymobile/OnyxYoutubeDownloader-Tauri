@@ -1,12 +1,16 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process::{Child, Command};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use lazy_static::lazy_static;
+use tauri::Emitter;
 
 lazy_static! {
     static ref CAFFEINATE_CHILD: Mutex<Option<Child>> = Mutex::new(None);
-    static ref SHIELD_ACTIVE: Mutex<bool> = Mutex::new(false);
+    static ref GUARD_RUNNING: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+    static ref GUARD_WHITELIST: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -338,6 +342,92 @@ fn get_system_memory() -> Result<SystemMemoryInfo, String> {
     })
 }
 
+#[tauri::command]
+fn set_active_guard(app: tauri::AppHandle, enable: bool, allowed_names: Vec<String>) -> Result<bool, String> {
+    if enable {
+        {
+            let mut wl = GUARD_WHITELIST.lock().unwrap();
+            wl.clear();
+            for name in allowed_names {
+                wl.insert(name.to_lowercase().trim().to_string());
+            }
+
+            // Always allow Finder, Onyx and Core Apps
+            wl.insert("finder".to_string());
+            wl.insert("onyx".to_string());
+            wl.insert("onyx dj performance shield".to_string());
+            wl.insert("onyxyoutubedownloader".to_string());
+        }
+
+        // 1. Temporarily disable Photos from popping up when connecting iPhone/iPad via USB
+        let _ = Command::new("defaults")
+            .args(&["-currentHost", "write", "com.apple.ImageCapture", "disableHotPlug", "-bool", "YES"])
+            .output();
+
+        // 2. Terminate background software updaters
+        let _ = Command::new("pkill").args(&["-f", "GoogleSoftwareUpdate"]).output();
+        let _ = Command::new("pkill").args(&["-f", "Microsoft AutoUpdate"]).output();
+
+        // 3. Start background watcher loop
+        if !GUARD_RUNNING.load(Ordering::SeqCst) {
+            GUARD_RUNNING.store(true, Ordering::SeqCst);
+            let guard_flag = GUARD_RUNNING.clone();
+
+            std::thread::spawn(move || {
+                let current_pid = std::process::id();
+                println!("[Active Guard] Background watchdog started");
+
+                while guard_flag.load(Ordering::SeqCst) {
+                    std::thread::sleep(std::time::Duration::from_millis(1500));
+                    if !guard_flag.load(Ordering::SeqCst) {
+                        break;
+                    }
+
+                    if let Ok(apps) = get_running_gui_apps() {
+                        let wl = GUARD_WHITELIST.lock().unwrap();
+                        for app_info in apps {
+                            if app_info.pid <= 1 || app_info.pid == current_pid || app_info.is_protected {
+                                continue;
+                            }
+
+                            let app_lower = app_info.name.to_lowercase();
+                            let is_allowed = wl.iter().any(|allowed| {
+                                app_lower.contains(allowed) || allowed.contains(&app_lower)
+                            });
+
+                            if !is_allowed {
+                                println!("[Active Guard] Intercepted unauthorized app: {} (PID: {})", app_info.name, app_info.pid);
+                                // Immediately kill
+                                let _ = Command::new("kill").args(&["-9", &app_info.pid.to_string()]).output();
+
+                                let timestamp = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .map(|d| d.as_millis())
+                                    .unwrap_or(0);
+
+                                let _ = app.emit("app_blocked_event", serde_json::json!({
+                                    "name": app_info.name,
+                                    "pid": app_info.pid,
+                                    "timestamp": timestamp
+                                }));
+                            }
+                        }
+                    }
+                }
+                println!("[Active Guard] Background watchdog stopped");
+            });
+        }
+    } else {
+        GUARD_RUNNING.store(false, Ordering::SeqCst);
+        // Restore Photos hotPlug
+        let _ = Command::new("defaults")
+            .args(&["-currentHost", "delete", "com.apple.ImageCapture", "disableHotPlug"])
+            .output();
+    }
+
+    Ok(enable)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -347,6 +437,7 @@ pub fn run() {
             terminate_apps,
             set_caffeinate,
             set_focus_mode,
+            set_active_guard,
             get_system_memory
         ])
         .run(tauri::generate_context!())

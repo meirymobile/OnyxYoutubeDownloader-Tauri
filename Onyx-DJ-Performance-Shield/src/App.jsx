@@ -29,12 +29,47 @@ export default function App() {
   // Auxiliary Options
   const [muteNotifications, setMuteNotifications] = useState(true);
   const [preventSleep, setPreventSleep] = useState(true);
+  const [activeGuard, setActiveGuard] = useState(() => {
+    return localStorage.getItem('onyx_shield_active_guard') !== 'false';
+  });
   const [confirmPrompt, setConfirmPrompt] = useState(false);
+  const [blockedEvents, setBlockedEvents] = useState([]);
+  const [latestBlocked, setLatestBlocked] = useState(null);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
 
-  // Sync mode to localStorage
+  // Sync mode & active guard to localStorage
   useEffect(() => {
     localStorage.setItem('onyx_shield_mode', mode);
   }, [mode]);
+
+  useEffect(() => {
+    localStorage.setItem('onyx_shield_active_guard', activeGuard);
+  }, [activeGuard]);
+
+  // Listen for real-time app blocked events emitted from Rust Active Guard
+  useEffect(() => {
+    let unlisten = null;
+    const setupListener = async () => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        unlisten = await listen('app_blocked_event', (event) => {
+          console.log('[Active Guard Event]', event.payload);
+          const data = event.payload;
+          setBlockedEvents(prev => [data, ...prev].slice(0, 50));
+          setLatestBlocked(data);
+          setTimeout(() => {
+            setLatestBlocked(curr => (curr?.timestamp === data.timestamp ? null : curr));
+          }, 6000);
+        });
+      } catch (e) {
+        console.warn('Tauri event listener setup failed:', e);
+      }
+    };
+    setupListener();
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   // Invoke helper with graceful fallback for browser preview
   const callTauri = async (cmd, args = {}) => {
@@ -214,7 +249,22 @@ export default function App() {
         await callTauri('set_caffeinate', { enable: true });
       }
 
-      // 4. Save current Whitelist to localStorage
+      // 4. Start Active Guard if enabled
+      if (activeGuard) {
+        let allowedNames = [];
+        if (mode === 'whitelist') {
+          allowedNames = apps
+            .filter(a => selectedPids.has(a.pid) || a.is_protected)
+            .map(a => a.name);
+        } else {
+          allowedNames = apps
+            .filter(a => !selectedPids.has(a.pid) || a.is_protected)
+            .map(a => a.name);
+        }
+        await callTauri('set_active_guard', { enable: true, allowedNames });
+      }
+
+      // 5. Save current Whitelist to localStorage
       if (mode === 'whitelist') {
         const keptNames = apps.filter(a => selectedPids.has(a.pid)).map(a => a.name);
         localStorage.setItem('onyx_saved_whitelist', JSON.stringify(keptNames));
@@ -241,7 +291,10 @@ export default function App() {
   const deactivateShield = async () => {
     setLoading(true);
     try {
-      await callTauri('set_caffeinate', { enable: false });
+      await Promise.all([
+        callTauri('set_caffeinate', { enable: false }),
+        callTauri('set_active_guard', { enable: false, allowedNames: [] })
+      ]);
       setIsShieldActive(false);
       setShieldStats(null);
       await refreshData();
@@ -348,6 +401,23 @@ export default function App() {
             </span>
             <span className="text-slate-300">
               נסגרו <b>{shieldStats.closedCount}</b> אפליקציות &bull; פונו <b>{(shieldStats.freedMemMb / 1024).toFixed(2)} GB</b> זיכרון &bull; התראות מושתקות &bull; מסך נעול כנגד שינה
+              {activeGuard && (
+                <>
+                  {' '}&bull;{' '}
+                  <span className="inline-flex items-center gap-1 font-bold text-amber-300">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    שומר רקע פעיל
+                    {blockedEvents.length > 0 && (
+                      <button 
+                        onClick={() => setShowBlockedModal(true)}
+                        className="underline hover:text-amber-200 ml-1 cursor-pointer bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px]"
+                      >
+                        (נחסמו {blockedEvents.length} ניסיונות)
+                      </button>
+                    )}
+                  </span>
+                </>
+              )}
             </span>
           </div>
           <button 
@@ -579,7 +649,7 @@ export default function App() {
       <footer className="px-6 py-4 bg-slate-900/90 backdrop-blur-md border-t border-slate-800 flex flex-wrap items-center justify-between gap-4 shrink-0">
         
         {/* Toggles */}
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex flex-wrap items-center gap-4 text-xs">
           <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white transition-colors">
             <input 
               type="checkbox"
@@ -588,7 +658,7 @@ export default function App() {
               className="accent-amber-500 w-4 h-4 rounded cursor-pointer"
             />
             <BellOff className="w-3.5 h-3.5 text-amber-400" />
-            <span>השתק התראות ואייפון (Focus Mode) 🔕</span>
+            <span>השתק התראות ואייפון (Focus) 🔕</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white transition-colors">
@@ -599,17 +669,28 @@ export default function App() {
               className="accent-amber-500 w-4 h-4 rounded cursor-pointer"
             />
             <Coffee className="w-3.5 h-3.5 text-amber-400" />
-            <span>מנע שינה ושומר מסך (Anti-Sleep) ☕</span>
+            <span>מנע שינה ושומר מסך ☕</span>
           </label>
 
-          <label className="hidden lg:flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-300 transition-colors">
+          <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white transition-colors">
+            <input 
+              type="checkbox"
+              checked={activeGuard}
+              onChange={(e) => setActiveGuard(e.target.checked)}
+              className="accent-amber-500 w-4 h-4 rounded cursor-pointer"
+            />
+            <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+            <span>שומר רקע אקטיבי (חסימת פתיחה אוטומטית) 🛡️</span>
+          </label>
+
+          <label className="hidden xl:flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-300 transition-colors">
             <input 
               type="checkbox"
               checked={confirmPrompt}
               onChange={(e) => setConfirmPrompt(e.target.checked)}
               className="accent-amber-500 w-4 h-4 rounded cursor-pointer"
             />
-            <span>בקש אישור לפני ביצוע</span>
+            <span>בקש אישור</span>
           </label>
         </div>
 
@@ -640,6 +721,90 @@ export default function App() {
           </button>
         </div>
       </footer>
+
+      {/* Real-time Blocked App Toast */}
+      {latestBlocked && (
+        <div className="fixed bottom-20 right-6 z-50 bg-rose-950/95 border border-rose-500/60 shadow-[0_0_30px_rgba(244,63,94,0.3)] rounded-2xl p-4 text-xs text-rose-200 flex items-center gap-3 backdrop-blur-md animate-slideUp">
+          <div className="p-2 rounded-xl bg-rose-500/20 text-rose-300">
+            <ShieldAlert className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <div className="font-bold text-white text-sm flex items-center gap-2">
+              <span>הפעלת רקע נבלמה אוטומטית! 🛑</span>
+              <span className="text-[10px] bg-rose-500/30 px-1.5 py-0.5 rounded text-rose-300">
+                ACTIVE GUARD
+              </span>
+            </div>
+            <div className="text-slate-300 mt-0.5">
+              האפליקציה <b className="text-amber-300">{latestBlocked.name}</b> (PID {latestBlocked.pid}) נסגרה מיידית.
+            </div>
+          </div>
+          <button 
+            onClick={() => setLatestBlocked(null)} 
+            className="p-1 hover:text-white text-slate-400 hover:bg-slate-800 rounded-lg transition-colors ml-2"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Blocked Events Modal */}
+      {showBlockedModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2 text-white font-bold">
+                <ShieldAlert className="w-5 h-5 text-amber-400" />
+                <span>היסטוריית חסימות בזמן אמת (Active Guard)</span>
+              </div>
+              <button 
+                onClick={() => setShowBlockedModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-2">
+              {blockedEvents.length === 0 ? (
+                <div className="text-center text-slate-500 py-8 text-xs">
+                  לא נרשמו ניסיונות פתיחה שנחסמו עד כה. המערכת שקטה.
+                </div>
+              ) : (
+                blockedEvents.map((evt, idx) => (
+                  <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-bold text-white">{evt.name}</div>
+                      <div className="text-[10px] text-slate-500 font-mono">PID {evt.pid}</div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-rose-400 font-bold block">נחסם מיידית 🛑</span>
+                      <span className="text-[9px] text-slate-500">
+                        {new Date(evt.timestamp).toLocaleTimeString('he-IL')}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-xs">
+              <button 
+                onClick={() => setBlockedEvents([])}
+                className="text-slate-400 hover:text-rose-400 transition-colors"
+              >
+                נקה היסטוריה
+              </button>
+              <button 
+                onClick={() => setShowBlockedModal(false)}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold"
+              >
+                סגור
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
