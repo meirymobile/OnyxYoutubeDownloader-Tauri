@@ -175,14 +175,19 @@
       opacity: 1;
     }
     .spotlight-img {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
       filter: brightness(0.55) contrast(1.15);
+      opacity: 0;
       transform: scale(1.02);
-      transition: transform 14s ease-out;
+      transition: opacity 1.4s cubic-bezier(0.4, 0, 0.2, 1), transform 16s ease-out;
+      pointer-events: none;
     }
-    .spotlight-backdrop.active .spotlight-img {
+    .spotlight-img.visible {
+      opacity: 1;
       transform: scale(1.12); /* Subtle Ken-Burns zoom */
     }
     .spotlight-vignette {
@@ -190,6 +195,7 @@
       inset: 0;
       background: radial-gradient(circle at center, rgba(5,2,10,0.2) 20%, rgba(5,2,10,0.85) 85%);
       box-shadow: inset 0 0 120px rgba(5,2,10,0.95);
+      z-index: 3;
     }
 
     /* Spotlight Dynamic Position Content Card */
@@ -225,89 +231,105 @@
     .spotlight-badge {
       display: inline-flex;
       align-items: center;
-      gap: 0.4vw;
-      padding: 0.3vw 1.1vw;
+      gap: 0.35vw;
+      padding: 0.25vw 0.9vw;
       border-radius: 999px;
       background: rgba(245, 158, 11, 0.18);
       border: 1.5px solid rgba(245, 158, 11, 0.6);
       color: #fbbf24;
-      font-size: 1.2vw;
-      font-weight: 900;
+      font-size: 1.05vw;
+      font-weight: 800;
       letter-spacing: 0.5px;
-      margin-bottom: 0.5vw;
-      box-shadow: 0 0 2vw rgba(245, 158, 11, 0.3);
+      margin-bottom: 0.4vw;
+      box-shadow: 0 0 1.5vw rgba(245, 158, 11, 0.3);
       animation: pulse 2s infinite;
       white-space: nowrap;
     }
 
-    /* Song Title & Artist: responsive 1:1 scale */
-    .spotlight-title {
+    /* LINE 1: Requester Name - Large & Colorful */
+    .spotlight-requester-hero {
       font-family: 'Space Grotesk', 'Assistant', sans-serif;
-      font-size: 2.1vw;
-      font-weight: 800;
-      background: linear-gradient(135deg, #ffffff 0%, #fef08a 40%, #f472b6 100%);
+      font-size: 2.25vw;
+      font-weight: 900;
+      background: linear-gradient(135deg, #ffffff 0%, #38bdf8 45%, #e879f9 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 0.5vw;
-      max-width: 68vw;
       line-height: 1.25;
-      text-shadow: 0 0 1.5vw rgba(244, 114, 182, 0.35);
+      margin-bottom: 0.4vw;
+      max-width: 70vw;
       direction: rtl;
       unicode-bidi: plaintext;
-    }
-
-    .spotlight-requester-wrap {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 0.4vw;
-      font-size: 1.3vw;
-      font-weight: 800;
-      color: #e2e8f0;
-      margin-bottom: 0.5vw;
-      background: rgba(15, 7, 26, 0.65);
-      padding: 0.35vw 1.2vw;
-      border-radius: 1.2vw;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(14px);
-      white-space: nowrap;
-      direction: rtl;
+      text-shadow: 0 0 1.5vw rgba(56, 189, 248, 0.4);
     }
-    .spotlight-requester {
-      color: #38bdf8;
+    .spotlight-heart-icon {
+      -webkit-text-fill-color: initial;
+      font-size: 1.9vw;
+    }
+    .spotlight-requester-name {
       font-weight: 900;
-      text-shadow: 0 0 1vw rgba(56, 189, 248, 0.6);
     }
 
-    .spotlight-note-box {
-      max-width: 65vw;
-      background: rgba(18, 10, 31, 0.85);
-      border: 1.5px solid rgba(245, 158, 11, 0.45);
-      padding: 0.4vw 1.2vw;
-      border-radius: 1.4vw;
-      backdrop-filter: blur(20px);
-      box-shadow: 0 1vw 2.5vw rgba(0, 0, 0, 0.6), 0 0 2vw rgba(245, 158, 11, 0.2);
+    /* LINE 2: Dedication Note - Large & Colorful */
+    .spotlight-note-hero {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.4vw;
+      gap: 0.3vw;
+      font-family: 'Space Grotesk', 'Assistant', sans-serif;
+      font-size: 1.85vw;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.25;
+      margin-bottom: 0.5vw;
+      max-width: 68vw;
       direction: rtl;
+      unicode-bidi: plaintext;
+      text-shadow: 0 0 1.5vw rgba(245, 158, 11, 0.35);
     }
     .quote-mark {
-      font-size: 2.2vw;
+      font-size: 2.3vw;
       line-height: 1;
-      color: #f59e0b;
+      color: #fbbf24;
       font-family: serif;
-      opacity: 0.8;
+      -webkit-text-fill-color: #fbbf24;
+      opacity: 0.9;
     }
     .spotlight-note {
-      font-size: 1.2vw;
-      font-weight: 700;
-      color: #fff;
-      line-height: 1.25;
       font-style: italic;
       direction: rtl;
       unicode-bidi: plaintext;
+    }
+
+    /* LINE 3: Song Title & Artist - Smallest at the bottom */
+    .spotlight-song-bar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4vw;
+      font-size: 1.15vw;
+      font-weight: 700;
+      color: #e2e8f0;
+      background: rgba(15, 7, 26, 0.7);
+      padding: 0.3vw 1.2vw;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      margin-bottom: 0.2vw;
+      white-space: nowrap;
+      max-width: 68vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      direction: rtl;
+      unicode-bidi: plaintext;
+    }
+    .spotlight-song-icon {
+      font-size: 1.1vw;
     }
 
     /* Action Steps Footer */
@@ -424,9 +446,10 @@
 
   <button class="fs-toggle-btn" onclick="toggleFullScreen()">⛶ מסך מלא</button>
 
-  <!-- Spotlight Fullscreen Media Backdrop -->
+  <!-- Spotlight Fullscreen Media Backdrop with Dual-Layer Crossfade -->
   <div id="spotlight-backdrop" class="spotlight-backdrop">
-    <img id="spotlight-img" class="spotlight-img" src="" alt="" />
+    <img id="spotlight-img-a" class="spotlight-img" src="" alt="" />
+    <img id="spotlight-img-b" class="spotlight-img" src="" alt="" />
     <div class="spotlight-vignette"></div>
   </div>
 
@@ -438,18 +461,24 @@
       <span class="spotlight-sparkle">✨</span>
     </div>
 
-    <h1 id="spotlight-title" class="spotlight-title">שם השיר</h1>
-    
-    <div class="spotlight-requester-wrap">
-      <span class="spotlight-heart">❤️</span>
-      <span>הוקדש באהבה על ידי:</span>
-      <span id="spotlight-requester" class="spotlight-requester">אורח ברחבה</span>
+    <!-- LINE 1: Requester Name - Large & Colorful -->
+    <div class="spotlight-requester-hero">
+      <span class="spotlight-heart-icon">❤️</span>
+      <span>הוקדש ע״י </span>
+      <span id="spotlight-requester" class="spotlight-requester-name">אורח ברחבה</span>
     </div>
 
-    <div id="spotlight-note-box" class="spotlight-note-box">
+    <!-- LINE 2: Dedication Note - Large & Colorful -->
+    <div id="spotlight-note-box" class="spotlight-note-hero" style="display: none;">
       <span class="quote-mark">“</span>
       <p id="spotlight-note" class="spotlight-note">הקדשה מיוחדת</p>
       <span class="quote-mark">”</span>
+    </div>
+
+    <!-- LINE 3: Song Title & Artist - Smallest at the bottom -->
+    <div class="spotlight-song-bar">
+      <span class="spotlight-song-icon">🎵</span>
+      <span id="spotlight-title">שם השיר</span>
     </div>
   </div>
 
@@ -568,17 +597,9 @@
         noteBox.style.display = 'none';
       }
 
-      // Update photo / backdrop
-      const backdrop = document.getElementById('spotlight-backdrop');
-      const photoImg = document.getElementById('spotlight-img');
-      if (data.photo) {
-        photoImg.src = data.photo;
-        photoImg.style.display = 'block';
-      } else {
-        photoImg.src = '';
-        photoImg.style.display = 'none';
-      }
-      backdrop.classList.add('active');
+      // Update photo / backdrop with smooth dual-buffer crossfade
+      updateSpotlightPhoto(data.photo);
+      document.getElementById('spotlight-backdrop').classList.add('active');
 
       // Activate card and apply dynamic textPosition and textScale from guest request
       const card = document.getElementById('spotlight-card');
@@ -594,10 +615,52 @@
       glideQrToCorner();
     }
 
+    let currentPhotoSlot = 'a';
+    let currentPhotoUrl = '';
+
+    function updateSpotlightPhoto(newPhotoUrl) {
+      const imgA = document.getElementById('spotlight-img-a');
+      const imgB = document.getElementById('spotlight-img-b');
+      if (!imgA || !imgB) return;
+
+      if (!newPhotoUrl) {
+        imgA.classList.remove('visible');
+        imgB.classList.remove('visible');
+        currentPhotoUrl = '';
+        return;
+      }
+
+      if (newPhotoUrl === currentPhotoUrl) {
+        return;
+      }
+      currentPhotoUrl = newPhotoUrl;
+
+      const nextSlot = (currentPhotoSlot === 'a') ? 'b' : 'a';
+      const activeImg = (currentPhotoSlot === 'a') ? imgA : imgB;
+      const nextImg = (nextSlot === 'a') ? imgA : imgB;
+
+      const preload = new Image();
+      preload.onload = () => {
+        nextImg.style.transition = 'none';
+        nextImg.style.transform = 'scale(1.02)';
+        nextImg.src = newPhotoUrl;
+        void nextImg.offsetHeight;
+        nextImg.style.transition = 'opacity 1.4s cubic-bezier(0.4, 0, 0.2, 1), transform 16s ease-out';
+        nextImg.classList.add('visible');
+        activeImg.classList.remove('visible');
+        currentPhotoSlot = nextSlot;
+      };
+      preload.onerror = () => {
+        activeImg.classList.remove('visible');
+      };
+      preload.src = newPhotoUrl;
+    }
+
     function deactivateSpotlight() {
       document.body.classList.remove('spotlight-mode');
       document.getElementById('spotlight-backdrop').classList.remove('active');
       document.getElementById('spotlight-card').classList.remove('active');
+      updateSpotlightPhoto('');
       
       // Glide QR code back to center
       glideQrToCenter();

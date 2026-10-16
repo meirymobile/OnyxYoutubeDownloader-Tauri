@@ -1893,71 +1893,74 @@ export default function GuestRequestsModal({
                     <div 
                       className="inline-flex items-center rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black tracking-wider whitespace-nowrap animate-pulse"
                       style={{
-                        gap: '0.4cqw',
-                        padding: '0.3cqw 1.1cqw',
-                        fontSize: '1.2cqw',
-                        marginBottom: '0.5cqw',
-                        boxShadow: '0 0 2cqw rgba(245,158,11,0.3)'
+                        gap: '0.35cqw',
+                        padding: '0.25cqw 0.9cqw',
+                        fontSize: '1.05cqw',
+                        marginBottom: '0.4cqw',
+                        boxShadow: '0 0 1.5cqw rgba(245,158,11,0.3)'
                       }}
                     >
-                      <Sparkles style={{ width: '1.2cqw', height: '1.2cqw' }} className="text-amber-400" />
+                      <Sparkles style={{ width: '1.05cqw', height: '1.05cqw' }} className="text-amber-400" />
                       <span>מתנגן עכשיו לבקשת הקהל!</span>
-                      <Sparkles style={{ width: '1.2cqw', height: '1.2cqw' }} className="text-amber-400" />
+                      <Sparkles style={{ width: '1.05cqw', height: '1.05cqw' }} className="text-amber-400" />
                     </div>
 
-                    <h4 
-                      className="font-extrabold bg-gradient-to-r from-white via-yellow-200 to-pink-400 bg-clip-text text-transparent leading-tight"
-                      dir="rtl"
-                      style={{
-                        fontSize: '2.1cqw',
-                        maxWidth: '68cqw',
-                        marginBottom: '0.5cqw',
-                        unicodeBidi: 'plaintext',
-                        filter: 'drop-shadow(0 0 1.5cqw rgba(244,114,182,0.4))'
-                      }}
-                    >
-                      {previewItem.title}
-                    </h4>
-
+                    {/* LINE 1: Requester Name - Large & Colorful */}
                     <div 
-                      className="inline-flex items-center justify-center font-bold text-slate-200 bg-[rgba(15,7,26,0.65)] border border-white/15 backdrop-blur-md whitespace-nowrap"
+                      className="inline-flex items-center justify-center font-black bg-gradient-to-r from-white via-cyan-400 to-fuchsia-400 bg-clip-text text-transparent leading-tight whitespace-nowrap"
                       dir="rtl"
                       style={{
                         gap: '0.4cqw',
-                        fontSize: '1.3cqw',
-                        padding: '0.35cqw 1.2cqw',
-                        borderRadius: '1.2cqw',
-                        marginBottom: '0.5cqw'
+                        fontSize: '2.25cqw',
+                        marginBottom: '0.4cqw',
+                        maxWidth: '70cqw',
+                        unicodeBidi: 'plaintext',
+                        filter: 'drop-shadow(0 0 1.5cqw rgba(56,189,248,0.4))'
                       }}
                     >
-                      <span className="text-pink-400">❤️</span>
-                      <span>הוקדש באהבה על ידי:</span>
-                      <span className="text-cyan-400 font-extrabold drop-shadow-[0_0_1cqw_rgba(56,189,248,0.6)]">
-                        {previewItem.requester || 'אורח ברחבה'}
-                      </span>
+                      <span style={{ fontSize: '1.9cqw', WebkitTextFillColor: 'initial' }}>❤️</span>
+                      <span>הוקדש ע״י </span>
+                      <span>{previewItem.requester || 'אורח ברחבה'}</span>
                     </div>
 
+                    {/* LINE 2: Dedication Note - Large & Colorful */}
                     {previewItem.note && previewItem.note.trim() && (
                       <div 
-                        className="bg-[rgba(18,10,31,0.85)] border border-amber-500/45 backdrop-blur-xl flex items-center justify-center"
+                        className="flex items-center justify-center font-extrabold bg-gradient-to-r from-yellow-200 via-amber-400 to-pink-400 bg-clip-text text-transparent leading-tight"
                         dir="rtl"
                         style={{
-                          maxWidth: '65cqw',
-                          padding: '0.4cqw 1.2cqw',
-                          borderRadius: '1.4cqw',
-                          gap: '0.4cqw'
+                          gap: '0.3cqw',
+                          fontSize: '1.85cqw',
+                          marginBottom: '0.5cqw',
+                          maxWidth: '68cqw',
+                          unicodeBidi: 'plaintext',
+                          filter: 'drop-shadow(0 0 1.5cqw rgba(245,158,11,0.35))'
                         }}
                       >
-                        <span className="font-serif text-amber-400 opacity-80 leading-none" style={{ fontSize: '2.2cqw' }}>“</span>
-                        <p 
-                          className="font-bold text-white italic leading-tight"
-                          style={{ fontSize: '1.2cqw', unicodeBidi: 'plaintext' }}
-                        >
+                        <span className="font-serif text-amber-400 opacity-90 leading-none select-none" style={{ fontSize: '2.3cqw', WebkitTextFillColor: '#fbbf24' }}>“</span>
+                        <p className="italic text-center">
                           {previewItem.note}
                         </p>
-                        <span className="font-serif text-amber-400 opacity-80 leading-none" style={{ fontSize: '2.2cqw' }}>”</span>
+                        <span className="font-serif text-amber-400 opacity-90 leading-none select-none" style={{ fontSize: '2.3cqw', WebkitTextFillColor: '#fbbf24' }}>”</span>
                       </div>
                     )}
+
+                    {/* LINE 3: Song Title & Artist - Smallest at the bottom */}
+                    <div 
+                      className="inline-flex items-center justify-center font-bold text-slate-200 bg-[rgba(15,7,26,0.7)] rounded-full border border-white/15 backdrop-blur-md shadow-md truncate whitespace-nowrap"
+                      dir="rtl"
+                      style={{
+                        gap: '0.4cqw',
+                        fontSize: '1.15cqw',
+                        padding: '0.3cqw 1.2cqw',
+                        marginBottom: '0.2cqw',
+                        maxWidth: '68cqw',
+                        unicodeBidi: 'plaintext'
+                      }}
+                    >
+                      <span style={{ fontSize: '1.1cqw' }}>🎵</span>
+                      <span>{previewItem.title}</span>
+                    </div>
                   </div>
                 </div>
 
