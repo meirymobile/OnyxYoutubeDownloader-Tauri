@@ -109,7 +109,17 @@
       line-height: 1.4;
     }
 
-    /* Ultra-High-Contrast QR Box */
+    /* Normal stage elements fade out smoothly during spotlight */
+    .normal-view-item {
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    body.spotlight-mode .normal-view-item {
+      opacity: 0 !important;
+      transform: translateY(-20px) !important;
+      pointer-events: none !important;
+    }
+
+    /* Ultra-High-Contrast QR Box with smooth CSS transition */
     .qr-card-glow {
       position: relative;
       padding: 24px;
@@ -117,10 +127,21 @@
       border-radius: 36px;
       box-shadow: 0 0 80px rgba(168, 85, 247, 0.45), 0 20px 40px rgba(0, 0, 0, 0.8);
       margin-bottom: 24px;
-      transition: transform 0.3s;
+      transform-origin: top left;
+      transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 1s ease;
+      z-index: 50;
     }
-    .qr-card-glow:hover {
-      transform: scale(1.02);
+    .qr-corner-badge {
+      display: none;
+      margin-top: 10px;
+      font-size: 13px;
+      font-weight: 900;
+      color: #07020d;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+    body.spotlight-mode .qr-corner-badge {
+      display: block;
     }
     #qrcode {
       display: flex;
@@ -137,6 +158,142 @@
         width: 320px;
         height: 320px;
       }
+    }
+
+    /* Spotlight Fullscreen Media Backdrop */
+    .spotlight-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.2s ease;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #1e0b36 0%, #05020a 100%);
+    }
+    .spotlight-backdrop.active {
+      opacity: 1;
+    }
+    .spotlight-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: brightness(0.55) contrast(1.15);
+      transform: scale(1.02);
+      transition: transform 14s ease-out;
+    }
+    .spotlight-backdrop.active .spotlight-img {
+      transform: scale(1.12); /* Subtle Ken-Burns zoom */
+    }
+    .spotlight-vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(5,2,10,0.2) 20%, rgba(5,2,10,0.85) 85%);
+      box-shadow: inset 0 0 120px rgba(5,2,10,0.95);
+    }
+
+    /* Spotlight Center Content Card */
+    .spotlight-card {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 30px;
+      opacity: 0;
+      transform: translateY(40px) scale(0.95);
+      pointer-events: none;
+      transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .spotlight-card.active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    .spotlight-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 28px;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.18);
+      border: 1.5px solid rgba(245, 158, 11, 0.6);
+      color: #fbbf24;
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      margin-bottom: 20px;
+      box-shadow: 0 0 35px rgba(245, 158, 11, 0.3);
+      animation: pulse 2s infinite;
+    }
+
+    .spotlight-title {
+      font-family: 'Space Grotesk', 'Assistant', sans-serif;
+      font-size: 48px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #ffffff 0%, #fef08a 40%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+      max-width: 850px;
+      line-height: 1.25;
+      text-shadow: 0 0 50px rgba(244, 114, 182, 0.4);
+    }
+    @media (min-width: 1024px) {
+      .spotlight-title {
+        font-size: 64px;
+      }
+    }
+
+    .spotlight-requester-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      font-weight: 800;
+      color: #e2e8f0;
+      margin-bottom: 24px;
+      background: rgba(15, 7, 26, 0.65);
+      padding: 8px 24px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(14px);
+    }
+    .spotlight-requester {
+      color: #38bdf8;
+      font-weight: 900;
+      text-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+    }
+
+    .spotlight-note-box {
+      max-width: 720px;
+      background: rgba(18, 10, 31, 0.8);
+      border: 1.5px solid rgba(245, 158, 11, 0.45);
+      padding: 22px 36px;
+      border-radius: 28px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(245, 158, 11, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .quote-mark {
+      font-size: 46px;
+      line-height: 1;
+      color: #f59e0b;
+      font-family: serif;
+      opacity: 0.8;
+    }
+    .spotlight-note {
+      font-size: 24px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.4;
+      font-style: italic;
     }
 
     /* Action Steps Footer */
@@ -225,7 +382,7 @@
       position: absolute;
       top: 20px;
       left: 20px;
-      z-index: 20;
+      z-index: 60;
       background: rgba(255, 255, 255, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.2);
       color: #fff;
@@ -247,21 +404,51 @@
 
   <button class="fs-toggle-btn" onclick="toggleFullScreen()">⛶ מסך מלא</button>
 
+  <!-- Spotlight Fullscreen Media Backdrop -->
+  <div id="spotlight-backdrop" class="spotlight-backdrop">
+    <img id="spotlight-img" class="spotlight-img" src="" alt="" />
+    <div class="spotlight-vignette"></div>
+  </div>
+
+  <!-- Spotlight Center Content Card -->
+  <div id="spotlight-card" class="spotlight-card">
+    <div class="spotlight-badge">
+      <span class="spotlight-sparkle">✨</span>
+      <span>מתנגן עכשיו לבקשת הקהל!</span>
+      <span class="spotlight-sparkle">✨</span>
+    </div>
+
+    <h1 id="spotlight-title" class="spotlight-title">שם השיר</h1>
+    
+    <div class="spotlight-requester-wrap">
+      <span class="spotlight-heart">❤️</span>
+      <span>הוקדש באהבה על ידי:</span>
+      <span id="spotlight-requester" class="spotlight-requester">אורח ברחבה</span>
+    </div>
+
+    <div id="spotlight-note-box" class="spotlight-note-box">
+      <span class="quote-mark">“</span>
+      <p id="spotlight-note" class="spotlight-note">הקדשה מיוחדת</p>
+      <span class="quote-mark">”</span>
+    </div>
+  </div>
+
   <div class="stage-container">
-    <div class="brand-badge">
+    <div class="normal-view-item brand-badge">
       <span class="live-pulse"></span>
       <span class="live-dot"></span>
       <span id="room-badge-text">עמדת בקשות שירים בלייב &bull; חדר SHAZZ-SONIC</span>
     </div>
 
-    <h1 class="dj-names" id="dj-names-text">DJ Shazz &amp; DJ Sonic</h1>
-    <div class="stage-subtitle">סרקו עכשיו מהסמארטפון ובקשו שיר שיושמע ברחבה! 🎵</div>
+    <h1 class="normal-view-item dj-names" id="dj-names-text">DJ Shazz &amp; DJ Sonic</h1>
+    <div class="normal-view-item stage-subtitle">סרקו עכשיו מהסמארטפון ובקשו שיר שיושמע ברחבה! 🎵</div>
 
-    <div class="qr-card-glow">
+    <div id="stage-qr-card" class="qr-card-glow">
       <div id="qrcode"></div>
+      <div class="qr-corner-badge">סרקו שיר הבא ⚡</div>
     </div>
 
-    <div class="instructions-bar">
+    <div class="normal-view-item instructions-bar">
       <div class="instruction-step">
         <span class="step-num">1</span>
         <span>פותחים מצלמה בנייד</span>
@@ -314,7 +501,90 @@
       correctLevel: QRCode.CorrectLevel.H
     });
 
-    // Realtime MQTT Listener for incoming requests
+    // Realtime Stage Spotlight Glide Transitions
+    let isQrCorner = false;
+    function glideQrToCorner() {
+      isQrCorner = true;
+      const qr = document.getElementById('stage-qr-card');
+      if (!qr) return;
+      const rect = qr.getBoundingClientRect();
+      const currentX = rect.left;
+      const currentY = rect.top;
+      const targetX = 32;
+      const targetY = 32;
+      const deltaX = targetX - currentX;
+      const deltaY = targetY - currentY;
+      
+      qr.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(0.62)`;
+    }
+
+    function glideQrToCenter() {
+      isQrCorner = false;
+      const qr = document.getElementById('stage-qr-card');
+      if (!qr) return;
+      qr.style.transform = 'translate(0px, 0px) scale(1)';
+    }
+
+    window.addEventListener('resize', () => {
+      if (isQrCorner) {
+        glideQrToCenter();
+        requestAnimationFrame(() => glideQrToCorner());
+      }
+    });
+
+    function activateSpotlight(data) {
+      document.body.classList.add('spotlight-mode');
+      
+      // Update texts
+      document.getElementById('spotlight-title').innerText = data.songTitle || 'שיר לבקשת הקהל';
+      document.getElementById('spotlight-requester').innerText = data.requester || 'אורח ברחבה';
+      
+      const noteBox = document.getElementById('spotlight-note-box');
+      const noteText = document.getElementById('spotlight-note');
+      if (data.note && data.note.trim()) {
+        noteText.innerText = data.note;
+        noteBox.style.display = 'flex';
+      } else {
+        noteBox.style.display = 'none';
+      }
+
+      // Update photo / backdrop
+      const backdrop = document.getElementById('spotlight-backdrop');
+      const photoImg = document.getElementById('spotlight-img');
+      if (data.photo) {
+        photoImg.src = data.photo;
+        photoImg.style.display = 'block';
+      } else {
+        photoImg.src = '';
+        photoImg.style.display = 'none';
+      }
+      backdrop.classList.add('active');
+
+      // Activate card
+      document.getElementById('spotlight-card').classList.add('active');
+
+      // Smoothly glide QR code to top-left corner
+      glideQrToCorner();
+    }
+
+    function deactivateSpotlight() {
+      document.body.classList.remove('spotlight-mode');
+      document.getElementById('spotlight-backdrop').classList.remove('active');
+      document.getElementById('spotlight-card').classList.remove('active');
+      
+      // Glide QR code back to center
+      glideQrToCenter();
+    }
+
+    function handleSpotlightMessage(payload) {
+      if (payload && payload.active) {
+        activateSpotlight(payload);
+      } else {
+        deactivateSpotlight();
+      }
+    }
+
+    // Realtime MQTT Listener for incoming requests & live stage spotlight
     function initMqttListener() {
       try {
         const clientId = 'stage_' + Math.random().toString(36).substring(2, 9);
@@ -323,7 +593,9 @@
         client.onMessageArrived = (message) => {
           try {
             const payload = JSON.parse(message.payloadString);
-            if (payload && payload.title) {
+            if (message.destinationName && message.destinationName.includes('spotlight')) {
+              handleSpotlightMessage(payload);
+            } else if (payload && payload.title) {
               showToast(payload);
             }
           } catch(e) {}
@@ -334,7 +606,9 @@
           timeout: 5,
           cleanSession: true,
           onSuccess: () => {
+            console.log('Stage screen subscribed to MQTT topics');
             client.subscribe(`onyx/requests/${roomCode}`, { qos: 0 });
+            client.subscribe(`onyx/stage/${roomCode}/spotlight`, { qos: 0 });
           },
           onFailure: () => {
             setTimeout(initMqttListener, 4000);
@@ -344,6 +618,19 @@
         console.warn('MQTT stage connect err:', err);
       }
     }
+
+    // LocalStorage fallback for same-machine testing
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'onyx_stage_spotlight') {
+        try {
+          if (e.newValue) {
+            handleSpotlightMessage(JSON.parse(e.newValue));
+          } else {
+            handleSpotlightMessage({ active: false });
+          }
+        } catch(err) {}
+      }
+    });
 
     let toastTimer = null;
     function showToast(req) {

@@ -23,7 +23,14 @@ func getLabel(_ element: AXUIElement) -> String? {
 }
 
 func getValue(_ element: AXUIElement) -> String? {
-    return getAttr(element, kAXValueAttribute as String) as? String
+    let raw = getAttr(element, kAXValueAttribute as String)
+    if let str = raw as? String {
+        return str
+    }
+    if let num = raw as? NSNumber {
+        return num.stringValue
+    }
+    return nil
 }
 
 func getTitle(_ element: AXUIElement) -> String? {
@@ -84,6 +91,7 @@ public func get_djay_tracks_json() -> UnsafeMutablePointer<CChar>? {
             if lower.starts(with: "title,") { trackInfo["title"] = val }
             else if lower.starts(with: "artist,") { trackInfo["artist"] = val }
             else if lower.starts(with: "play /") { trackInfo["is_playing"] = (val == "Active") ? "true" : "false" }
+            else if lower.contains("volume") || lower.contains("fader") { trackInfo["volume"] = val }
         }
         
         if trackInfo["title"] != nil {

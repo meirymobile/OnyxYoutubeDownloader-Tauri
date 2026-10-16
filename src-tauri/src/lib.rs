@@ -533,7 +533,13 @@ async fn get_djay_tracks_native(app: tauri::AppHandle) -> Result<String, String>
     use tauri::Manager;
     unsafe {
         let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-        let dylib_path = exe_path.parent().unwrap().parent().unwrap().join("Frameworks").join("djay_reader.dylib");
+        let candidates = vec![
+            exe_path.parent().unwrap().parent().unwrap().join("Frameworks").join("djay_reader.dylib"),
+            exe_path.parent().unwrap().join("djay_reader.dylib"),
+            std::env::current_dir().unwrap_or_default().join("src-tauri").join("djay_reader.dylib"),
+            std::env::current_dir().unwrap_or_default().join("djay_reader.dylib"),
+        ];
+        let dylib_path = candidates.into_iter().find(|p| p.exists()).ok_or_else(|| "djay_reader.dylib not found".to_string())?;
         
         let lib = Library::new(&dylib_path).map_err(|e| format!("Failed to load dylib at {:?}: {}", dylib_path, e))?;
         let func: Symbol<unsafe extern "C" fn() -> *mut c_char> = lib.get(b"get_djay_tracks_json").map_err(|e| e.to_string())?;

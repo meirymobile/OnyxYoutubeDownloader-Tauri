@@ -6,7 +6,7 @@ import {
   FolderOpen, Music, CheckCircle2, AlertCircle, Clock, Volume2, 
   QrCode, Maximize2, Minimize2, Settings2, User, MessageSquareHeart, Monitor,
   MapPin, Navigation, Compass, Smartphone, Search, Building2, CheckCircle,
-  Tv, Cast, Wifi, Loader2, Sparkles
+  Tv, Cast, Wifi, Loader2, Sparkles, Camera, Image as ImageIcon
 } from 'lucide-react';
 
 // Popular Israeli event venues & wedding halls for 1-click DJ GPS calibration
@@ -166,8 +166,75 @@ export default function GuestRequestsModal({
     djNamesRef.current = djNames;
   }, [djNames]);
 
+  const requestsRef = useRef(requests);
+  useEffect(() => {
+    requestsRef.current = requests;
+  }, [requests]);
+
+  const [currentSpotlightId, setCurrentSpotlightId] = useState(null);
+  const currentSpotlightIdRef = useRef(null);
+  useEffect(() => {
+    currentSpotlightIdRef.current = currentSpotlightId;
+  }, [currentSpotlightId]);
+
   const hiveClientRef = useRef(null);
   const emqxClientRef = useRef(null);
+
+  // Broadcast Live Stage Experience Spotlight (Song, Requester, Dedication, Guest Photo)
+  const broadcastSpotlight = (spotlightData) => {
+    const cleanRoom = (roomCode || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+    const spotlightTopic = `onyx/stage/${cleanRoom}/spotlight`;
+    const payloadStr = JSON.stringify(spotlightData);
+
+    const sendToClient = (client, name) => {
+      try {
+        if (client && client.isConnected()) {
+          const MqttMessage = Paho?.Message || (Paho?.default && Paho.default.Message) || (window.Paho && window.Paho.Message);
+          if (MqttMessage) {
+            const msg = new MqttMessage(payloadStr);
+            msg.destinationName = spotlightTopic;
+            msg.qos = 0;
+            msg.retained = true;
+            client.send(msg);
+          }
+        }
+      } catch (err) {
+        console.warn(`[Onyx Stage Spotlight] Failed to broadcast to ${name}:`, err);
+      }
+    };
+
+    sendToClient(hiveClientRef.current, 'HiveMQ');
+    sendToClient(emqxClientRef.current, 'EMQX');
+
+    // Also sync to localStorage for Tauri Stage Display windows
+    try {
+      if (spotlightData && spotlightData.active) {
+        localStorage.setItem('onyx_stage_spotlight', payloadStr);
+      } else {
+        localStorage.removeItem('onyx_stage_spotlight');
+      }
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
+  };
+
+  const toggleManualSpotlight = (item) => {
+    if (currentSpotlightId === item.id) {
+      setCurrentSpotlightId(null);
+      broadcastSpotlight({ active: false, timestamp: Date.now() });
+    } else {
+      setCurrentSpotlightId(item.id);
+      broadcastSpotlight({
+        active: true,
+        requestId: item.id,
+        songTitle: item.title,
+        artist: item.channel || '',
+        requester: item.requester || 'אורח ברחבה',
+        note: item.note || '',
+        photo: item.photo || null,
+        timestamp: Date.now()
+      });
+    }
+  };
 
   // Broadcast Real-time Room Active/Closed Status to all guests via Dual-Engine (HTTPS ntfy + Retained MQTT)
   const broadcastRoomStatus = (activeState, customRoomCode) => {
@@ -875,6 +942,142 @@ export default function GuestRequestsModal({
     };
   }, [roomCode]);
 
+  // Live Stage Matching Helper Functions
+  const normalizeTrackText = (text) => {
+    if (!text) return '';
+    return text
+      .toLowerCase()
+      // Remove content in brackets e.g. (Official Music Video), [Audio], (Remix)
+      .replace(/[\(\[\{][^\)\]\}]*[\)\]\}]/g, ' ')
+      // Remove leading track numbering e.g. "01 - ", "02. ", "03 "
+      .replace(/^\s*\d+[\s\.\-_]+/g, '')
+      // Remove common YouTube suffixes
+      .replace(/official\s+video|official\s+audio|lyrics|hd|4k|videoclip/gi, '')
+      // Keep only letters & numbers across all alphabets (Hebrew, English, etc.)
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const isSongMatch = (deck, req) => {
+    const deckTitle = normalizeTrackText(deck.title);
+    const deckArtist = normalizeTrackText(deck.artist);
+    const reqTitle = normalizeTrackText(req.title);
+    const reqChannel = normalizeTrackText(req.channel);
+
+    if (!deckTitle || !reqTitle) return false;
+    if (deckTitle === reqTitle) return true;
+    if (deckTitle.length >= 4 && reqTitle.includes(deckTitle)) return true;
+    if (reqTitle.length >= 4 && deckTitle.includes(reqTitle)) return true;
+
+    // Check combined artist + title
+    const combinedDeck = `${deckArtist} ${deckTitle}`.trim();
+    const combinedReq = `${reqChannel} ${reqTitle}`.trim();
+    if (combinedDeck.length >= 6 && combinedReq.includes(combinedDeck)) return true;
+    if (combinedReq.length >= 6 && combinedDeck.includes(combinedReq)) return true;
+
+    // Word token overlap
+    const deckWords = deckTitle.split(' ').filter(w => w.length > 2);
+    const reqWords = reqTitle.split(' ').filter(w => w.length > 2);
+    if (deckWords.length >= 2 && reqWords.length >= 2) {
+      const matchCount = deckWords.filter(w => reqWords.some(rw => rw === w || rw.includes(w) || w.includes(rw))).length;
+      if (matchCount / Math.min(deckWords.length, reqWords.length) >= 0.7) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  // Live Stage Experience: Continuously Poll djay Pro Master Track via Channel Upfaders (Crossfader Excluded)
+  useEffect(() => {
+    let isCancelled = false;
+    let autoSpotlightReqId = null;
+
+    const checkMasterDeckAndSpotlight = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const resText = await invoke('get_djay_tracks_native');
+        if (!resText || isCancelled) return;
+
+        const data = JSON.parse(resText);
+        if (data.error || !data.decks) return;
+
+        // Upfader-Only Logic: Exclude crossfader entirely.
+        // A deck is audible on speakers if is_playing is true AND vertical volume slider >= 0.15 (15%)
+        const audibleDecks = data.decks.filter(d => {
+          const isPlaying = d.is_playing === 'true' || d.is_playing === true;
+          const vol = d.volume !== undefined ? parseFloat(d.volume) : 1.0;
+          return isPlaying && !isNaN(vol) && vol >= 0.15;
+        });
+
+        let masterDeck = null;
+        if (audibleDecks.length === 1) {
+          masterDeck = audibleDecks[0];
+        } else if (audibleDecks.length > 1) {
+          // If both decks are active, the track with the higher channel fader is the Master track
+          audibleDecks.sort((a, b) => (parseFloat(b.volume) || 0) - (parseFloat(a.volume) || 0));
+          masterDeck = audibleDecks[0];
+        }
+
+        if (!masterDeck) {
+          // No track is playing audibly on speakers (or only headphone cueing)
+          if (autoSpotlightReqId !== null) {
+            autoSpotlightReqId = null;
+            setCurrentSpotlightId(null);
+            broadcastSpotlight({ active: false, timestamp: Date.now() });
+          }
+          return;
+        }
+
+        // Match against current guest requests
+        const currentReqs = requestsRef.current || [];
+        const matchedReq = currentReqs.find(r => isSongMatch(masterDeck, r));
+
+        if (matchedReq) {
+          if (autoSpotlightReqId !== matchedReq.id) {
+            autoSpotlightReqId = matchedReq.id;
+            setCurrentSpotlightId(matchedReq.id);
+            console.log(`[Onyx Stage Live] Master Track MATCHED Guest Request: "${matchedReq.title}" by ${matchedReq.requester}`);
+
+            // Mark request as played
+            setRequests(prev => prev.map(r => r.id === matchedReq.id ? { ...r, status: 'played' } : r));
+
+            broadcastSpotlight({
+              active: true,
+              requestId: matchedReq.id,
+              songTitle: matchedReq.title,
+              artist: masterDeck.artist || matchedReq.channel || '',
+              requester: matchedReq.requester || 'אורח ברחבה',
+              note: matchedReq.note || '',
+              photo: matchedReq.photo || null,
+              timestamp: Date.now()
+            });
+          }
+        } else {
+          // An audible track is playing, but it is NOT a guest request -> mix-out or new song
+          if (autoSpotlightReqId !== null) {
+            console.log('[Onyx Stage Live] Mixed out to non-guest track. Deactivating Stage Spotlight.');
+            autoSpotlightReqId = null;
+            setCurrentSpotlightId(null);
+            broadcastSpotlight({ active: false, timestamp: Date.now() });
+          }
+        }
+      } catch (e) {
+        // Silent catch for accessibility / app not running
+      }
+    };
+
+    const interval = setInterval(checkMasterDeckAndSpotlight, 1200);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+      if (autoSpotlightReqId !== null) {
+        broadcastSpotlight({ active: false, timestamp: Date.now() });
+      }
+    };
+  }, [roomCode]);
+
   // Process a newly received song request
   const processIncomingRequest = async (reqItem) => {
     if (!reqItem || !reqItem.title) return;
@@ -909,6 +1112,7 @@ export default function GuestRequestsModal({
         thumbnail: reqItem.thumbnail || '',
         requester: reqItem.requester || 'אורח',
         note: reqItem.note || '',
+        photo: reqItem.photo || null,
         timestamp: reqItem.timestamp || Date.now(),
         status: 'pending', // 'pending', 'downloading', 'ready', 'played', 'error'
         jobId: null,
@@ -1760,12 +1964,19 @@ export default function GuestRequestsModal({
                         {item.formattedNum}
                       </div>
 
-                      {/* Thumbnail */}
-                      <img 
-                        src={item.thumbnail} 
-                        className="w-14 h-10 object-cover rounded-lg bg-black border border-slate-800 shrink-0" 
-                        alt=""
-                      />
+                      {/* Thumbnail or Guest Live Photo */}
+                      <div className="relative shrink-0">
+                        <img 
+                          src={item.photo || item.thumbnail} 
+                          className="w-14 h-10 object-cover rounded-lg bg-black border border-slate-800" 
+                          alt=""
+                        />
+                        {item.photo && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white p-0.5 rounded-full shadow-md" title="האורח צירף תמונה אמיתית מהאירוע!">
+                            <Camera className="w-2.5 h-2.5" />
+                          </span>
+                        )}
+                      </div>
 
                       {/* Title & Requester Details */}
                       <div className="min-w-0 flex-1">
@@ -1783,6 +1994,13 @@ export default function GuestRequestsModal({
                             <span className="text-amber-300/90 flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
                               <MessageSquareHeart className="w-3 h-3 text-amber-400" />
                               "{item.note}"
+                            </span>
+                          )}
+
+                          {item.photo && (
+                            <span className="text-pink-300 flex items-center gap-1 bg-pink-500/10 px-2 py-0.5 rounded-md border border-pink-500/20">
+                              <Camera className="w-3 h-3 text-pink-400" />
+                              תמונת אורח צורפה 📸
                             </span>
                           )}
                         </div>
@@ -1812,6 +2030,22 @@ export default function GuestRequestsModal({
 
                     {/* Status & Action Buttons */}
                     <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      {/* Live Stage Spotlight Button */}
+                      <button 
+                        onClick={() => toggleManualSpotlight(item)}
+                        className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold border ${
+                          currentSpotlightId === item.id
+                            ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.6)] animate-pulse'
+                            : 'bg-slate-800/80 hover:bg-purple-900/40 text-purple-300 hover:text-white border-purple-500/30'
+                        }`}
+                        title={currentSpotlightId === item.id ? 'השיר מוקרן כעת על מסך הבמה! לחץ לביטול' : 'הקרן שיר, תמונה והקדשה זו למסך הבמה בלייב'}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span className="hidden md:inline">
+                          {currentSpotlightId === item.id ? 'מוקרן בבמה ✦' : 'הקרן לבמה'}
+                        </span>
+                      </button>
+
                       {/* Status Indicator */}
                       {item.status === 'downloading' && (
                         <span className="text-xs font-mono font-black text-amber-300 flex items-center gap-1.5 bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-500/40 shadow-sm animate-pulse">

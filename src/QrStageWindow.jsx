@@ -15,9 +15,19 @@ export default function QrStageWindow() {
   const [djLat, setDjLat] = useState(() => localStorage.getItem('onyx_guest_lat'));
   const [djLon, setDjLon] = useState(() => localStorage.getItem('onyx_guest_lon'));
   const [isActive, setIsActive] = useState(() => localStorage.getItem('onyx_guest_active') === 'true');
+  const [spotlight, setSpotlight] = useState(() => {
+    try {
+      const saved = localStorage.getItem('onyx_stage_spotlight');
+      return saved ? JSON.parse(saved) : { active: false };
+    } catch {
+      return { active: false };
+    }
+  });
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [qrTransform, setQrTransform] = useState('translate(0px, 0px) scale(1)');
   const canvasRef = useRef(null);
+  const qrRef = useRef(null);
 
   // Sync state from localStorage & storage events
   useEffect(() => {
@@ -31,15 +41,43 @@ export default function QrStageWindow() {
       setGeoRadius(localStorage.getItem('onyx_guest_geo_radius') || '30');
       setDjLat(localStorage.getItem('onyx_guest_lat'));
       setDjLon(localStorage.getItem('onyx_guest_lon'));
+
+      try {
+        const savedSpotlight = localStorage.getItem('onyx_stage_spotlight');
+        if (savedSpotlight) {
+          const parsed = JSON.parse(savedSpotlight);
+          setSpotlight(parsed);
+        } else {
+          setSpotlight({ active: false });
+        }
+      } catch {
+        setSpotlight({ active: false });
+      }
     };
 
     window.addEventListener('storage', syncState);
-    const interval = setInterval(syncState, 1500);
+    const interval = setInterval(syncState, 1200);
     return () => {
       window.removeEventListener('storage', syncState);
       clearInterval(interval);
     };
   }, []);
+
+  // Butter-Smooth Glide to Top-Left Corner
+  useEffect(() => {
+    if (spotlight.active) {
+      if (qrRef.current) {
+        const rect = qrRef.current.getBoundingClientRect();
+        const targetX = 32;
+        const targetY = 32;
+        const deltaX = targetX - rect.left;
+        const deltaY = targetY - rect.top;
+        setQrTransform(`translate(${deltaX}px, ${deltaY}px) scale(0.62)`);
+      }
+    } else {
+      setQrTransform('translate(0px, 0px) scale(1)');
+    }
+  }, [spotlight.active]);
 
   const buildTargetUrl = () => {
     try {
@@ -194,11 +232,64 @@ export default function QrStageWindow() {
         </div>
       </div>
 
+      {/* Spotlight Media Backdrop */}
+      <div 
+        className={`fixed inset-0 z-[5] pointer-events-none transition-opacity duration-1000 overflow-hidden ${
+          spotlight.active ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        {spotlight.photo ? (
+          <img 
+            src={spotlight.photo} 
+            alt="Spotlight Photo" 
+            className="w-full h-full object-cover filter brightness-[0.55] contrast-[1.15] scale-105 transition-transform duration-[16000ms] ease-out"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-purple-950/80 via-slate-950 to-amber-950/70" />
+        )}
+        <div className="absolute inset-0 bg-radial-[circle_at_center,rgba(5,2,10,0.25)_20%,rgba(5,2,10,0.9)_85%]" />
+      </div>
+
+      {/* Spotlight Center Dedication Card */}
+      <div 
+        className={`fixed inset-0 z-20 flex flex-col items-center justify-center text-center p-6 transition-all duration-1000 pointer-events-none ${
+          spotlight.active ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-10'
+        }`}
+      >
+        <div className="inline-flex items-center gap-2.5 px-7 py-2.5 rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black text-sm tracking-widest shadow-[0_0_35px_rgba(245,158,11,0.4)] animate-pulse mb-5">
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>מתנגן עכשיו לבקשת הקהל!</span>
+          <Sparkles className="w-4 h-4 text-amber-400" />
+        </div>
+
+        <h1 className="text-4xl sm:text-6xl md:text-7xl font-black bg-gradient-to-r from-white via-yellow-200 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_40px_rgba(244,114,182,0.4)] max-w-4xl leading-tight mb-4">
+          {spotlight.songTitle || 'שיר לבקשת הקהל'}
+        </h1>
+
+        <div className="inline-flex items-center gap-2.5 text-xl sm:text-2xl font-extrabold text-slate-200 bg-slate-950/70 px-6 py-2 rounded-2xl border border-white/20 backdrop-blur-md shadow-xl mb-6">
+          <span className="text-pink-400">❤️</span>
+          <span>הוקדש באהבה על ידי:</span>
+          <span className="text-cyan-400 font-black drop-shadow-[0_0_15px_rgba(56,189,248,0.6)]">
+            {spotlight.requester || 'אורח ברחבה'}
+          </span>
+        </div>
+
+        {spotlight.note && (
+          <div className="max-w-2xl bg-slate-950/80 border border-amber-500/40 px-8 py-5 rounded-3xl backdrop-blur-xl shadow-2xl flex items-center gap-3">
+            <span className="text-4xl font-serif text-amber-400 opacity-80 leading-none">“</span>
+            <p className="text-xl sm:text-2xl font-extrabold text-white italic leading-relaxed">
+              {spotlight.note}
+            </p>
+            <span className="text-4xl font-serif text-amber-400 opacity-80 leading-none">”</span>
+          </div>
+        )}
+      </div>
+
       {/* Center Stage Presentation */}
       <div className="flex-1 flex flex-col items-center justify-center text-center z-10 w-full max-w-4xl my-auto animate-fadeIn px-2 md:px-4">
         
         {/* DJ Main Title */}
-        <div className="mb-3 md:mb-5">
+        <div className={`mb-3 md:mb-5 transition-all duration-700 ${spotlight.active ? 'opacity-0 -translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(168,85,247,0.5)]">
             {djNames}
           </h1>
@@ -208,8 +299,16 @@ export default function QrStageWindow() {
         </div>
 
         {isActive ? (
-          /* ACTIVE EVENT: OPTIMIZED STAGE QR CODE CARD */
-          <div className="relative group">
+          /* ACTIVE EVENT: OPTIMIZED STAGE QR CODE CARD WITH SMOOTH CORNER GLIDE */
+          <div 
+            ref={qrRef} 
+            className="relative group origin-top-left"
+            style={{ 
+              transform: qrTransform, 
+              transition: 'transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 1s ease',
+              zIndex: 50 
+            }}
+          >
             {/* Luminous Neon Frame */}
             <div className="absolute -inset-3 bg-gradient-to-r from-purple-600 via-pink-500 to-amber-500 rounded-[34px] blur-xl opacity-75 group-hover:opacity-100 transition-opacity animate-pulse duration-1000" />
             
@@ -223,7 +322,7 @@ export default function QrStageWindow() {
               )}
               
               <div className="mt-2.5 pt-2 border-t border-slate-200/80 w-full flex justify-between items-center text-slate-900 font-mono font-bold text-xs sm:text-sm">
-                <span>ONYX STAGE DISPLAY</span>
+                <span>{spotlight.active ? 'סרקו גם אתם!' : 'ONYX STAGE DISPLAY'}</span>
                 <span className="text-amber-600 tracking-wider">#{roomCode}</span>
               </div>
             </div>
@@ -243,7 +342,7 @@ export default function QrStageWindow() {
 
         {/* Bottom Callout Instructions - Enriched, Huge Font & Crystal-Clear for Dancefloor Crowd */}
         {isActive && (
-          <div className="mt-5 md:mt-7 space-y-2 md:space-y-3 w-full max-w-3xl px-2" dir="rtl">
+          <div className={`mt-5 md:mt-7 space-y-2 md:space-y-3 w-full max-w-3xl px-2 transition-all duration-700 ${spotlight.active ? 'opacity-0 translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`} dir="rtl">
             {/* Primary Action Title */}
             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white flex items-center justify-center gap-2 md:gap-3 drop-shadow-[0_4px_20px_rgba(245,158,11,0.6)]">
               <Music className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 text-amber-400 shrink-0 animate-bounce" />
