@@ -290,6 +290,9 @@ fn print_log(message: String) {
 #[tauri::command]
 fn open_djay_companion(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::Manager;
+    if let Some(float_window) = app.get_webview_window("djay_float") {
+        let _ = float_window.hide();
+    }
     if app.get_webview_window("djay").is_none() {
         tauri::WebviewWindowBuilder::new(&app, "djay", tauri::WebviewUrl::App("index.html?djay=true".into()))
             .title("djay Companion")
@@ -299,11 +302,12 @@ fn open_djay_companion(app: tauri::AppHandle) -> Result<(), String> {
             .resizable(false)
             .always_on_top(true)
             .decorations(false)
-            
             .build()
             .map_err(|e| e.to_string())?;
     } else {
         let window = app.get_webview_window("djay").unwrap();
+        let _ = window.show();
+        let _ = window.unminimize();
         window.set_focus().map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -519,6 +523,7 @@ fn restore_djay_companion(app: tauri::AppHandle) -> Result<(), String> {
     }
     if let Some(window) = app.get_webview_window("djay") {
         let _ = window.show();
+        let _ = window.unminimize();
         let _ = window.set_focus();
     }
     Ok(())
@@ -540,30 +545,31 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 
 #[tauri::command]
-async fn get_djay_tracks_native(app: tauri::AppHandle) -> Result<String, String> {
-    use tauri::Manager;
-    unsafe {
-        let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-        let candidates = vec![
-            exe_path.parent().unwrap().parent().unwrap().join("Frameworks").join("djay_reader.dylib"),
-            exe_path.parent().unwrap().join("djay_reader.dylib"),
-            std::env::current_dir().unwrap_or_default().join("src-tauri").join("djay_reader.dylib"),
-            std::env::current_dir().unwrap_or_default().join("djay_reader.dylib"),
-        ];
-        let dylib_path = candidates.into_iter().find(|p| p.exists()).ok_or_else(|| "djay_reader.dylib not found".to_string())?;
-        
-        let lib = Library::new(&dylib_path).map_err(|e| format!("Failed to load dylib at {:?}: {}", dylib_path, e))?;
-        let func: Symbol<unsafe extern "C" fn() -> *mut c_char> = lib.get(b"get_djay_tracks_json").map_err(|e| e.to_string())?;
-        
-        let ptr = func();
-        if ptr.is_null() {
-            return Err("Failed to get tracks".to_string());
+async fn get_djay_tracks_native(_app: tauri::AppHandle) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        unsafe {
+            let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+            let candidates = vec![
+                exe_path.parent().unwrap().parent().unwrap().join("Frameworks").join("djay_reader.dylib"),
+                exe_path.parent().unwrap().join("djay_reader.dylib"),
+                std::env::current_dir().unwrap_or_default().join("src-tauri").join("djay_reader.dylib"),
+                std::env::current_dir().unwrap_or_default().join("djay_reader.dylib"),
+            ];
+            let dylib_path = candidates.into_iter().find(|p| p.exists()).ok_or_else(|| "djay_reader.dylib not found".to_string())?;
+            
+            let lib = Library::new(&dylib_path).map_err(|e| format!("Failed to load dylib at {:?}: {}", dylib_path, e))?;
+            let func: Symbol<unsafe extern "C" fn() -> *mut c_char> = lib.get(b"get_djay_tracks_json").map_err(|e| e.to_string())?;
+            
+            let ptr = func();
+            if ptr.is_null() {
+                return Err("Failed to get tracks".to_string());
+            }
+            let c_str = CStr::from_ptr(ptr);
+            let s = c_str.to_string_lossy().into_owned();
+            libc::free(ptr as *mut libc::c_void);
+            Ok(s)
         }
-        let c_str = CStr::from_ptr(ptr);
-        let s = c_str.to_string_lossy().into_owned();
-        libc::free(ptr as *mut libc::c_void);
-        Ok(s)
-    }
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

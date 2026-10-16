@@ -33,22 +33,50 @@ func getValue(_ element: AXUIElement) -> String? {
     return nil
 }
 
+func getRole(_ element: AXUIElement) -> String {
+    return (getAttr(element, kAXRoleAttribute as String) as? String) ?? ""
+}
+
 func getTitle(_ element: AXUIElement) -> String? {
     return getAttr(element, kAXTitleAttribute as String) as? String
 }
 
-func findLabeledElements(_ element: AXUIElement, prefix: String, depth: Int = 0) -> [String: String] {
+func findDecksGroup(_ element: AXUIElement, depth: Int = 0) -> AXUIElement? {
+    if depth > 3 { return nil }
+    for child in getChildren(element) {
+        let label = getLabel(child) ?? ""
+        if label == "Decks" || label.contains("Decks") {
+            return child
+        }
+        if let found = findDecksGroup(child, depth: depth + 1) {
+            return found
+        }
+    }
+    return nil
+}
+
+func findLabeledElements(_ element: AXUIElement, depth: Int = 0) -> [String: String] {
     var results: [String: String] = [:]
+    let role = getRole(element)
+    
+    // Skip library music tables/outlines to make scan fast and non-blocking
+    if role == "AXTable" || role == "AXOutline" || role == "AXList" || role == "AXScrollArea" {
+        let label = getLabel(element) ?? ""
+        if !label.contains("Deck") && !label.contains("Mixer") {
+            return results
+        }
+    }
+    
     let label = getLabel(element) ?? ""
     let value = getValue(element) ?? getTitle(element) ?? ""
     
-    if !label.isEmpty && label.contains(prefix) && !value.isEmpty {
+    if !label.isEmpty && !value.isEmpty {
         results[label] = value
     }
     
-    if depth < 8 { // Reduced depth to prevent UI freezes
+    if depth < 4 {
         for child in getChildren(element) {
-            let childResults = findLabeledElements(child, prefix: prefix, depth: depth + 1)
+            let childResults = findLabeledElements(child, depth: depth + 1)
             results.merge(childResults) { _, new in new }
         }
     }
@@ -78,17 +106,18 @@ public func get_djay_tracks_json() -> UnsafeMutablePointer<CChar>? {
         return strdup("{\"error\": \"Accessibility API disabled for this process\"}")
     }
     
+    let target = findDecksGroup(app) ?? app
+    let elements = findLabeledElements(target, depth: 0)
+    
     var decksOut: [[String: String]] = []
     
     for deckNumber in 1...2 {
         let prefix = "Deck \(deckNumber)"
-        let elements = findLabeledElements(app, prefix: prefix, depth: 0)
-        
         var trackInfo: [String: String] = ["deck": "\(deckNumber)"]
         var lineVolumeFound: String? = nil
         var fallbackVolume: String? = nil
         
-        for (label, val) in elements {
+        for (label, val) in elements where label.contains(prefix) {
             let lower = label.lowercased()
             if lower.starts(with: "title,") { 
                 trackInfo["title"] = val 
