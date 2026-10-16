@@ -557,7 +557,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // Ensure no leftover zombie Python servers are running from previous crashes
-            std::process::Command::new("pkill").arg("-f").arg("backend_server").output().ok();
+            let _ = std::process::Command::new("pkill").arg("-9").arg("-f").arg("backend_server").output();
+            std::thread::sleep(std::time::Duration::from_millis(350));
             
             if let Ok(cmd) = app.shell().sidecar("backend_server") {
                 if let Ok((mut rx, child)) = cmd.spawn() {
@@ -622,7 +623,12 @@ pub fn run() {
             audio_engine::get_audio_devices, audio_engine::start_audio_routing, audio_engine::install_blackhole,
             link_sync::toggle_link, link_sync::get_link_status, link_sync::get_link_phase
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                let _ = std::process::Command::new("pkill").arg("-9").arg("-f").arg("backend_server").output();
+            }
+        });
 }
 

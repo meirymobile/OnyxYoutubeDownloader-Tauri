@@ -682,7 +682,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
-    
-    
 
-    uvicorn.run(app, host="127.0.0.1", port=args.port)
+    port = args.port
+    for p in range(port, port + 10):
+        try:
+            import socket
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('127.0.0.1', p))
+            port = p
+            break
+        except OSError:
+            continue
+
+    logger.info(f"Binding backend to port {port}")
+    uvicorn.run(app, host="127.0.0.1", port=port)

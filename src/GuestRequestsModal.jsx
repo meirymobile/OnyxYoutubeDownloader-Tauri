@@ -961,11 +961,33 @@ export default function GuestRequestsModal({
         spotify: true
       };
 
-      const res = await fetch(`http://127.0.0.1:${serverPort}/api/download`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      let activePort = serverPort;
+      let res = null;
+      const candidatePorts = [serverPort, 8001, 8000, 8002, 8003];
+      for (const p of [...new Set(candidatePorts)]) {
+        try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 2000);
+          const testRes = await fetch(`http://127.0.0.1:${p}/api/download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          clearTimeout(tid);
+          if (testRes.ok) {
+            res = testRes;
+            activePort = p;
+            break;
+          }
+        } catch (e) {
+          // try next candidate port
+        }
+      }
+
+      if (!res) {
+        throw new Error('שרת ההורדות המקומי אינו זמין כרגע');
+      }
 
       const data = await res.json();
       if (data && data.job_id) {
@@ -975,7 +997,7 @@ export default function GuestRequestsModal({
         // Poll for progress percentage and completion every 600ms
         const pollTimer = setInterval(async () => {
           try {
-            const statusRes = await fetch(`http://127.0.0.1:${serverPort}/api/download/${jobId}`);
+            const statusRes = await fetch(`http://127.0.0.1:${activePort}/api/download/${jobId}`);
             if (statusRes.ok) {
               const statusData = await statusRes.json();
               
@@ -1679,15 +1701,19 @@ export default function GuestRequestsModal({
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-slate-400 flex items-center gap-1.5 cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={autoDownload} 
-                onChange={(e) => setAutoDownload(e.target.checked)}
-                className="accent-purple-500 rounded cursor-pointer"
-              />
-              <span>הורדה אוטומטית (Auto-Download)</span>
-            </label>
+            <button
+              type="button"
+              onClick={() => setAutoDownload(!autoDownload)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-sm ${
+                autoDownload 
+                  ? 'bg-emerald-950/70 border-emerald-500/50 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.25)]' 
+                  : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+              }`}
+              title={autoDownload ? 'הורדה אוטומטית פועלת - כל שיר חדש יורד מיד לעמדת הדיג\'יי' : 'הורדה אוטומטית כבויה - לחץ להפעלה או הורד ידנית'}
+            >
+              <div className={`w-2.5 h-2.5 rounded-full ${autoDownload ? 'bg-emerald-400 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-slate-600'}`} />
+              <span>{autoDownload ? 'הורדה אוטומטית: פעילה ⚡' : 'הורדה אוטומטית: כבויה ⏸️'}</span>
+            </button>
           </div>
         </div>
 
