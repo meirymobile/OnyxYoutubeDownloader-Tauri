@@ -804,6 +804,182 @@
       margin: 4px 0;
       font-family: 'Space Grotesk', sans-serif;
     }
+
+    /* Event Stage & Privacy Consent Modal (One-time per event) */
+    .consent-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 1, 8, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1200;
+      animation: fadeIn 0.3s ease-out;
+    }
+    .consent-card {
+      background: linear-gradient(180deg, #180c26 0%, #0d0615 100%);
+      border: 1.5px solid rgba(245, 158, 11, 0.45);
+      border-radius: 28px;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 440px;
+      max-height: 90vh;
+      overflow-y: auto;
+      text-align: center;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.95), 0 0 50px rgba(245, 158, 11, 0.2);
+      position: relative;
+    }
+    .consent-close-btn {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #cbd5e1;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .consent-close-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+    .consent-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+      font-size: 11px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+    .consent-title {
+      font-size: 21px;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    .consent-desc {
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+    .consent-points {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 18px;
+      text-align: right;
+    }
+    .consent-point-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 10px 12px;
+    }
+    .consent-point-icon {
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .consent-point-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #f1f5f9;
+      margin-bottom: 2px;
+    }
+    .consent-point-text {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+    .consent-checkbox-wrap {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1.5px solid rgba(245, 158, 11, 0.35);
+      border-radius: 16px;
+      padding: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      text-align: right;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s;
+    }
+    .consent-checkbox-wrap:hover, .consent-checkbox-wrap.checked {
+      background: rgba(245, 158, 11, 0.16);
+      border-color: #f59e0b;
+    }
+    .consent-checkbox-custom {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      border: 2px solid #f59e0b;
+      background: #0d0615;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+      color: #05020a;
+      transition: all 0.2s;
+    }
+    .consent-checkbox-custom.checked {
+      background: #f59e0b;
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+    }
+    .consent-checkbox-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #e2e8f0;
+      line-height: 1.45;
+      flex: 1;
+    }
+    .consent-confirm-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #f59e0b, #ec4899);
+      border: none;
+      border-radius: 16px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 900;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+      transition: all 0.25s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .consent-confirm-btn:disabled {
+      background: #251e33;
+      color: #64748b;
+      box-shadow: none;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
   </style>
 </head>
 <body>
@@ -899,8 +1075,11 @@
       </div>
     </div>
 
-    <footer style="font-size: 11px; color: #64748b; letter-spacing: 1px; text-align: center; margin-top: 20px;">
-      GUEST REQUESTS &bull; DJ SHAZZ &amp; DJ SONIC &bull; ONYX
+    <footer style="font-size: 11px; color: #64748b; letter-spacing: 0.5px; text-align: center; margin-top: 20px;">
+      <span>GUEST REQUESTS &bull; DJ SHAZZ &amp; DJ SONIC &bull; ONYX</span><br/>
+      <button type="button" onclick="openConsentModal()" style="background: none; border: none; color: #a855f7; font-size: 11px; text-decoration: underline; margin-top: 6px; cursor: pointer; font-family: inherit;">
+        🛡️ אישור הקרנה ושמירה על פרטיות
+      </button>
     </footer>
   </div>
 
@@ -939,6 +1118,75 @@
 
     <!-- Results Section -->
     <div id="results-list" class="results-container"></div>
+
+    <footer style="font-size: 11px; color: #64748b; letter-spacing: 0.5px; text-align: center; margin-top: 30px; margin-bottom: 20px;">
+      <span>GUEST REQUESTS &bull; ONYX DJ LIVE</span><br/>
+      <button type="button" onclick="openConsentModal()" style="background: none; border: none; color: #a855f7; font-size: 11px; text-decoration: underline; margin-top: 6px; cursor: pointer; font-family: inherit;">
+        🛡️ אישור הקרנה ושמירה על פרטיות
+      </button>
+    </footer>
+  </div>
+
+  <!-- Event Stage & Privacy Consent Modal (One-time per event) -->
+  <div id="consent-modal" class="consent-overlay">
+    <div class="consent-card">
+      <button id="consent-close-btn" class="consent-close-btn" onclick="closeConsentModal()" title="סגור" style="display: none;">&times;</button>
+      
+      <div class="consent-badge">
+        <span>🛡️ אישור הקרנה ושמירה על פרטיות</span>
+      </div>
+
+      <h2 class="consent-title">ברוכים הבאים לרחבה! 🎵</h2>
+      <p class="consent-desc">
+        באירוע הזה תוכלו לבקש שירים ישירות לדיג'יי, להוסיף הקדשה אישית ולצרף תמונת סלפי שתוצג על מסכי הענק ברחבה!
+      </p>
+
+      <div class="consent-points">
+        <div class="consent-point-item">
+          <div class="consent-point-icon">📺</div>
+          <div>
+            <div class="consent-point-title">הקרנה חיה על מסכי הבמה</div>
+            <div class="consent-point-text">במידה ותבחרו לצרף תמונה והקדשה לבקשת השיר, הן יוקרנו על גבי מסכי האולם ברגע שהשיר שבחרתם יושמע ברחבה.</div>
+          </div>
+        </div>
+
+        <div class="consent-point-item">
+          <div class="consent-point-icon">🔒</div>
+          <div>
+            <div class="consent-point-title">התמונות אינן נשמרות</div>
+            <div class="consent-point-text">התמונה משמשת אך ורק להקרנה במהלך נגינת השיר ונמחקת מיד לאחר מכן. אין שום שמירה של התמונות באף מאגר.</div>
+          </div>
+        </div>
+
+        <div class="consent-point-item">
+          <div class="consent-point-icon">🛡️</div>
+          <div>
+            <div class="consent-point-title">פרטיות מלאה – ללא צד שלישי</div>
+            <div class="consent-point-text">התמונות והפרטים שלכם פרטיים לחלוטין ולעולם אינם נמסרים, נמכרים או מועברים לאף גורם שלישי.</div>
+          </div>
+        </div>
+
+        <div class="consent-point-item">
+          <div class="consent-point-icon">✨</div>
+          <div>
+            <div class="consent-point-title">בחירה חופשית לחלוטין</div>
+            <div class="consent-point-text">העלאת תמונה הינה אופציונלית תמיד – תוכלו בכל שלב לבקש שיר גם ללא תמונה כלל!</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mandatory Checkbox Confirmation -->
+      <div id="consent-checkbox-wrap" class="consent-checkbox-wrap" onclick="toggleConsentCheckbox()">
+        <div id="consent-checkbox-custom" class="consent-checkbox-custom"></div>
+        <div class="consent-checkbox-label">
+          קראתי ואני מאשר/ת את הצגת התמונה על מסכי האירוע, ומאשר/ת כי ידוע לי שהתמונות נמחקות מיידית ואינן נמסרות לאף גורם שלישי.
+        </div>
+      </div>
+
+      <button id="consent-confirm-btn" class="consent-confirm-btn" onclick="confirmConsent()" disabled>
+        <span>אישור וכניסה לרחבה 🚀</span>
+      </button>
+    </div>
   </div>
 
   <!-- Request Details Modal -->
@@ -1045,6 +1293,89 @@
     let guestDistance = 0;
     let selectedTrack = null;
     let roomRef = null;
+
+    // ========================================================
+    // FIRST-TIME EVENT STAGE & PRIVACY CONSENT LOGIC (ONE-TIME PER EVENT)
+    // ========================================================
+    let isConsentChecked = false;
+
+    function getEventConsentKey() {
+      return 'onyx_stage_consent_' + cleanRoom;
+    }
+
+    function checkConsentModal() {
+      const agreed = localStorage.getItem(getEventConsentKey()) === 'true';
+      const modal = document.getElementById('consent-modal');
+      const closeBtn = document.getElementById('consent-close-btn');
+      if (!modal) return;
+      if (!agreed) {
+        isConsentChecked = false;
+        updateConsentCheckboxUI();
+        if (closeBtn) closeBtn.style.display = 'none'; // Force approval on first visit
+        modal.style.display = 'flex';
+      } else {
+        modal.style.display = 'none';
+      }
+    }
+
+    function openConsentModal() {
+      const modal = document.getElementById('consent-modal');
+      const closeBtn = document.getElementById('consent-close-btn');
+      const agreed = localStorage.getItem(getEventConsentKey()) === 'true';
+      if (!modal) return;
+      if (agreed) {
+        isConsentChecked = true;
+        updateConsentCheckboxUI();
+        if (closeBtn) closeBtn.style.display = 'block';
+      } else {
+        isConsentChecked = false;
+        updateConsentCheckboxUI();
+        if (closeBtn) closeBtn.style.display = 'none';
+      }
+      modal.style.display = 'flex';
+    }
+
+    function closeConsentModal() {
+      const modal = document.getElementById('consent-modal');
+      if (modal) {
+        modal.style.transition = 'opacity 0.25s ease';
+        modal.style.opacity = '0';
+        setTimeout(() => {
+          modal.style.display = 'none';
+          modal.style.opacity = '1';
+        }, 250);
+      }
+    }
+
+    function toggleConsentCheckbox() {
+      isConsentChecked = !isConsentChecked;
+      updateConsentCheckboxUI();
+    }
+
+    function updateConsentCheckboxUI() {
+      const wrap = document.getElementById('consent-checkbox-wrap');
+      const box = document.getElementById('consent-checkbox-custom');
+      const btn = document.getElementById('consent-confirm-btn');
+      if (!wrap || !box || !btn) return;
+
+      if (isConsentChecked) {
+        wrap.classList.add('checked');
+        box.classList.add('checked');
+        box.innerHTML = '<span style="font-size: 14px; font-weight: 900; line-height: 1;">✓</span>';
+        btn.disabled = false;
+      } else {
+        wrap.classList.remove('checked');
+        box.classList.remove('checked');
+        box.innerHTML = '';
+        btn.disabled = true;
+      }
+    }
+
+    function confirmConsent() {
+      if (!isConsentChecked) return;
+      localStorage.setItem(getEventConsentKey(), 'true');
+      closeConsentModal();
+    }
 
     // Haversine distance formula in meters
     function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
@@ -1480,6 +1811,7 @@
         if (subMsg) subMsg.innerHTML = 'תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!';
         if (retryBtn) retryBtn.style.display = 'none';
       }
+      checkConsentModal();
     }
 
     function showActiveState(data) {
@@ -1501,6 +1833,7 @@
       const closedTitle = document.getElementById('closed-dj-title');
       if (activeTitle) activeTitle.innerText = names;
       if (closedTitle) closedTitle.innerText = names;
+      checkConsentModal();
     }
 
     let currentSearchResults = [];
@@ -1965,6 +2298,10 @@
         showClosedState({ reason: 'inactive' });
         return;
       }
+      if (selectedPhotoDataUrl && localStorage.getItem(getEventConsentKey()) !== 'true') {
+        openConsentModal();
+        return;
+      }
       if (!selectedTrack) return;
       const requester = document.getElementById('requester-name').value.trim() || 'אורח אנונימי';
       const note = document.getElementById('requester-note').value.trim();
@@ -2037,6 +2374,7 @@
     });
 
     // Start
+    checkConsentModal();
     checkStatus();
   </script>
 </body>
