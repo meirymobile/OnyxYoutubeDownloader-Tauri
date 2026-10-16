@@ -417,6 +417,17 @@ fn open_qr_stage_on_monitor(app: tauri::AppHandle, monitor_index: usize, fullscr
 }
 
 #[tauri::command]
+fn open_screen_mirroring_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.Displays-Settings.extension")
+            .spawn();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn write_log(message: String) -> Result<(), String> {
     use std::fs::{OpenOptions, metadata, create_dir_all};
     use std::io::Write;
@@ -621,6 +632,7 @@ pub fn run() {
             close_qr_stage_window,
             get_available_monitors,
             open_qr_stage_on_monitor,
+            open_screen_mirroring_settings,
             start_djay_drag,
             close_djay_window,
             minimize_djay_to_tray,

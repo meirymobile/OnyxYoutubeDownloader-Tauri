@@ -1582,8 +1582,18 @@ export default function GuestRequestsModal({
         await invoke('open_qr_stage_on_monitor', { monitorIndex: device.monitorIndex, fullscreen: true });
         setActiveCastDevice(device);
         setCastMessage({ type: 'success', text: `המסך נפתח בהצלחה על: ${device.name} 🚀` });
+      } else if (device.protocol === 'AirPlay') {
+        // Native macOS AirPlay display (e.g. Samsung 7 Series, Apple TV, Smart TVs)
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          await invoke('open_screen_mirroring_settings');
+        } catch (e) {}
+        setCastMessage({ 
+          type: 'info', 
+          text: `טלוויזיית ${device.name} מתחברת דרך שיקוף המסך של ה-Mac: לחץ על סמל מרכז הבקרה למעלה (ליד השעון) ⯈ "שיקוף מסך" ⯈ בחר ב-${device.name}. הטלוויזיה תקפיץ מיד קוד אישור! לאחר האישור, לחץ כאן "רענן סריקה 🔄" כדי לשדר ב-4K.` 
+        });
       } else {
-        // Wireless Google Cast / AirPlay via Python backend
+        // Wireless Google Cast via Python backend
         const res = await fetch(`http://127.0.0.1:${serverPort}/api/cast/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
