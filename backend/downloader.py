@@ -52,6 +52,7 @@ def download_video(url: str, output_dir: str, format_type: str = "video", progre
         'http_headers': {'Connection': 'close'}, # Fix for [Errno 32] Broken pipe on macOS
         'windowsfilenames': True, # Sanitize filenames for all OS
         'overwrites': True, # Overwrite files automatically to prevent ffmpeg hanging
+        'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'tv', 'web']}},
     }
     
     if download_delay and download_delay > 0:

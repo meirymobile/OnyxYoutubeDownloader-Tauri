@@ -8,7 +8,7 @@ logger = logging.getLogger("onyx")
 
 current_cast_device = None
 current_cast_instance = None
-cast_lock = threading.Lock()
+cast_lock = threading.RLock()
 
 def scan_wireless_devices(timeout=2.0):
     """

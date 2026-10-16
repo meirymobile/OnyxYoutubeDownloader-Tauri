@@ -615,8 +615,12 @@ try:
 except ImportError:
     from backend import cast_service
 
+class CastStartReq(BaseModel):
+    device_id: str
+    target_url: str
+
 @app.get("/api/cast/devices")
-async def get_cast_devices():
+def get_cast_devices():
     """Scans and returns all wireless screens (Chromecast, Android TV, AirPlay) on local network."""
     try:
         devices = cast_service.scan_wireless_devices(timeout=2.0)
@@ -626,22 +630,19 @@ async def get_cast_devices():
         return {"status": "error", "devices": [], "message": str(e)}
 
 @app.post("/api/cast/start")
-async def start_wireless_cast(req: Request):
+def start_wireless_cast(req: CastStartReq):
     """Starts broadcasting the Stage QR view to the chosen wireless display."""
     try:
-        data = await req.json()
-        device_id = data.get("device_id")
-        target_url = data.get("target_url")
-        if not device_id or not target_url:
+        if not req.device_id or not req.target_url:
             raise HTTPException(status_code=400, detail="device_id and target_url required")
-        res = cast_service.start_cast(device_id, target_url)
+        res = cast_service.start_cast(req.device_id, req.target_url)
         return {"status": "success", "result": res}
     except Exception as e:
         logger.error(f"Error starting wireless cast: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/cast/stop")
-async def stop_wireless_cast():
+def stop_wireless_cast():
     """Stops the active cast session."""
     try:
         cast_service.stop_cast()
@@ -651,7 +652,7 @@ async def stop_wireless_cast():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/cast/status")
-async def get_cast_status_endpoint():
+def get_cast_status_endpoint():
     """Returns current cast status."""
     try:
         return {"status": "success", "cast": cast_service.get_cast_status()}
