@@ -287,14 +287,17 @@ export default function QrStageWindow() {
       // 2. Animated Stage Floor Equalizer
       const bars = 48;
       const barWidth = w / bars;
+      const gradBar = ctx.createLinearGradient(0, h, 0, h - 60);
+      gradBar.addColorStop(0, 'rgba(168, 85, 247, 0.4)');
+      gradBar.addColorStop(1, 'rgba(56, 189, 248, 0.05)');
+
+      ctx.beginPath();
       for (let i = 0; i < bars; i++) {
         const barH = 15 + Math.abs(Math.sin(angle * 2 + i * 0.25)) * 45;
-        const gradBar = ctx.createLinearGradient(0, h, 0, h - barH);
-        gradBar.addColorStop(0, 'rgba(168, 85, 247, 0.4)');
-        gradBar.addColorStop(1, 'rgba(56, 189, 248, 0.05)');
-        ctx.fillStyle = gradBar;
-        ctx.fillRect(i * barWidth, h - barH, barWidth - 3, barH);
+        ctx.rect(i * barWidth, h - barH, barWidth - 3, barH);
       }
+      ctx.fillStyle = gradBar;
+      ctx.fill();
     };
 
     render();

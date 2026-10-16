@@ -72,43 +72,79 @@ function DJSoftwareWaveform({ isProcessing, analyserNode, isPlaying }) {
       textMaskHeight = targetHeight;
     };
 
+    const gridCanvas = document.createElement('canvas');
+    const gridCtx = gridCanvas.getContext('2d');
+    let activeGradient = null;
+
+    const buildGridCanvas = (w, h) => {
+      gridCanvas.width = w;
+      gridCanvas.height = h;
+      gridCtx.fillStyle = '#050507';
+      gridCtx.fillRect(0, 0, w, h);
+
+      const nBars = Math.floor(w / (barWidth + barSpacing));
+      const nRows = Math.floor(h / (rowHeight + rowSpacing));
+      const startX = Math.floor((w % (barWidth + barSpacing)) / 2);
+      const startYOffset = Math.floor((h % (rowHeight + rowSpacing)) / 2);
+
+      gridCtx.beginPath();
+      for (let i = 0; i < nBars; i++) {
+        const x = i * (barWidth + barSpacing) + startX;
+        for (let r = 0; r < nRows; r++) {
+          const y = h - (r + 1) * (rowHeight + rowSpacing) - startYOffset;
+          gridCtx.rect(x, y, barWidth, rowHeight);
+        }
+      }
+      gridCtx.fillStyle = '#1e293b';
+      gridCtx.fill();
+
+      activeGradient = ctx.createLinearGradient(0, h, 0, 0);
+      activeGradient.addColorStop(0, 'hsl(190, 95%, 65%)');
+      activeGradient.addColorStop(1, 'hsl(130, 95%, 65%)');
+    };
+
     let lastRenderTime = 0;
     
     const render = (now) => {
       animationFrameId = requestAnimationFrame(render);
       if (document.hidden) return; // Pause completely if tab/window is hidden
-      if (now - lastRenderTime < 33) return; // 30 FPS cap (saves ~70% CPU)
+      if (now - lastRenderTime < 33) return; // 30 FPS cap
       lastRenderTime = now;
       
-      const rect = canvas.getBoundingClientRect()
+      const rect = canvas.getBoundingClientRect();
       if (canvas.width !== rect.width || canvas.height !== rect.height) {
-        canvas.width = rect.width
-        canvas.height = rect.height
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        buildGridCanvas(rect.width, rect.height);
         generateTextMask(rect.height);
       }
       
-      const width = canvas.width
-      const height = canvas.height
+      const width = canvas.width;
+      const height = canvas.height;
       if (!textMask || textMaskHeight !== height) {
         generateTextMask(height);
       }
+      if (gridCanvas.width !== width || gridCanvas.height !== height) {
+        buildGridCanvas(width, height);
+      }
+
+      // Blit entire background + all inactive LED dots in ONE hardware GPU blit!
+      ctx.drawImage(gridCanvas, 0, 0);
       
-      // Clear background
-      ctx.fillStyle = '#050507'
-      ctx.fillRect(0, 0, width, height)
-      
-      const numBars = Math.floor(width / (barWidth + barSpacing))
+      const numBars = Math.floor(width / (barWidth + barSpacing));
       if (bars.length !== numBars) {
-        bars.length = 0
+        bars.length = 0;
         for (let i = 0; i < numBars; i++) {
           bars.push({
             phase: Math.random() * Math.PI * 2,
             speed: 0.002 + Math.random() * 0.003
-          })
+          });
         }
       }
       
-      const numRows = Math.floor(height / (rowHeight + rowSpacing))
+      const numRows = Math.floor(height / (rowHeight + rowSpacing));
+      const startX = Math.floor((width % (barWidth + barSpacing)) / 2);
+      const startYOffset = Math.floor((height % (rowHeight + rowSpacing)) / 2);
       
       if (isPlaying && analyserNode && frequencyData) {
         analyserNode.getByteFrequencyData(frequencyData);
@@ -117,9 +153,13 @@ function DJSoftwareWaveform({ isProcessing, analyserNode, isPlaying }) {
         if (textMaskWidth > 0 && textOffset >= textMaskWidth) textOffset = 0;
       }
       
+      // Batch collect only active LEDs into a single path
+      ctx.beginPath();
+      let hasActive = false;
+
       for (let i = 0; i < numBars; i++) {
-        const bar = bars[i]
-        bar.phase += bar.speed * (isProcessing ? 4.0 : 1.5)
+        const bar = bars[i];
+        bar.phase += bar.speed * (isProcessing ? 4.0 : 1.5);
         
         let activeRows = 0;
         let activeRowsProcessing = 0;
@@ -130,18 +170,18 @@ function DJSoftwareWaveform({ isProcessing, analyserNode, isPlaying }) {
           const energy = Math.pow(val / 255.0, 1.2); 
           activeRows = Math.floor(energy * numRows);
         } else if (isProcessing) {
-          let energy = Math.abs(Math.sin(bar.phase)) * Math.abs(Math.cos(bar.phase * 0.4 + i * 0.2))
-          activeRowsProcessing = Math.floor(energy * numRows)
+          let energy = Math.abs(Math.sin(bar.phase)) * Math.abs(Math.cos(bar.phase * 0.4 + i * 0.2));
+          activeRowsProcessing = Math.floor(energy * numRows);
         }
         
+        const x = i * (barWidth + barSpacing) + startX;
+        
         for (let r = 0; r < numRows; r++) {
-          const y = height - (r + 1) * (rowHeight + rowSpacing) - Math.floor((height % (rowHeight + rowSpacing)) / 2)
-          const x = i * (barWidth + barSpacing) + Math.floor((width % (barWidth + barSpacing)) / 2)
-          
           let isActive = false;
           if (isPlaying) {
             isActive = (r < activeRows);
           } else {
+            const y = height - (r + 1) * (rowHeight + rowSpacing) - startYOffset;
             if (textMask && textMaskWidth > 0) {
               const sampleX = Math.floor(x + textOffset) % textMaskWidth;
               const py = Math.floor(y + rowHeight / 2);
@@ -154,16 +194,19 @@ function DJSoftwareWaveform({ isProcessing, analyserNode, isPlaying }) {
           }
           
           if (isActive) {
-            const hue = 190 - (r / numRows) * 60 
-            ctx.fillStyle = `hsl(${hue}, 95%, 65%)`
-          } else {
-            ctx.fillStyle = '#1e293b' 
+            const y = height - (r + 1) * (rowHeight + rowSpacing) - startYOffset;
+            ctx.rect(x, y, barWidth, rowHeight);
+            hasActive = true;
           }
-          
-          ctx.fillRect(x, y, barWidth, rowHeight)
         }
       }
-    }
+
+      // Draw all active LEDs with neon gradient in ONE single call!
+      if (hasActive && activeGradient) {
+        ctx.fillStyle = activeGradient;
+        ctx.fill();
+      }
+    };
 
     animationFrameId = requestAnimationFrame(render)
     return () => cancelAnimationFrame(animationFrameId)
