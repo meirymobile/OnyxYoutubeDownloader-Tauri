@@ -1841,8 +1841,11 @@ export default function GuestRequestsModal({
 
             {/* Preview Body */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-              {/* Stage Screen Simulation Frame (16:9) */}
-              <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-purple-500/30 bg-[#05020a] shadow-[0_20px_50px_rgba(0,0,0,0.8)] select-none">
+              {/* Stage Screen Simulation Frame (16:9) with Container Queries */}
+              <div 
+                className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-purple-500/30 bg-[#05020a] shadow-[0_20px_50px_rgba(0,0,0,0.8)] select-none"
+                style={{ containerType: 'inline-size' }}
+              >
                 
                 {/* Background: Either Guest Photo or Cinematic Stage Backdrop */}
                 {previewItem.photo ? (
@@ -1868,36 +1871,91 @@ export default function GuestRequestsModal({
                   <span className="text-[9px] font-black font-mono text-black mt-0.5">סרקו גם אתם!</span>
                 </div>
 
-                {/* Dynamic Spotlight Card with Exact Position and Scale */}
+                {/* Dynamic Spotlight Card with Exact Position and Scale (1:1 WYSIWYG match) */}
                 <div 
-                  className="absolute z-20 pointer-events-none transition-all duration-300"
+                  className="absolute z-20 pointer-events-none transition-all duration-300 flex flex-col items-center justify-center text-center"
                   style={{
                     left: `${(previewItem.textPosition && typeof previewItem.textPosition.x === 'number') ? previewItem.textPosition.x : 50}%`,
                     top: `${(previewItem.textPosition && typeof previewItem.textPosition.y === 'number') ? previewItem.textPosition.y : 75}%`,
                     transform: `translate(-50%, -50%) scale(${(typeof previewItem.textScale === 'number' && previewItem.textScale > 0) ? previewItem.textScale : 1.0})`,
-                    maxWidth: '85%'
+                    maxWidth: '75cqw',
+                    width: 'max-content'
                   }}
                 >
-                  <div className="px-5 py-4 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(168,85,247,0.3)] text-center">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[10px] sm:text-xs font-black tracking-wider mb-2">
-                      <span>✨</span>
+                  <div 
+                    className="flex flex-col items-center justify-center text-center bg-[rgba(10,4,18,0.88)] border border-white/20 backdrop-blur-md"
+                    style={{
+                      padding: '1.2cqw 2.2cqw',
+                      borderRadius: '2.2cqw',
+                      boxShadow: '0 1cqw 3cqw rgba(0,0,0,0.85), 0 0 2cqw rgba(168,85,247,0.35)'
+                    }}
+                  >
+                    <div 
+                      className="inline-flex items-center rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black tracking-wider whitespace-nowrap animate-pulse"
+                      style={{
+                        gap: '0.4cqw',
+                        padding: '0.3cqw 1.1cqw',
+                        fontSize: '1.2cqw',
+                        marginBottom: '0.5cqw',
+                        boxShadow: '0 0 2cqw rgba(245,158,11,0.3)'
+                      }}
+                    >
+                      <Sparkles style={{ width: '1.2cqw', height: '1.2cqw' }} className="text-amber-400" />
                       <span>מתנגן עכשיו לבקשת הקהל!</span>
-                      <span>✨</span>
+                      <Sparkles style={{ width: '1.2cqw', height: '1.2cqw' }} className="text-amber-400" />
                     </div>
 
-                    <h4 className="text-sm sm:text-lg md:text-xl font-extrabold text-white leading-tight mb-1 drop-shadow-md">
+                    <h4 
+                      className="font-extrabold bg-gradient-to-r from-white via-yellow-200 to-pink-400 bg-clip-text text-transparent leading-tight"
+                      dir="rtl"
+                      style={{
+                        fontSize: '2.1cqw',
+                        maxWidth: '68cqw',
+                        marginBottom: '0.5cqw',
+                        unicodeBidi: 'plaintext',
+                        filter: 'drop-shadow(0 0 1.5cqw rgba(244,114,182,0.4))'
+                      }}
+                    >
                       {previewItem.title}
                     </h4>
 
-                    <div className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-200 bg-black/40 px-3 py-1 rounded-xl border border-white/10 my-1">
-                      <span>❤️</span>
+                    <div 
+                      className="inline-flex items-center justify-center font-bold text-slate-200 bg-[rgba(15,7,26,0.65)] border border-white/15 backdrop-blur-md whitespace-nowrap"
+                      dir="rtl"
+                      style={{
+                        gap: '0.4cqw',
+                        fontSize: '1.3cqw',
+                        padding: '0.35cqw 1.2cqw',
+                        borderRadius: '1.2cqw',
+                        marginBottom: '0.5cqw'
+                      }}
+                    >
+                      <span className="text-pink-400">❤️</span>
                       <span>הוקדש באהבה על ידי:</span>
-                      <span className="text-cyan-400 font-extrabold">{previewItem.requester || 'אורח ברחבה'}</span>
+                      <span className="text-cyan-400 font-extrabold drop-shadow-[0_0_1cqw_rgba(56,189,248,0.6)]">
+                        {previewItem.requester || 'אורח ברחבה'}
+                      </span>
                     </div>
 
                     {previewItem.note && previewItem.note.trim() && (
-                      <div className="mt-2 text-xs sm:text-sm font-bold text-amber-200 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-xl italic">
-                        “{previewItem.note}”
+                      <div 
+                        className="bg-[rgba(18,10,31,0.85)] border border-amber-500/45 backdrop-blur-xl flex items-center justify-center"
+                        dir="rtl"
+                        style={{
+                          maxWidth: '65cqw',
+                          padding: '0.4cqw 1.2cqw',
+                          borderRadius: '1.4cqw',
+                          gap: '0.4cqw'
+                        }}
+                      >
+                        <span className="font-serif text-amber-400 opacity-80 leading-none" style={{ fontSize: '2.2cqw' }}>“</span>
+                        <p 
+                          className="font-bold text-white italic leading-tight"
+                          style={{ fontSize: '1.2cqw', unicodeBidi: 'plaintext' }}
+                        >
+                          {previewItem.note}
+                        </p>
+                        <span className="font-serif text-amber-400 opacity-80 leading-none" style={{ fontSize: '2.2cqw' }}>”</span>
                       </div>
                     )}
                   </div>

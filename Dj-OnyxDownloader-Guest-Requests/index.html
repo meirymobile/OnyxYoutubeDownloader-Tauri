@@ -661,6 +661,7 @@
       touch-action: none;
       user-select: none;
       box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+      container-type: inline-size;
     }
     .stage-sim-bg {
       position: absolute;
@@ -668,7 +669,7 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      filter: brightness(0.65) contrast(1.1);
+      filter: brightness(0.6) contrast(1.15);
     }
     .stage-sim-overlay {
       position: absolute;
@@ -678,89 +679,136 @@
     }
     .stage-sim-qr-badge {
       position: absolute;
-      top: 6px;
-      left: 6px;
+      top: 2cqw;
+      left: 2cqw;
       background: #ffffff;
       color: #05020a;
-      padding: 3px 6px;
-      border-radius: 6px;
-      font-size: 9px;
+      padding: 0.5cqw 1cqw;
+      border-radius: 0.6cqw;
+      font-size: 1.4cqw;
       font-weight: 900;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      box-shadow: 0 0.5cqw 1.5cqw rgba(0,0,0,0.8);
       pointer-events: none;
       z-index: 10;
       display: flex;
       align-items: center;
-      gap: 3px;
+      gap: 0.4cqw;
     }
-    /* Draggable Card in Simulator */
+    /* Draggable Card in Simulator - 1:1 Stage Spotlight Card Match */
     .stage-sim-draggable {
       position: absolute;
       top: 75%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(15, 7, 26, 0.92);
-      border: 1.5px solid rgba(245, 158, 11, 0.7);
-      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.85), 0 0 15px rgba(245, 158, 11, 0.35);
-      backdrop-filter: blur(10px);
-      border-radius: 12px;
-      padding: 6px 12px;
+      background: rgba(10, 4, 18, 0.88);
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 1cqw 3cqw rgba(0, 0, 0, 0.85), 0 0 2cqw rgba(168, 85, 247, 0.35);
+      backdrop-filter: blur(14px);
+      border-radius: 2.2cqw;
+      padding: 1.2cqw 2.2cqw;
       text-align: center;
       cursor: grab;
       touch-action: none;
       z-index: 20;
-      max-width: 82%;
+      max-width: 75cqw;
+      width: max-content;
       transition: border-color 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     .stage-sim-draggable.dragging {
       cursor: grabbing;
-      box-shadow: 0 0 25px rgba(245, 158, 11, 0.9);
+      box-shadow: 0 0 3cqw rgba(245, 158, 11, 0.9);
       border-color: #fbbf24;
-      transform: translate(-50%, -50%) scale(1.04);
     }
-    .sim-song-badge {
+    .sim-stage-badge {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      font-size: 10px;
-      font-weight: 800;
-      color: #fef08a;
-      background: rgba(245, 158, 11, 0.15);
-      padding: 2px 7px;
-      border-radius: 6px;
-      max-width: 100%;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-    }
-    .sim-requester-text {
-      font-size: 11px;
+      gap: 0.4cqw;
+      padding: 0.3cqw 1.1cqw;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.18);
+      border: 1px solid rgba(245, 158, 11, 0.6);
+      color: #fbbf24;
+      font-size: 1.2cqw;
       font-weight: 900;
-      color: #38bdf8;
-      margin-top: 2px;
-      text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+      margin-bottom: 0.5cqw;
+      letter-spacing: 0.2px;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    }
+    .sim-song-title {
+      font-family: 'Space Grotesk', 'Assistant', sans-serif;
+      font-size: 2.1cqw;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff 0%, #fef08a 40%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.25;
+      margin-bottom: 0.5cqw;
+      max-width: 68cqw;
+      direction: rtl;
+      unicode-bidi: plaintext;
+    }
+    .sim-requester-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4cqw;
+      font-size: 1.3cqw;
+      font-weight: 800;
+      color: #e2e8f0;
+      background: rgba(15, 7, 26, 0.65);
+      padding: 0.35cqw 1.2cqw;
+      border-radius: 1.2cqw;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      margin-bottom: 0.5cqw;
+      white-space: nowrap;
+      direction: rtl;
+    }
+    .sim-requester-name {
+      color: #38bdf8;
+      font-weight: 900;
+      text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+    }
+    .sim-note-box {
+      background: rgba(18, 10, 31, 0.85);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      padding: 0.4cqw 1.2cqw;
+      border-radius: 1.4cqw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4cqw;
+      max-width: 65cqw;
+      direction: rtl;
+    }
+    .sim-quote-mark {
+      font-size: 2.2cqw;
+      line-height: 1;
+      color: #f59e0b;
+      font-family: serif;
+      opacity: 0.8;
     }
     .sim-note-text {
-      font-size: 10px;
+      font-size: 1.2cqw;
       font-weight: 700;
       color: #ffffff;
       font-style: italic;
-      margin-top: 1px;
       line-height: 1.25;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+      direction: rtl;
+      unicode-bidi: plaintext;
     }
     .drag-hint-badge {
-      font-size: 8px;
+      font-size: 0.9cqw;
       color: #94a3b8;
-      font-weight: 800;
-      margin-top: 3px;
-      letter-spacing: 0.5px;
+      font-weight: 700;
+      margin-top: 0.3cqw;
+      opacity: 0.65;
     }
     .sim-preset-buttons {
       display: flex;
@@ -1246,34 +1294,44 @@
               <span>🏁 QR</span>
             </div>
 
-            <!-- Draggable Dedication Card -->
+            <!-- Draggable Dedication Card (1:1 Stage Spotlight Replica) -->
             <div id="stage-sim-draggable" class="stage-sim-draggable">
-              <div class="sim-song-badge">
-                <span>🎵</span>
-                <span id="sim-song-text">שם השיר</span>
+              <div class="sim-stage-badge">
+                <span>✨</span>
+                <span>מתנגן עכשיו לבקשת הקהל!</span>
+                <span>✨</span>
               </div>
-              <div id="sim-requester-text" class="sim-requester-text">הוקדש על ידי: אורח ברחבה</div>
-              <div id="sim-note-wrap" style="display: none;">
-                <div id="sim-note-text" class="sim-note-text">"מזל טוב!"</div>
+              <div id="sim-song-text" class="sim-song-title">שם השיר יופיע כאן</div>
+              <div class="sim-requester-wrap">
+                <span>❤️</span>
+                <span>הוקדש באהבה על ידי:</span>
+                <span id="sim-requester-text" class="sim-requester-name">אורח ברחבה</span>
               </div>
-              <div class="drag-hint-badge">✥ גרור אותי לכל מקום</div>
+              <div id="sim-note-wrap" class="sim-note-box" style="display: none;">
+                <span class="sim-quote-mark">“</span>
+                <span id="sim-note-text" class="sim-note-text"></span>
+                <span class="sim-quote-mark">”</span>
+              </div>
+              <div class="drag-hint-badge">❖ גרור למקום הרצוי במסך</div>
             </div>
           </div>
 
           <!-- Quick Alignment Presets -->
           <div class="sim-preset-buttons">
             <span style="font-size: 11px; color: #94a3b8; margin-left: 4px;">מיקום מהיר:</span>
-            <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 25)">למעלה ⬆️</button>
+            <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 22)">למעלה ⬆️</button>
             <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 50)">מרכז 🎯</button>
-            <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 75)">למטה ⬇️</button>
+            <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 80)">למטה ⬇️</button>
+            <button type="button" class="sim-preset-btn" onclick="setSimPosition(20, 80)">פינה שמאלית ↙️</button>
+            <button type="button" class="sim-preset-btn" onclick="setSimPosition(80, 80)">פינה ימנית ↘️</button>
           </div>
 
           <!-- Card Scale Presets & Controls -->
           <div class="sim-preset-buttons" style="margin-top: 6px;">
             <span style="font-size: 11px; color: #94a3b8; margin-left: 4px;">גודל כרטיס:</span>
-            <button type="button" class="sim-preset-btn" onclick="adjustSimScale(-0.15)" title="הקטן כרטיס">🔍- קטן</button>
+            <button type="button" class="sim-preset-btn" onclick="adjustSimScale(-0.1)" title="הקטן כרטיס">🔍- קטן</button>
             <button type="button" class="sim-preset-btn" onclick="setSimScale(1.0)" title="גודל רגיל">100%</button>
-            <button type="button" class="sim-preset-btn" onclick="adjustSimScale(0.15)" title="הגדל כרטיס">🔍+ גדול</button>
+            <button type="button" class="sim-preset-btn" onclick="adjustSimScale(0.1)" title="הגדל כרטיס">🔍+ גדול</button>
             <span id="sim-scale-badge" style="font-size: 10px; color: #facc15; font-weight: 800; min-width: 32px;">100%</span>
           </div>
         </div>
@@ -2033,13 +2091,13 @@
       }
       const nameVal = document.getElementById('requester-name')?.value.trim();
       if (reqEl) {
-        reqEl.innerText = nameVal ? `הוקדש על ידי: ${nameVal}` : 'הוקדש על ידי: אורח ברחבה';
+        reqEl.innerText = nameVal ? nameVal : 'אורח ברחבה';
       }
       const noteVal = document.getElementById('requester-note')?.value.trim();
       if (noteEl && noteWrap) {
         if (noteVal) {
-          noteEl.innerText = `"${noteVal}"`;
-          noteWrap.style.display = 'block';
+          noteEl.innerText = noteVal;
+          noteWrap.style.display = 'flex';
         } else {
           noteEl.innerText = '';
           noteWrap.style.display = 'none';
@@ -2094,13 +2152,23 @@
         let newX = Math.round(cardStartLeft + deltaXPercent);
         let newY = Math.round(cardStartTop + deltaYPercent);
 
-        // Clamping boundaries so card remains visible inside screen
-        newX = Math.max(22, Math.min(78, newX));
-        newY = Math.max(20, Math.min(80, newY));
+        // Dynamic boundaries based on actual card dimensions so user can drag all the way to any edge
+        const cardRect = card.getBoundingClientRect();
+        const halfWidthPct = Math.max(8, Math.min(32, ((cardRect.width / 2) / rect.width) * 100));
+        const halfHeightPct = Math.max(6, Math.min(26, ((cardRect.height / 2) / rect.height) * 100));
 
-        // If user drags directly into top-left QR badge, nudge slightly down
-        if (newX < 34 && newY < 32) {
-          newY = 34;
+        const safeMargin = 2;
+        const minX = Math.round(halfWidthPct + safeMargin);
+        const maxX = Math.round(100 - halfWidthPct - safeMargin);
+        const minY = Math.round(halfHeightPct + safeMargin);
+        const maxY = Math.round(100 - halfHeightPct - safeMargin);
+
+        newX = Math.max(minX, Math.min(maxX, newX));
+        newY = Math.max(minY, Math.min(maxY, newY));
+
+        // If dragged into top-left QR badge, keep clear of QR
+        if (newX - halfWidthPct < 18 && newY - halfHeightPct < 16) {
+          newY = Math.round(16 + halfHeightPct);
         }
 
         selectedTextPosition = { x: newX, y: newY };

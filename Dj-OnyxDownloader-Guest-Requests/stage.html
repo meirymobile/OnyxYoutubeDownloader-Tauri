@@ -204,13 +204,13 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 22px 30px;
-      border-radius: 28px;
-      background: rgba(10, 4, 18, 0.82);
-      border: 1.5px solid rgba(255, 255, 255, 0.18);
+      padding: 1.2vw 2.2vw;
+      border-radius: 2.2vw;
+      background: rgba(10, 4, 18, 0.88);
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
       backdrop-filter: blur(20px);
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75), 0 0 50px rgba(168, 85, 247, 0.25);
-      max-width: 90vw;
+      box-shadow: 0 1vw 3vw rgba(0, 0, 0, 0.85), 0 0 2vw rgba(168, 85, 247, 0.35);
+      max-width: 75vw;
       width: max-content;
       opacity: 0;
       pointer-events: none;
@@ -225,84 +225,89 @@
     .spotlight-badge {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px 24px;
+      gap: 0.4vw;
+      padding: 0.3vw 1.1vw;
       border-radius: 999px;
       background: rgba(245, 158, 11, 0.18);
       border: 1.5px solid rgba(245, 158, 11, 0.6);
       color: #fbbf24;
-      font-size: 14px;
+      font-size: 1.2vw;
       font-weight: 900;
-      letter-spacing: 1.5px;
-      margin-bottom: 14px;
-      box-shadow: 0 0 35px rgba(245, 158, 11, 0.3);
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5vw;
+      box-shadow: 0 0 2vw rgba(245, 158, 11, 0.3);
       animation: pulse 2s infinite;
+      white-space: nowrap;
     }
 
-    /* Song Title & Artist: reduced font size per user request */
+    /* Song Title & Artist: responsive 1:1 scale */
     .spotlight-title {
       font-family: 'Space Grotesk', 'Assistant', sans-serif;
-      font-size: 24px;
+      font-size: 2.1vw;
       font-weight: 800;
       background: linear-gradient(135deg, #ffffff 0%, #fef08a 40%, #f472b6 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 12px;
-      max-width: 750px;
-      line-height: 1.3;
-      text-shadow: 0 0 30px rgba(244, 114, 182, 0.35);
-    }
-    @media (min-width: 1024px) {
-      .spotlight-title {
-        font-size: 30px;
-      }
+      margin-bottom: 0.5vw;
+      max-width: 68vw;
+      line-height: 1.25;
+      text-shadow: 0 0 1.5vw rgba(244, 114, 182, 0.35);
+      direction: rtl;
+      unicode-bidi: plaintext;
     }
 
     .spotlight-requester-wrap {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      font-size: 22px;
+      justify-content: center;
+      gap: 0.4vw;
+      font-size: 1.3vw;
       font-weight: 800;
       color: #e2e8f0;
-      margin-bottom: 24px;
+      margin-bottom: 0.5vw;
       background: rgba(15, 7, 26, 0.65);
-      padding: 8px 24px;
-      border-radius: 20px;
+      padding: 0.35vw 1.2vw;
+      border-radius: 1.2vw;
       border: 1px solid rgba(255, 255, 255, 0.15);
       backdrop-filter: blur(14px);
+      white-space: nowrap;
+      direction: rtl;
     }
     .spotlight-requester {
       color: #38bdf8;
       font-weight: 900;
-      text-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+      text-shadow: 0 0 1vw rgba(56, 189, 248, 0.6);
     }
 
     .spotlight-note-box {
-      max-width: 720px;
-      background: rgba(18, 10, 31, 0.8);
+      max-width: 65vw;
+      background: rgba(18, 10, 31, 0.85);
       border: 1.5px solid rgba(245, 158, 11, 0.45);
-      padding: 22px 36px;
-      border-radius: 28px;
+      padding: 0.4vw 1.2vw;
+      border-radius: 1.4vw;
       backdrop-filter: blur(20px);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(245, 158, 11, 0.2);
+      box-shadow: 0 1vw 2.5vw rgba(0, 0, 0, 0.6), 0 0 2vw rgba(245, 158, 11, 0.2);
       display: flex;
       align-items: center;
-      gap: 16px;
+      justify-content: center;
+      gap: 0.4vw;
+      direction: rtl;
     }
     .quote-mark {
-      font-size: 46px;
+      font-size: 2.2vw;
       line-height: 1;
       color: #f59e0b;
       font-family: serif;
       opacity: 0.8;
     }
     .spotlight-note {
-      font-size: 24px;
-      font-weight: 800;
+      font-size: 1.2vw;
+      font-weight: 700;
       color: #fff;
-      line-height: 1.4;
+      line-height: 1.25;
       font-style: italic;
+      direction: rtl;
+      unicode-bidi: plaintext;
     }
 
     /* Action Steps Footer */

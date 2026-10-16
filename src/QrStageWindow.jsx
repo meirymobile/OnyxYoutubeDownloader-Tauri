@@ -259,8 +259,8 @@ export default function QrStageWindow() {
 
       {/* Spotlight Dedication Card - Positioned dynamically from guest mobile simulator */}
       <div 
-        className={`fixed z-20 flex flex-col items-center justify-center text-center p-6 md:p-8 rounded-3xl bg-slate-950/85 border border-white/20 backdrop-blur-2xl shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_50px_rgba(168,85,247,0.3)] transition-all duration-700 pointer-events-none max-w-[90vw] w-max ${
-          spotlight.active ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+        className={`fixed z-20 flex flex-col items-center justify-center text-center p-[1.2vw_2.2vw] rounded-[2.2vw] bg-[rgba(10,4,18,0.88)] border border-white/20 backdrop-blur-2xl shadow-[0_1vw_3vw_rgba(0,0,0,0.85),0_0_2vw_rgba(168,85,247,0.35)] transition-opacity duration-700 pointer-events-none max-w-[75vw] w-max ${
+          spotlight.active ? 'opacity-100' : 'opacity-0'
         }`}
         style={{
           left: `${spotlight.textPosition?.x ?? 50}%`,
@@ -268,32 +268,45 @@ export default function QrStageWindow() {
           transform: `translate(-50%, -50%) scale(${spotlight.textScale ?? 1})`,
         }}
       >
-        <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black text-xs tracking-wider shadow-[0_0_25px_rgba(245,158,11,0.4)] animate-pulse mb-3">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+        <div className="inline-flex items-center gap-[0.4vw] px-[1.1vw] py-[0.3vw] rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black text-[1.2vw] tracking-wider shadow-[0_0_2vw_rgba(245,158,11,0.3)] animate-pulse mb-[0.5vw] whitespace-nowrap">
+          <Sparkles className="w-[1.2vw] h-[1.2vw] text-amber-400" />
           <span>מתנגן עכשיו לבקשת הקהל!</span>
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <Sparkles className="w-[1.2vw] h-[1.2vw] text-amber-400" />
         </div>
 
-        {/* Song title with refined smaller typography per user request */}
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-white via-yellow-200 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(244,114,182,0.4)] max-w-2xl leading-snug mb-3">
+        {/* Song title with 1:1 responsive scale */}
+        <h1 
+          className="text-[2.1vw] font-extrabold bg-gradient-to-r from-white via-yellow-200 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_1.5vw_rgba(244,114,182,0.4)] max-w-[68vw] leading-tight mb-[0.5vw]"
+          dir="rtl"
+          style={{ unicodeBidi: 'plaintext' }}
+        >
           {spotlight.songTitle || 'שיר לבקשת הקהל'}
         </h1>
 
-        <div className="inline-flex items-center gap-2 text-base sm:text-lg font-bold text-slate-200 bg-slate-900/70 px-5 py-1.5 rounded-xl border border-white/15 backdrop-blur-md shadow-lg mb-3">
+        <div 
+          className="inline-flex items-center justify-center gap-[0.4vw] text-[1.3vw] font-bold text-slate-200 bg-[rgba(15,7,26,0.65)] px-[1.2vw] py-[0.35vw] rounded-[1.2vw] border border-white/15 backdrop-blur-md shadow-lg mb-[0.5vw] whitespace-nowrap"
+          dir="rtl"
+        >
           <span className="text-pink-400">❤️</span>
           <span>הוקדש באהבה על ידי:</span>
-          <span className="text-cyan-400 font-extrabold drop-shadow-[0_0_12px_rgba(56,189,248,0.6)]">
+          <span className="text-cyan-400 font-extrabold drop-shadow-[0_0_1vw_rgba(56,189,248,0.6)]">
             {spotlight.requester || 'אורח ברחבה'}
           </span>
         </div>
 
         {spotlight.note && (
-          <div className="max-w-xl bg-slate-950/75 border border-amber-500/40 px-6 py-3 rounded-2xl backdrop-blur-xl shadow-xl flex items-center gap-2.5">
-            <span className="text-2xl font-serif text-amber-400 opacity-80 leading-none">“</span>
-            <p className="text-base sm:text-lg font-bold text-white italic leading-relaxed">
+          <div 
+            className="max-w-[65vw] bg-[rgba(18,10,31,0.85)] border border-amber-500/45 px-[1.2vw] py-[0.4vw] rounded-[1.4vw] backdrop-blur-xl shadow-xl flex items-center justify-center gap-[0.4vw]"
+            dir="rtl"
+          >
+            <span className="text-[2.2vw] font-serif text-amber-400 opacity-80 leading-none">“</span>
+            <p 
+              className="text-[1.2vw] font-bold text-white italic leading-tight"
+              style={{ unicodeBidi: 'plaintext' }}
+            >
               {spotlight.note}
             </p>
-            <span className="text-2xl font-serif text-amber-400 opacity-80 leading-none">”</span>
+            <span className="text-[2.2vw] font-serif text-amber-400 opacity-80 leading-none">”</span>
           </div>
         )}
       </div>
