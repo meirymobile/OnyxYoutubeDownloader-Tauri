@@ -231,6 +231,7 @@ export default function GuestRequestsModal({
       broadcastSpotlight({ active: false, timestamp: Date.now() });
     } else {
       setCurrentSpotlightId(item.id);
+      const isGuestPhoto = !!(item.photo && item.photo.trim() && item.photo !== item.thumbnail && !item.photo.includes('ytimg.com') && !item.photo.includes('youtube.com'));
       broadcastSpotlight({
         active: true,
         requestId: item.id,
@@ -239,6 +240,7 @@ export default function GuestRequestsModal({
         requester: item.requester || 'אורח ברחבה',
         note: item.note || '',
         photo: item.photo || item.thumbnail || null,
+        hasGuestPhoto: isGuestPhoto,
         textPosition: item.textPosition || { x: 50, y: 75 },
         textScale: (typeof item.textScale === 'number' && item.textScale > 0) ? item.textScale : 1.0,
         timestamp: Date.now()
@@ -1111,7 +1113,8 @@ export default function GuestRequestsModal({
             // Mark request as played
             setRequests(prev => prev.map(r => r.id === matchedReq.id ? { ...r, status: 'played' } : r));
 
-            broadcastSpotlight({
+            const isGuestPhoto = !!(matchedReq.photo && matchedReq.photo.trim() && matchedReq.photo !== matchedReq.thumbnail && !matchedReq.photo.includes('ytimg.com') && !matchedReq.photo.includes('youtube.com'));
+            const spotlightPayload = {
               active: true,
               requestId: matchedReq.id,
               songTitle: matchedReq.title,
@@ -1119,23 +1122,15 @@ export default function GuestRequestsModal({
               requester: matchedReq.requester || 'אורח ברחבה',
               note: matchedReq.note || '',
               photo: matchedReq.photo || matchedReq.thumbnail || null,
+              hasGuestPhoto: isGuestPhoto,
               textPosition: matchedReq.textPosition || { x: 50, y: 75 },
               textScale: matchedReq.textScale || 1.0,
               timestamp: Date.now()
-            });
+            };
+
+            broadcastSpotlight(spotlightPayload);
             try {
-              localStorage.setItem('onyx_stage_spotlight', JSON.stringify({
-                active: true,
-                requestId: matchedReq.id,
-                songTitle: matchedReq.title,
-                artist: masterDeck.artist || matchedReq.channel || '',
-                requester: matchedReq.requester || 'אורח ברחבה',
-                note: matchedReq.note || '',
-                photo: matchedReq.photo || matchedReq.thumbnail || null,
-                textPosition: matchedReq.textPosition || { x: 50, y: 75 },
-                textScale: matchedReq.textScale || 1.0,
-                timestamp: Date.now()
-              }));
+              localStorage.setItem('onyx_stage_spotlight', JSON.stringify(spotlightPayload));
               window.dispatchEvent(new Event('storage'));
             } catch (e) {}
           }
@@ -2012,16 +2007,25 @@ export default function GuestRequestsModal({
                 </div>
 
                 {/* Dynamic Spotlight Card with Exact Position and Scale (1:1 WYSIWYG match) */}
-                <div 
-                  className="absolute z-20 pointer-events-none transition-all duration-300 flex flex-col items-center justify-center text-center"
-                  style={{
-                    left: `${(previewItem.textPosition && typeof previewItem.textPosition.x === 'number') ? previewItem.textPosition.x : 50}%`,
-                    top: `${(previewItem.textPosition && typeof previewItem.textPosition.y === 'number') ? previewItem.textPosition.y : 75}%`,
-                    transform: `translate(-50%, -50%) scale(${(typeof previewItem.textScale === 'number' && previewItem.textScale > 0) ? previewItem.textScale : 1.0})`,
-                    maxWidth: '75cqw',
-                    width: 'max-content'
-                  }}
-                >
+                {(() => {
+                  const hasCustomNote = !!(previewItem.note && previewItem.note.trim());
+                  const hasGuestPhoto = !!(previewItem.photo && previewItem.photo.trim() && previewItem.photo !== previewItem.thumbnail && !previewItem.photo.includes('ytimg.com') && !previewItem.photo.includes('youtube.com'));
+                  const isDockedToBottom = !hasGuestPhoto && !hasCustomNote;
+
+                  return (
+                    <div 
+                      className="absolute z-20 pointer-events-none transition-all duration-300 flex flex-col items-center justify-center text-center"
+                      style={{
+                        left: isDockedToBottom ? '50%' : `${(previewItem.textPosition && typeof previewItem.textPosition.x === 'number') ? previewItem.textPosition.x : 50}%`,
+                        top: isDockedToBottom ? 'auto' : `${(previewItem.textPosition && typeof previewItem.textPosition.y === 'number') ? previewItem.textPosition.y : 75}%`,
+                        bottom: isDockedToBottom ? '2.5cqw' : 'auto',
+                        transform: isDockedToBottom
+                          ? `translate(-50%, 0) scale(${(typeof previewItem.textScale === 'number' && previewItem.textScale > 0) ? previewItem.textScale : 1.0})`
+                          : `translate(-50%, -50%) scale(${(typeof previewItem.textScale === 'number' && previewItem.textScale > 0) ? previewItem.textScale : 1.0})`,
+                        maxWidth: '75cqw',
+                        width: 'max-content'
+                      }}
+                    >
                   <div 
                     className="flex flex-col items-center justify-center text-center bg-[rgba(10,4,18,0.88)] border border-white/20 backdrop-blur-md"
                     style={{
@@ -2104,6 +2108,8 @@ export default function GuestRequestsModal({
                     </div>
                   </div>
                 </div>
+              );
+            })()}
 
                 {/* 16:9 Screen Badge */}
                 <div className="absolute bottom-2 right-2 text-[10px] font-mono font-bold text-slate-400 bg-black/70 px-2 py-0.5 rounded-md border border-slate-700 pointer-events-none">
@@ -2128,11 +2134,16 @@ export default function GuestRequestsModal({
                         <Camera className="w-3.5 h-3.5" /> צורפה תמונה מהאירוע (מוצגת ברקע)
                       </span>
                     ) : (
-                      <span className="text-slate-400">ללא תמונה מצורפת (יוצג רקע במה דיפולטיבי)</span>
+                      <span className="text-slate-400">ללא תמונה מצורפת (עטיפת שיר ברקע)</span>
                     )}
                   </div>
                   {previewItem.note && (
                     <div className="text-amber-300 font-medium">הקדשה: "{previewItem.note}"</div>
+                  )}
+                  {!previewItem.photo && (!previewItem.note || !previewItem.note.trim()) && (
+                    <div className="text-cyan-400 font-bold text-[11px] flex items-center gap-1">
+                      📍 תיבת הטקסט מוצמדת לתחתית המסך
+                    </div>
                   )}
                 </div>
               </div>

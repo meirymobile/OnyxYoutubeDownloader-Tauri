@@ -170,7 +170,7 @@ export default function QrStageWindow() {
       return () => clearTimeout(timer);
     }
 
-    const newKey = `${spotlight.requester || ''}:::${spotlight.songTitle || ''}:::${spotlight.note || ''}:::${spotlight.photo || ''}:::${spotlight.textPosition?.x ?? 50}:::${spotlight.textPosition?.y ?? 75}:::${spotlight.textScale ?? 1}`;
+    const newKey = `${spotlight.requester || ''}:::${spotlight.songTitle || ''}:::${spotlight.note || ''}:::${spotlight.photo || ''}:::${spotlight.hasGuestPhoto ?? ''}:::${spotlight.textPosition?.x ?? 50}:::${spotlight.textPosition?.y ?? 75}:::${spotlight.textScale ?? 1}`;
 
     if (newKey === currentKeyRef.current && cardVisible) {
       return;
@@ -422,64 +422,80 @@ export default function QrStageWindow() {
       </div>
 
       {/* Spotlight Dedication Card - Positioned dynamically from guest mobile simulator with smooth fade transitions */}
-      {isSpotlightActive && displayedSpotlight && (
-        <div 
-          className={`fixed z-20 flex flex-col items-center justify-center text-center p-[1.2vw_2.2vw] rounded-[2.2vw] bg-[rgba(10,4,18,0.88)] border border-white/20 backdrop-blur-2xl shadow-[0_1vw_3vw_rgba(0,0,0,0.85),0_0_2vw_rgba(168,85,247,0.35)] transition-all duration-500 ease-out pointer-events-none max-w-[75vw] w-max ${
-            cardVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-          }`}
-          style={{
-            left: `${displayedSpotlight.textPosition?.x ?? 50}%`,
-            top: `${displayedSpotlight.textPosition?.y ?? 75}%`,
-            transform: `translate(-50%, -50%) scale(${(displayedSpotlight.textScale ?? 1) * (cardVisible ? 1 : 0.95)})`,
-          }}
-        >
-          <div className="inline-flex items-center gap-[0.35vw] px-[0.9vw] py-[0.25vw] rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black text-[1.05vw] tracking-wider shadow-[0_0_1.5vw_rgba(245,158,11,0.3)] animate-pulse mb-[0.4vw] whitespace-nowrap">
-            <Sparkles className="w-[1.05vw] h-[1.05vw] text-amber-400" />
-            <span>מתנגן עכשיו לבקשת הקהל!</span>
-            <Sparkles className="w-[1.05vw] h-[1.05vw] text-amber-400" />
-          </div>
+      {isSpotlightActive && displayedSpotlight && (() => {
+        const hasCustomNote = !!(displayedSpotlight.note && displayedSpotlight.note.trim());
+        const hasGuestPhoto = displayedSpotlight.hasGuestPhoto !== undefined
+          ? Boolean(displayedSpotlight.hasGuestPhoto)
+          : Boolean(
+              displayedSpotlight.photo &&
+              !displayedSpotlight.photo.includes('ytimg.com') &&
+              !displayedSpotlight.photo.includes('youtube.com') &&
+              !displayedSpotlight.photo.includes('youtu.be')
+            );
+        const isDockedToBottom = !hasGuestPhoto && !hasCustomNote;
 
-          {/* LINE 1: Requester Name - Large & Colorful */}
+        return (
           <div 
-            className="inline-flex items-center justify-center gap-[0.4vw] font-black text-[2.25vw] bg-gradient-to-r from-white via-cyan-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_0_1.5vw_rgba(56,189,248,0.4)] leading-tight mb-[0.4vw] max-w-[70vw] whitespace-nowrap"
-            dir="rtl"
-            style={{ unicodeBidi: 'plaintext' }}
+            className={`fixed z-20 flex flex-col items-center justify-center text-center p-[1.2vw_2.2vw] rounded-[2.2vw] bg-[rgba(10,4,18,0.88)] border border-white/20 backdrop-blur-2xl shadow-[0_1vw_3vw_rgba(0,0,0,0.85),0_0_2vw_rgba(168,85,247,0.35)] transition-all duration-500 ease-out pointer-events-none max-w-[75vw] w-max ${
+              cardVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+            }`}
+            style={{
+              left: isDockedToBottom ? '50%' : `${displayedSpotlight.textPosition?.x ?? 50}%`,
+              top: isDockedToBottom ? 'auto' : `${displayedSpotlight.textPosition?.y ?? 75}%`,
+              bottom: isDockedToBottom ? '2.5vw' : 'auto',
+              transform: isDockedToBottom
+                ? `translate(-50%, 0) scale(${(displayedSpotlight.textScale ?? 1) * (cardVisible ? 1 : 0.95)})`
+                : `translate(-50%, -50%) scale(${(displayedSpotlight.textScale ?? 1) * (cardVisible ? 1 : 0.95)})`,
+            }}
           >
-            <span className="text-[1.9vw] text-pink-400" style={{ WebkitTextFillColor: 'initial' }}>❤️</span>
-            <span>הוקדש ע״י </span>
-            <span>{displayedSpotlight.requester || 'אורח ברחבה'}</span>
-          </div>
-
-          {/* LINE 2: Dedication Note - Large & Colorful */}
-          {displayedSpotlight.note && displayedSpotlight.note.trim() && (
-            <div 
-              className="flex items-center justify-center gap-[0.35vw] font-black text-[2.25vw] bg-clip-text text-transparent leading-tight mb-[0.4vw] max-w-[70vw]"
-              dir="rtl"
-              style={{
-                backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #fde047 30%, #fb7185 65%, #e879f9 100%)',
-                filter: 'drop-shadow(0 0 1.5vw rgba(251,113,133,0.4))',
-                unicodeBidi: 'plaintext'
-              }}
-            >
-              <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>“</span>
-              <p className="text-center font-black">
-                {displayedSpotlight.note}
-              </p>
-              <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>”</span>
+            <div className="inline-flex items-center gap-[0.35vw] px-[0.9vw] py-[0.25vw] rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black text-[1.05vw] tracking-wider shadow-[0_0_1.5vw_rgba(245,158,11,0.3)] animate-pulse mb-[0.4vw] whitespace-nowrap">
+              <Sparkles className="w-[1.05vw] h-[1.05vw] text-amber-400" />
+              <span>מתנגן עכשיו לבקשת הקהל!</span>
+              <Sparkles className="w-[1.05vw] h-[1.05vw] text-amber-400" />
             </div>
-          )}
 
-          {/* LINE 3: Song Title & Artist - Smallest at the bottom */}
-          <div 
-            className="inline-flex items-center justify-center gap-[0.4vw] text-[1.15vw] font-bold text-slate-200 bg-[rgba(15,7,26,0.7)] px-[1.2vw] py-[0.3vw] rounded-full border border-white/15 backdrop-blur-md shadow-md mb-[0.2vw] max-w-[68vw] truncate whitespace-nowrap"
-            dir="rtl"
-            style={{ unicodeBidi: 'plaintext' }}
-          >
-            <span className="text-[1.1vw]">🎵</span>
-            <span>{displayedSpotlight.songTitle || 'שיר לבקשת הקהל'}</span>
+            {/* LINE 1: Requester Name - Large & Colorful */}
+            <div 
+              className="inline-flex items-center justify-center gap-[0.4vw] font-black text-[2.25vw] bg-gradient-to-r from-white via-cyan-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_0_1.5vw_rgba(56,189,248,0.4)] leading-tight mb-[0.4vw] max-w-[70vw] whitespace-nowrap"
+              dir="rtl"
+              style={{ unicodeBidi: 'plaintext' }}
+            >
+              <span className="text-[1.9vw] text-pink-400" style={{ WebkitTextFillColor: 'initial' }}>❤️</span>
+              <span>הוקדש ע״י </span>
+              <span>{displayedSpotlight.requester || 'אורח ברחבה'}</span>
+            </div>
+
+            {/* LINE 2: Dedication Note - Large & Colorful */}
+            {displayedSpotlight.note && displayedSpotlight.note.trim() && (
+              <div 
+                className="flex items-center justify-center gap-[0.35vw] font-black text-[2.25vw] bg-clip-text text-transparent leading-tight mb-[0.4vw] max-w-[70vw]"
+                dir="rtl"
+                style={{
+                  backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #fde047 30%, #fb7185 65%, #e879f9 100%)',
+                  filter: 'drop-shadow(0 0 1.5vw rgba(251,113,133,0.4))',
+                  unicodeBidi: 'plaintext'
+                }}
+              >
+                <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>“</span>
+                <p className="text-center font-black">
+                  {displayedSpotlight.note}
+                </p>
+                <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>”</span>
+              </div>
+            )}
+
+            {/* LINE 3: Song Title & Artist - Smallest at the bottom */}
+            <div 
+              className="inline-flex items-center justify-center gap-[0.4vw] text-[1.15vw] font-bold text-slate-200 bg-[rgba(15,7,26,0.7)] px-[1.2vw] py-[0.3vw] rounded-full border border-white/15 backdrop-blur-md shadow-md mb-[0.2vw] max-w-[68vw] truncate whitespace-nowrap"
+              dir="rtl"
+              style={{ unicodeBidi: 'plaintext' }}
+            >
+              <span className="text-[1.1vw]">🎵</span>
+              <span>{displayedSpotlight.songTitle || 'שיר לבקשת הקהל'}</span>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Center Stage Presentation */}
       <div className="flex-1 flex flex-col items-center justify-center text-center z-40 w-full max-w-4xl my-auto animate-fadeIn px-2 md:px-4">

@@ -227,6 +227,12 @@
       transform: translate(-50%, -50%) scale(var(--card-scale, 1));
       pointer-events: auto;
     }
+    .spotlight-card.docked-bottom.active {
+      transform: translate(-50%, 0) scale(var(--card-scale, 1));
+    }
+    .spotlight-card.docked-bottom:not(.active) {
+      transform: translate(-50%, 0) scale(0.95);
+    }
 
     .spotlight-badge {
       display: inline-flex;
@@ -590,7 +596,7 @@
       
       const card = document.getElementById('spotlight-card');
       const isCardActive = card.classList.contains('active');
-      const newKey = `${data.requester || ''}:::${data.songTitle || ''}:::${data.note || ''}:::${data.photo || ''}:::${data.textPosition?.x ?? 50}:::${data.textPosition?.y ?? 75}:::${data.textScale ?? 1}`;
+      const newKey = `${data.requester || ''}:::${data.songTitle || ''}:::${data.note || ''}:::${data.photo || ''}:::${data.hasGuestPhoto ?? ''}:::${data.textPosition?.x ?? 50}:::${data.textPosition?.y ?? 75}:::${data.textScale ?? 1}`;
 
       // Update photo / backdrop with smooth dual-buffer crossfade
       updateSpotlightPhoto(data.photo);
@@ -602,18 +608,39 @@
         
         const noteBox = document.getElementById('spotlight-note-box');
         const noteText = document.getElementById('spotlight-note');
-        if (data.note && data.note.trim()) {
+        const hasCustomNote = !!(data.note && data.note.trim());
+        if (hasCustomNote) {
           noteText.innerText = data.note;
           noteBox.style.display = 'flex';
         } else {
           noteBox.style.display = 'none';
         }
 
-        const posX = (data.textPosition && typeof data.textPosition.x === 'number') ? data.textPosition.x : 50;
-        const posY = (data.textPosition && typeof data.textPosition.y === 'number') ? data.textPosition.y : 75;
+        const hasGuestPhoto = data.hasGuestPhoto !== undefined
+          ? Boolean(data.hasGuestPhoto)
+          : Boolean(
+              data.photo &&
+              !data.photo.includes('ytimg.com') &&
+              !data.photo.includes('youtube.com') &&
+              !data.photo.includes('youtu.be')
+            );
+        const isDockedToBottom = !hasGuestPhoto && !hasCustomNote;
+
+        if (isDockedToBottom) {
+          card.classList.add('docked-bottom');
+          card.style.left = '50%';
+          card.style.top = 'auto';
+          card.style.bottom = '2.5vw';
+        } else {
+          card.classList.remove('docked-bottom');
+          const posX = (data.textPosition && typeof data.textPosition.x === 'number') ? data.textPosition.x : 50;
+          const posY = (data.textPosition && typeof data.textPosition.y === 'number') ? data.textPosition.y : 75;
+          card.style.left = `${posX}%`;
+          card.style.top = `${posY}%`;
+          card.style.bottom = 'auto';
+        }
+
         const scale = (typeof data.textScale === 'number' && data.textScale > 0) ? data.textScale : 1.0;
-        card.style.left = `${posX}%`;
-        card.style.top = `${posY}%`;
         card.style.setProperty('--card-scale', scale);
         
         requestAnimationFrame(() => {
