@@ -51,7 +51,11 @@ export default function QrStageWindow() {
         const savedSpotlight = localStorage.getItem('onyx_stage_spotlight');
         if (savedSpotlight) {
           const parsed = JSON.parse(savedSpotlight);
-          setSpotlight(parsed);
+          if (parsed && parsed.active) {
+            setSpotlight(parsed);
+          } else {
+            setSpotlight({ active: false });
+          }
         } else {
           setSpotlight({ active: false });
         }
@@ -61,12 +65,22 @@ export default function QrStageWindow() {
     };
 
     window.addEventListener('storage', syncState);
-    const interval = setInterval(syncState, 1200);
+    const interval = setInterval(syncState, 1000);
     return () => {
       window.removeEventListener('storage', syncState);
       clearInterval(interval);
     };
   }, []);
+
+  // Guarantee stage screen returns to main QR screen whenever room changes (e.g. New Event)
+  const lastRoomRef = useRef(null);
+  useEffect(() => {
+    if (lastRoomRef.current && lastRoomRef.current !== roomCode) {
+      setSpotlight({ active: false });
+      setActivePhotoSlot('none');
+    }
+    lastRoomRef.current = roomCode;
+  }, [roomCode]);
 
   // Dual-layer image crossfade controller
   useEffect(() => {

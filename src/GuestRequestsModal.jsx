@@ -187,8 +187,9 @@ export default function GuestRequestsModal({
   const emqxClientRef = useRef(null);
 
   // Broadcast Live Stage Experience Spotlight (Song, Requester, Dedication, Guest Photo)
-  const broadcastSpotlight = (spotlightData) => {
-    const cleanRoom = (roomCode || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+  const broadcastSpotlight = (spotlightData, targetRoom = null) => {
+    const target = targetRoom || roomCode;
+    const cleanRoom = (target || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
     const spotlightTopic = `onyx/stage/${cleanRoom}/spotlight`;
     const payloadStr = JSON.stringify(spotlightData);
 
@@ -217,7 +218,7 @@ export default function GuestRequestsModal({
       if (spotlightData && spotlightData.active) {
         localStorage.setItem('onyx_stage_spotlight', payloadStr);
       } else {
-        localStorage.removeItem('onyx_stage_spotlight');
+        localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
       }
       window.dispatchEvent(new Event('storage'));
     } catch (e) {}
@@ -1163,12 +1164,39 @@ export default function GuestRequestsModal({
     if (currentSpotlightId === item.id) {
       setCurrentSpotlightId(null);
       broadcastSpotlight({ active: false, timestamp: Date.now() });
+      localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
+      try { window.dispatchEvent(new Event('storage')); } catch (e) {}
     }
     // Delete request completely: song is not downloaded, image is discarded, row disappears
-    setRequests(prev => prev.filter(r => r.id !== item.id));
+    setRequests(prev => {
+      const remaining = prev.filter(r => r.id !== item.id);
+      if (remaining.length === 0) {
+        // If all requests are gone, guarantee screen returns to main QR screen!
+        setCurrentSpotlightId(null);
+        broadcastSpotlight({ active: false, timestamp: Date.now() });
+        localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
+        try { window.dispatchEvent(new Event('storage')); } catch (e) {}
+      }
+      return remaining;
+    });
     if (previewItem && previewItem.id === item.id) {
       setPreviewItem(null);
     }
+  };
+
+  // Clear all requests completely and return audience to main QR screen
+  const handleClearAllRequests = () => {
+    if (requests.length === 0) return;
+    if (!window.confirm("האם למחוק את כל הבקשות ברשימה? פעולה זו תחזיר מיד את מסך הבמה לתצוגת הברקוד הראשית.")) {
+      return;
+    }
+    setCurrentSpotlightId(null);
+    setPreviewItem(null);
+    broadcastSpotlight({ active: false, timestamp: Date.now() });
+    localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
+    try { window.dispatchEvent(new Event('storage')); } catch (e) {}
+    setRequests([]);
+    localStorage.setItem('onyx_guest_requests_list', '[]');
   };
 
   // Trigger Local Download with Sequential Number Prefix & Real-time Progress Tracking
@@ -1334,17 +1362,35 @@ export default function GuestRequestsModal({
         return;
       }
     }
-    // Broadcast CLOSED state for the retiring room code immediately
-    broadcastRoomStatus(false, roomCode);
+    const retiringRoom = roomCode;
 
+    // 1. Immediately terminate any active spotlight projection on BOTH retiring room and new room
+    setCurrentSpotlightId(null);
+    setPreviewItem(null);
+    broadcastSpotlight({ active: false, timestamp: Date.now() }, retiringRoom);
+    localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
+    try {
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
+
+    // 2. Broadcast CLOSED state for the retiring room code immediately
+    broadcastRoomStatus(false, retiringRoom);
+
+    // 3. Reset state & create new room code
     const newCode = `SHAZZ-${Math.floor(1000 + Math.random() * 9000)}`;
     setRoomCode(newCode);
     setRequestCounter(0);
     setRequests([]);
+    localStorage.setItem('onyx_guest_requests_list', '[]');
+    localStorage.setItem('onyx_guest_counter', '0');
     setIsActive(true);
     localStorage.setItem('onyx_room_active_' + newCode, 'true');
-    // Broadcast ACTIVE state for new room
-    setTimeout(() => broadcastRoomStatus(true, newCode), 500);
+
+    // 4. Ensure new room also has spotlight explicitly set to false and active status
+    setTimeout(() => {
+      broadcastSpotlight({ active: false, timestamp: Date.now() }, newCode);
+      broadcastRoomStatus(true, newCode);
+    }, 400);
   };
 
   // Toggle active/inactive
@@ -2185,6 +2231,18 @@ export default function GuestRequestsModal({
           </div>
 
           <div className="flex items-center gap-2">
+            {requests.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAllRequests}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 shadow-sm"
+                title="מחיקת כל הבקשות ברשימה וחזרה למסך הברקוד הראשי"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>נקה הכל</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setAutoDownload(!autoDownload)}
