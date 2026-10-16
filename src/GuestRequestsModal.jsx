@@ -1003,6 +1003,9 @@ export default function GuestRequestsModal({
   useEffect(() => {
     let isCancelled = false;
     let autoSpotlightReqId = null;
+    let spotlightStartTime = 0;
+    let silenceMissCount = 0;
+    let mixoutMissCount = 0;
 
     const checkMasterDeckAndSpotlight = async () => {
       try {
@@ -1010,6 +1013,8 @@ export default function GuestRequestsModal({
         if (!isActiveRef.current) {
           if (autoSpotlightReqId !== null) {
             autoSpotlightReqId = null;
+            silenceMissCount = 0;
+            mixoutMissCount = 0;
             setCurrentSpotlightId(null);
             broadcastSpotlight({ active: false, timestamp: Date.now() });
             try {
@@ -1024,8 +1029,31 @@ export default function GuestRequestsModal({
         const resText = await invoke('get_djay_tracks_native');
         if (!resText || isCancelled) return;
 
-        const data = JSON.parse(resText);
-        if (data.error || !data.decks) return;
+        let data = null;
+        try {
+          data = JSON.parse(resText);
+        } catch (err) {
+          return;
+        }
+
+        // 1. If djay Pro reported error, is occluded in background/other space, or returned 0 decks:
+        // Do NOT assume music stopped! Keep the current spotlight locked and alive.
+        if (data.error || !data.decks || data.decks.length === 0) {
+          // If a spotlight is active, check sanity timeout (e.g. 5 minutes max per song)
+          if (autoSpotlightReqId !== null && (Date.now() - spotlightStartTime > 300000)) {
+            console.log('[Onyx Stage Live] Spotlight duration expired after 5 minutes.');
+            autoSpotlightReqId = null;
+            silenceMissCount = 0;
+            mixoutMissCount = 0;
+            setCurrentSpotlightId(null);
+            broadcastSpotlight({ active: false, timestamp: Date.now() });
+            try {
+              localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
+              window.dispatchEvent(new Event('storage'));
+            } catch (e) {}
+          }
+          return;
+        }
 
         // Upfader-Only Logic: Exclude crossfader entirely.
         // A deck is audible on speakers if is_playing is true AND vertical volume slider >= 0.15 (15%)
@@ -1044,23 +1072,39 @@ export default function GuestRequestsModal({
           masterDeck = audibleDecks[0];
         }
 
+        // 2. If no deck is audible on speakers (e.g. both faders down or both paused):
         if (!masterDeck) {
-          // No track is playing audibly on speakers (or only headphone cueing)
           if (autoSpotlightReqId !== null) {
-            autoSpotlightReqId = null;
-            setCurrentSpotlightId(null);
-            broadcastSpotlight({ active: false, timestamp: Date.now() });
+            silenceMissCount++;
+            // Require at least 8 consecutive seconds (~7 checks at 1.2s) of confirmed silence before deactivating
+            if (silenceMissCount >= 7 || (Date.now() - spotlightStartTime > 300000)) {
+              console.log('[Onyx Stage Live] Sustained silence detected. Deactivating Stage Spotlight.');
+              autoSpotlightReqId = null;
+              silenceMissCount = 0;
+              mixoutMissCount = 0;
+              setCurrentSpotlightId(null);
+              broadcastSpotlight({ active: false, timestamp: Date.now() });
+              try {
+                localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
+                window.dispatchEvent(new Event('storage'));
+              } catch (e) {}
+            }
           }
           return;
         }
+
+        // Reset silence counter since a deck is clearly audible
+        silenceMissCount = 0;
 
         // Match against current guest requests (only approved requests)
         const currentReqs = requestsRef.current || [];
         const matchedReq = currentReqs.find(r => r.isApproved && isSongMatch(masterDeck, r));
 
         if (matchedReq) {
+          mixoutMissCount = 0; // Confirmed matching track
           if (autoSpotlightReqId !== matchedReq.id) {
             autoSpotlightReqId = matchedReq.id;
+            spotlightStartTime = Date.now();
             setCurrentSpotlightId(matchedReq.id);
             console.log(`[Onyx Stage Live] Master Track MATCHED Guest Request: "${matchedReq.title}" by ${matchedReq.requester}`);
 
@@ -1079,14 +1123,39 @@ export default function GuestRequestsModal({
               textScale: matchedReq.textScale || 1.0,
               timestamp: Date.now()
             });
+            try {
+              localStorage.setItem('onyx_stage_spotlight', JSON.stringify({
+                active: true,
+                requestId: matchedReq.id,
+                songTitle: matchedReq.title,
+                artist: masterDeck.artist || matchedReq.channel || '',
+                requester: matchedReq.requester || 'אורח ברחבה',
+                note: matchedReq.note || '',
+                photo: matchedReq.photo || matchedReq.thumbnail || null,
+                textPosition: matchedReq.textPosition || { x: 50, y: 75 },
+                textScale: matchedReq.textScale || 1.0,
+                timestamp: Date.now()
+              }));
+              window.dispatchEvent(new Event('storage'));
+            } catch (e) {}
           }
         } else {
-          // An audible track is playing, but it is NOT a guest request -> mix-out or new song
+          // An audible track is playing, but it is NOT this guest request -> genuine mix-out!
           if (autoSpotlightReqId !== null) {
-            console.log('[Onyx Stage Live] Mixed out to non-guest track. Deactivating Stage Spotlight.');
-            autoSpotlightReqId = null;
-            setCurrentSpotlightId(null);
-            broadcastSpotlight({ active: false, timestamp: Date.now() });
+            mixoutMissCount++;
+            // Require 3 consecutive checks (~3.6s) of an audible different song before deactivating (prevents crossfade flicker)
+            if (mixoutMissCount >= 3) {
+              console.log('[Onyx Stage Live] Mixed out to non-guest track. Deactivating Stage Spotlight.');
+              autoSpotlightReqId = null;
+              silenceMissCount = 0;
+              mixoutMissCount = 0;
+              setCurrentSpotlightId(null);
+              broadcastSpotlight({ active: false, timestamp: Date.now() });
+              try {
+                localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
+                window.dispatchEvent(new Event('storage'));
+              } catch (e) {}
+            }
           }
         }
       } catch (e) {
