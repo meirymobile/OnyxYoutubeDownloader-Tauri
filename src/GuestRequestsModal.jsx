@@ -21,6 +21,28 @@ const POPULAR_VENUES = [
   { name: 'בית על הים', city: 'יפו', lat: 32.053890, lon: 34.750560 },
 ];
 
+// Audio chime notification using Web Audio API (safe, zero external dependencies)
+const playChime = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch (e) {
+    // Audio context may be restricted by browser policy before user interaction
+  }
+};
+
 export default function GuestRequestsModal({ 
   isOpen, 
   onClose, 
