@@ -116,6 +116,7 @@ export default function GuestRequestsModal({
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isBigQr, setIsBigQr] = useState(false);
+  const [isModalMaximized, setIsModalMaximized] = useState(false);
 
   // Synchronized Refs to avoid stale closures in MQTT listeners
   const isActiveRef = useRef(isActive);
@@ -1084,7 +1085,7 @@ export default function GuestRequestsModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-6 bg-black/85 backdrop-blur-md select-none font-sans" dir="rtl">
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md select-none font-sans ${isModalMaximized ? 'p-0' : 'p-3 md:p-6'}`} dir="rtl">
       
       {/* Fullscreen Big QR Modal */}
       {isBigQr && (
@@ -1162,7 +1163,11 @@ export default function GuestRequestsModal({
       )}
 
       {/* Main Modal Card */}
-      <div className="w-full max-w-4xl h-[90vh] max-h-[820px] bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden relative">
+      <div className={`w-full bg-slate-950 border border-slate-800 shadow-2xl flex flex-col overflow-hidden relative transition-all duration-200 ${
+        isModalMaximized 
+          ? 'w-full h-full max-w-none max-h-none rounded-none m-0 border-0' 
+          : 'max-w-6xl h-[92vh] max-h-[880px] rounded-3xl'
+      }`}>
         
         {/* Modal Header */}
         <div className="p-4 md:p-5 border-b border-slate-800/80 bg-slate-900/60 flex items-center justify-between shrink-0">
@@ -1236,7 +1241,16 @@ export default function GuestRequestsModal({
               <span>אירוע חדש 🔄</span>
             </button>
 
-            <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800">
+            {/* Maximize / Restore Button */}
+            <button 
+              onClick={() => setIsModalMaximized(!isModalMaximized)} 
+              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-all active:scale-95"
+              title={isModalMaximized ? "שחזר גודל חלון" : "הגדל למסך מלא"}
+            >
+              {isModalMaximized ? <Minimize2 className="w-4 h-4 text-purple-400" /> : <Maximize2 className="w-4 h-4 text-purple-400" />}
+            </button>
+
+            <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-all active:scale-95" title="סגור חלון">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -1458,7 +1472,7 @@ export default function GuestRequestsModal({
 
           {/* TAB 2: QR CODE & GUEST LINK */}
           {activeTab === 'qr' && (
-            <div className="flex flex-col items-center justify-center p-4 text-center max-w-lg mx-auto space-y-5">
+            <div className="flex flex-col items-center justify-center p-4 text-center max-w-2xl mx-auto space-y-5">
               <div className="relative p-5 bg-white rounded-3xl shadow-[0_0_40px_rgba(245,158,11,0.3)]">
                 {qrDataUrl && <img src={qrDataUrl} className="w-56 h-56 md:w-64 md:h-64 object-contain" alt="QR" />}
                 <button 
@@ -1579,7 +1593,7 @@ export default function GuestRequestsModal({
 
           {/* TAB 3: SETTINGS */}
           {activeTab === 'settings' && (
-            <div className="max-w-lg mx-auto space-y-4 text-right">
+            <div className="w-full max-w-3xl mx-auto space-y-4 text-right">
               {/* DEDICATED GUEST DOWNLOAD DIRECTORY CONFIGURATION CARD */}
               <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-2.5 shadow-lg">
                 <div className="flex items-center justify-between">
