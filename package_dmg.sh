@@ -12,10 +12,7 @@ mkdir -p src-tauri/target/release/bundle/dmg install
 rm -f src-tauri/target/release/bundle/dmg/OnyxYoutubeDownloader.dmg
 hdiutil create -volname "OnyxYoutubeDownloader" -srcfolder "$APP_PATH" -ov -format UDZO src-tauri/target/release/bundle/dmg/OnyxYoutubeDownloader.dmg
 
-echo "==> Distributing DMG to install/ folder, project root, Desktop, and Downloads..."
+echo "==> Saving DMG exclusively to install/ folder..."
 cp src-tauri/target/release/bundle/dmg/OnyxYoutubeDownloader.dmg ./install/OnyxYoutubeDownloader.dmg
-cp src-tauri/target/release/bundle/dmg/OnyxYoutubeDownloader.dmg ./OnyxYoutubeDownloader.dmg
-cp src-tauri/target/release/bundle/dmg/OnyxYoutubeDownloader.dmg ~/Downloads/
-cp src-tauri/target/release/bundle/dmg/OnyxYoutubeDownloader.dmg ~/Desktop/
 
 echo "==> Done! Installer is available in ./install/OnyxYoutubeDownloader.dmg"
