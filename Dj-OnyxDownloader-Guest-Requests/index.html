@@ -1267,6 +1267,15 @@
             <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 50)">מרכז 🎯</button>
             <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 75)">למטה ⬇️</button>
           </div>
+
+          <!-- Card Scale Presets & Controls -->
+          <div class="sim-preset-buttons" style="margin-top: 6px;">
+            <span style="font-size: 11px; color: #94a3b8; margin-left: 4px;">גודל כרטיס:</span>
+            <button type="button" class="sim-preset-btn" onclick="adjustSimScale(-0.15)" title="הקטן כרטיס">🔍- קטן</button>
+            <button type="button" class="sim-preset-btn" onclick="setSimScale(1.0)" title="גודל רגיל">100%</button>
+            <button type="button" class="sim-preset-btn" onclick="adjustSimScale(0.15)" title="הגדל כרטיס">🔍+ גדול</button>
+            <span id="sim-scale-badge" style="font-size: 10px; color: #facc15; font-weight: 800; min-width: 32px;">100%</span>
+          </div>
         </div>
       </div>
 
@@ -1988,6 +1997,30 @@
 
     let selectedPhotoDataUrl = null;
     let selectedTextPosition = { x: 50, y: 75 }; // Default lower center to clear faces
+    let selectedTextScale = 1.0; // Default 100% scale
+
+    function setSimScale(scale) {
+      selectedTextScale = Math.max(0.65, Math.min(1.4, Math.round(scale * 100) / 100));
+      applySimTransform(false);
+    }
+
+    function adjustSimScale(delta) {
+      setSimScale(selectedTextScale + delta);
+    }
+
+    function applySimTransform(isDragging = false) {
+      const card = document.getElementById('stage-sim-draggable');
+      const badge = document.getElementById('sim-scale-badge');
+      if (badge) {
+        badge.innerText = Math.round(selectedTextScale * 100) + '%';
+      }
+      if (card) {
+        card.style.left = `${selectedTextPosition.x}%`;
+        card.style.top = `${selectedTextPosition.y}%`;
+        const dragScale = isDragging ? selectedTextScale * 1.04 : selectedTextScale;
+        card.style.transform = `translate(-50%, -50%) scale(${dragScale})`;
+      }
+    }
 
     function updateSimContent() {
       const songEl = document.getElementById('sim-song-text');
@@ -2016,11 +2049,7 @@
 
     function setSimPosition(x, y) {
       selectedTextPosition = { x: Math.round(x), y: Math.round(y) };
-      const card = document.getElementById('stage-sim-draggable');
-      if (card) {
-        card.style.left = `${selectedTextPosition.x}%`;
-        card.style.top = `${selectedTextPosition.y}%`;
-      }
+      applySimTransform(false);
     }
 
     let isDraggingSim = false;
@@ -2035,6 +2064,15 @@
       if (!card || !screen || card._dragInitialized) return;
       card._dragInitialized = true;
 
+      let initialPinchDistance = null;
+      let initialPinchScale = 1.0;
+
+      const getTouchDistance = (t1, t2) => {
+        const dx = t1.clientX - t2.clientX;
+        const dy = t1.clientY - t2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+      };
+
       const onStart = (clientX, clientY) => {
         isDraggingSim = true;
         dragStartX = clientX;
@@ -2042,6 +2080,7 @@
         cardStartLeft = selectedTextPosition.x;
         cardStartTop = selectedTextPosition.y;
         card.classList.add('dragging');
+        applySimTransform(true);
       };
 
       const onMove = (clientX, clientY) => {
@@ -2065,18 +2104,28 @@
         }
 
         selectedTextPosition = { x: newX, y: newY };
-        card.style.left = `${newX}%`;
-        card.style.top = `${newY}%`;
+        applySimTransform(true);
       };
 
       const onEnd = () => {
         if (isDraggingSim) {
           isDraggingSim = false;
           card.classList.remove('dragging');
+          applySimTransform(false);
         }
       };
 
-      // Touch events (Mobile)
+      // Pinch to Zoom (Two-finger gesture on mobile)
+      screen.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length === 2) {
+          isDraggingSim = false;
+          card.classList.remove('dragging');
+          initialPinchDistance = getTouchDistance(e.touches[0], e.touches[1]);
+          initialPinchScale = selectedTextScale;
+        }
+      }, { passive: true });
+
+      // Touch events (Mobile drag + pinch zoom)
       card.addEventListener('touchstart', (e) => {
         if (e.touches && e.touches.length === 1) {
           onStart(e.touches[0].clientX, e.touches[0].clientY);
@@ -2084,12 +2133,21 @@
       }, { passive: true });
 
       window.addEventListener('touchmove', (e) => {
-        if (isDraggingSim && e.touches && e.touches.length === 1) {
+        if (e.touches && e.touches.length === 2 && initialPinchDistance) {
+          const currentDist = getTouchDistance(e.touches[0], e.touches[1]);
+          const factor = currentDist / initialPinchDistance;
+          setSimScale(initialPinchScale * factor);
+        } else if (isDraggingSim && e.touches && e.touches.length === 1) {
           onMove(e.touches[0].clientX, e.touches[0].clientY);
         }
       }, { passive: true });
 
-      window.addEventListener('touchend', onEnd);
+      window.addEventListener('touchend', (e) => {
+        if (!e.touches || e.touches.length < 2) {
+          initialPinchDistance = null;
+        }
+        onEnd();
+      });
 
       // Mouse events (Desktop)
       card.addEventListener('mousedown', (e) => {
@@ -2118,6 +2176,7 @@
       document.getElementById('request-modal').style.display = 'flex';
 
       setSimPosition(50, 75);
+      setSimScale(1.0);
       updateSimContent();
       initSimDrag();
 
@@ -2174,6 +2233,8 @@
     function removeSelectedPhoto() {
       selectedPhotoDataUrl = null;
       selectedTextPosition = { x: 50, y: 75 };
+      selectedTextScale = 1.0;
+      setSimScale(1.0);
       const cam = document.getElementById('photo-camera-input');
       const gal = document.getElementById('photo-gallery-input');
       if (cam) cam.value = '';
@@ -2320,6 +2381,7 @@
         note: note,
         photo: selectedPhotoDataUrl || null,
         textPosition: selectedTextPosition || { x: 50, y: 75 },
+        textScale: selectedTextScale || 1.0,
         timestamp: Date.now(),
         status: 'pending'
       };

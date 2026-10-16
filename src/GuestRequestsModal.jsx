@@ -232,6 +232,7 @@ export default function GuestRequestsModal({
         note: item.note || '',
         photo: item.photo || null,
         textPosition: item.textPosition || { x: 50, y: 75 },
+        textScale: (typeof item.textScale === 'number' && item.textScale > 0) ? item.textScale : 1.0,
         timestamp: Date.now()
       });
     }
@@ -1053,6 +1054,7 @@ export default function GuestRequestsModal({
               note: matchedReq.note || '',
               photo: matchedReq.photo || null,
               textPosition: matchedReq.textPosition || { x: 50, y: 75 },
+              textScale: matchedReq.textScale || 1.0,
               timestamp: Date.now()
             });
           }
@@ -1116,6 +1118,7 @@ export default function GuestRequestsModal({
         note: reqItem.note || '',
         photo: reqItem.photo || null,
         textPosition: reqItem.textPosition || { x: 50, y: 75 },
+        textScale: reqItem.textScale || 1.0,
         timestamp: reqItem.timestamp || Date.now(),
         status: 'pending', // 'pending', 'downloading', 'ready', 'played', 'error'
         jobId: null,

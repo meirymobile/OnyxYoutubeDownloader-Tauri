@@ -218,7 +218,7 @@
     }
     .spotlight-card.active {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      transform: translate(-50%, -50%) scale(var(--card-scale, 1));
       pointer-events: auto;
     }
 
@@ -569,12 +569,14 @@
       }
       backdrop.classList.add('active');
 
-      // Activate card and apply dynamic textPosition from guest request
+      // Activate card and apply dynamic textPosition and textScale from guest request
       const card = document.getElementById('spotlight-card');
       const posX = (data.textPosition && typeof data.textPosition.x === 'number') ? data.textPosition.x : 50;
       const posY = (data.textPosition && typeof data.textPosition.y === 'number') ? data.textPosition.y : 75;
+      const scale = (typeof data.textScale === 'number' && data.textScale > 0) ? data.textScale : 1.0;
       card.style.left = `${posX}%`;
       card.style.top = `${posY}%`;
+      card.style.setProperty('--card-scale', scale);
       card.classList.add('active');
 
       // Smoothly glide QR code to top-left corner

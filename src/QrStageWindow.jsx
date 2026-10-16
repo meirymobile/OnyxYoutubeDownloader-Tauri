@@ -258,7 +258,7 @@ export default function QrStageWindow() {
         style={{
           left: `${spotlight.textPosition?.x ?? 50}%`,
           top: `${spotlight.textPosition?.y ?? 75}%`,
-          transform: 'translate(-50%, -50%)',
+          transform: `translate(-50%, -50%) scale(${spotlight.textScale ?? 1})`,
         }}
       >
         <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black text-xs tracking-wider shadow-[0_0_25px_rgba(245,158,11,0.4)] animate-pulse mb-3">
