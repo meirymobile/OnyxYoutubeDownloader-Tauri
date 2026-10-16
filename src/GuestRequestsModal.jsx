@@ -6,7 +6,8 @@ import {
   FolderOpen, Music, CheckCircle2, AlertCircle, Clock, Volume2, 
   QrCode, Maximize2, Minimize2, Settings2, User, MessageSquareHeart, Monitor,
   MapPin, Navigation, Compass, Smartphone, Search, Building2, CheckCircle,
-  Tv, Cast, Wifi, Loader2, Sparkles, Camera, Image as ImageIcon
+  Tv, Cast, Wifi, Loader2, Sparkles, Camera, Image as ImageIcon,
+  Eye, Trash2, ShieldAlert
 } from 'lucide-react';
 
 // Popular Israeli event venues & wedding halls for 1-click DJ GPS calibration
@@ -88,11 +89,16 @@ export default function GuestRequestsModal({
   });
   const [requests, setRequests] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('onyx_guest_requests_list') || '[]');
+      const list = JSON.parse(localStorage.getItem('onyx_guest_requests_list') || '[]');
+      return list.map(r => ({
+        ...r,
+        isApproved: r.isApproved ?? (r.status === 'ready' || r.status === 'played' || !!r.filePath)
+      }));
     } catch {
       return [];
     }
   });
+  const [previewItem, setPreviewItem] = useState(null);
 
   // Geofencing State
   const [geoEnabled, setGeoEnabled] = useState(() => {
@@ -1032,9 +1038,9 @@ export default function GuestRequestsModal({
           return;
         }
 
-        // Match against current guest requests
+        // Match against current guest requests (only approved requests)
         const currentReqs = requestsRef.current || [];
-        const matchedReq = currentReqs.find(r => isSongMatch(masterDeck, r));
+        const matchedReq = currentReqs.find(r => r.isApproved && isSongMatch(masterDeck, r));
 
         if (matchedReq) {
           if (autoSpotlightReqId !== matchedReq.id) {
@@ -1120,7 +1126,8 @@ export default function GuestRequestsModal({
         textPosition: reqItem.textPosition || { x: 50, y: 75 },
         textScale: reqItem.textScale || 1.0,
         timestamp: reqItem.timestamp || Date.now(),
-        status: 'pending', // 'pending', 'downloading', 'ready', 'played', 'error'
+        isApproved: false,
+        status: 'needs_review', // 'needs_review', 'downloading', 'ready', 'played', 'error'
         jobId: null,
         filePath: null
       };
@@ -1128,13 +1135,40 @@ export default function GuestRequestsModal({
       // Play arrival sound
       playChime();
 
-      // Trigger auto-download if active
-      if (autoDownloadRef.current && isActiveRef.current) {
-        setTimeout(() => triggerDownload(newRequest), 100);
-      }
-
+      // Content Moderation Protection:
+      // Song is NOT downloaded and NOT broadcasted until the DJ previews and approves!
       return [newRequest, ...prev];
     });
+  };
+
+  // DJ Content Moderation Handlers: Approve or Reject Guest Request
+  const handleApproveRequest = (item) => {
+    if (!item) return;
+    setRequests(prev => prev.map(r => r.id === item.id ? { 
+      ...r, 
+      isApproved: true,
+      status: 'downloading',
+      percent: 5,
+      progressText: 'מתחיל הורדה...'
+    } : r));
+    triggerDownload({ ...item, isApproved: true });
+    if (previewItem && previewItem.id === item.id) {
+      setPreviewItem(null);
+    }
+  };
+
+  const handleRejectRequest = (item) => {
+    if (!item) return;
+    // Deactivate stage spotlight if this request is currently active on stage
+    if (currentSpotlightId === item.id) {
+      setCurrentSpotlightId(null);
+      broadcastSpotlight({ active: false, timestamp: Date.now() });
+    }
+    // Delete request completely: song is not downloaded, image is discarded, row disappears
+    setRequests(prev => prev.filter(r => r.id !== item.id));
+    if (previewItem && previewItem.id === item.id) {
+      setPreviewItem(null);
+    }
   };
 
   // Trigger Local Download with Sequential Number Prefix & Real-time Progress Tracking
@@ -1769,6 +1803,185 @@ export default function GuestRequestsModal({
         </div>
       )}
 
+      {/* Stage Screen Preview & Moderation Modal */}
+      {previewItem && (
+        <div className="fixed inset-0 z-[250] bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-fadeIn" dir="rtl">
+          <div className="bg-slate-950 border border-purple-500/50 rounded-3xl w-full max-w-4xl max-h-[95vh] flex flex-col shadow-[0_0_80px_rgba(147,51,234,0.35)] overflow-hidden">
+            {/* Preview Header */}
+            <div className="p-4 md:p-5 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-purple-600/20 border border-purple-500/30 text-purple-400">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base md:text-lg font-black text-white flex items-center gap-2">
+                    <span>סינון תוכן ובדיקת תצוגת במה</span>
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                      previewItem.isApproved 
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                    }`}>
+                      {previewItem.isApproved ? '✓ בקשה מאושרת' : '⚠️ ממתין לבדיקה ואישור הדיג\'יי'}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    בדוק שהתמונה, שם המבקש וההקדשה הולמים לפני אישור ההקרנה וההורדה למחשב
+                  </p>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => setPreviewItem(null)} 
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-all"
+                title="סגור תצוגה מקדימה"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Preview Body */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+              {/* Stage Screen Simulation Frame (16:9) */}
+              <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-purple-500/30 bg-[#05020a] shadow-[0_20px_50px_rgba(0,0,0,0.8)] select-none">
+                
+                {/* Background: Either Guest Photo or Cinematic Stage Backdrop */}
+                {previewItem.photo ? (
+                  <div className="absolute inset-0">
+                    <img 
+                      src={previewItem.photo} 
+                      className="w-full h-full object-cover filter brightness-[0.55] contrast-[1.15]" 
+                      alt="Guest Stage Backdrop" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/60" />
+                    <div className="absolute inset-0 shadow-[inset_0_0_100px_rgba(5,2,10,0.9)]" />
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#190933] via-[#05020a] to-[#250d42] flex items-center justify-center">
+                    <div className="w-72 h-72 rounded-full bg-purple-600/10 blur-3xl animate-pulse" />
+                    <div className="w-48 h-48 rounded-full bg-amber-500/10 blur-2xl animate-pulse" />
+                  </div>
+                )}
+
+                {/* Corner QR Badge Simulation (Top-Left) */}
+                <div className="absolute top-3 left-3 z-30 p-2 bg-white rounded-xl shadow-xl flex flex-col items-center scale-75 origin-top-left pointer-events-none border border-purple-200">
+                  {qrDataUrl && <img src={qrDataUrl} className="w-16 h-16 object-contain" alt="QR" />}
+                  <span className="text-[9px] font-black font-mono text-black mt-0.5">סרקו גם אתם!</span>
+                </div>
+
+                {/* Dynamic Spotlight Card with Exact Position and Scale */}
+                <div 
+                  className="absolute z-20 pointer-events-none transition-all duration-300"
+                  style={{
+                    left: `${(previewItem.textPosition && typeof previewItem.textPosition.x === 'number') ? previewItem.textPosition.x : 50}%`,
+                    top: `${(previewItem.textPosition && typeof previewItem.textPosition.y === 'number') ? previewItem.textPosition.y : 75}%`,
+                    transform: `translate(-50%, -50%) scale(${(typeof previewItem.textScale === 'number' && previewItem.textScale > 0) ? previewItem.textScale : 1.0})`,
+                    maxWidth: '85%'
+                  }}
+                >
+                  <div className="px-5 py-4 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(168,85,247,0.3)] text-center">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[10px] sm:text-xs font-black tracking-wider mb-2">
+                      <span>✨</span>
+                      <span>מתנגן עכשיו לבקשת הקהל!</span>
+                      <span>✨</span>
+                    </div>
+
+                    <h4 className="text-sm sm:text-lg md:text-xl font-extrabold text-white leading-tight mb-1 drop-shadow-md">
+                      {previewItem.title}
+                    </h4>
+
+                    <div className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-200 bg-black/40 px-3 py-1 rounded-xl border border-white/10 my-1">
+                      <span>❤️</span>
+                      <span>הוקדש באהבה על ידי:</span>
+                      <span className="text-cyan-400 font-extrabold">{previewItem.requester || 'אורח ברחבה'}</span>
+                    </div>
+
+                    {previewItem.note && previewItem.note.trim() && (
+                      <div className="mt-2 text-xs sm:text-sm font-bold text-amber-200 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-xl italic">
+                        “{previewItem.note}”
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 16:9 Screen Badge */}
+                <div className="absolute bottom-2 right-2 text-[10px] font-mono font-bold text-slate-400 bg-black/70 px-2 py-0.5 rounded-md border border-slate-700 pointer-events-none">
+                  תצוגת במה 16:9 🖥️
+                </div>
+              </div>
+
+              {/* Metadata & Content Inspection Box */}
+              <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="space-y-1.5">
+                  <div className="text-slate-400 font-bold">פרטי שיר ומקור:</div>
+                  <div className="text-white font-bold text-sm truncate">{previewItem.title}</div>
+                  <div className="text-slate-400 font-mono">{previewItem.channel || 'חיפוש יוטיוב'}</div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="text-slate-400 font-bold">פרטי מבקש ותמונה:</div>
+                  <div className="text-cyan-300 font-bold">{previewItem.requester}</div>
+                  <div className="flex items-center gap-2">
+                    {previewItem.photo ? (
+                      <span className="text-pink-400 font-bold flex items-center gap-1">
+                        <Camera className="w-3.5 h-3.5" /> צורפה תמונה מהאירוע (מוצגת ברקע)
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">ללא תמונה מצורפת (יוצג רקע במה דיפולטיבי)</span>
+                    )}
+                  </div>
+                  {previewItem.note && (
+                    <div className="text-amber-300 font-medium">הקדשה: "{previewItem.note}"</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div className="p-4 md:p-5 border-t border-slate-800 bg-slate-900/90 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              {/* Reject Button (Always Available) */}
+              <button 
+                onClick={() => handleRejectRequest(previewItem)}
+                className="px-5 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
+                title="מחק בקשה לחלוטין - השיר לא יורד והתמונה נמחקת"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>✕ דחה ומחק בקשה (תוכן לא הולם)</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setPreviewItem(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                >
+                  סגור
+                </button>
+
+                {!previewItem.isApproved ? (
+                  <button 
+                    onClick={() => handleApproveRequest(previewItem)}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-[0_0_25px_rgba(16,185,129,0.4)] text-xs font-black flex items-center gap-2 transition-all active:scale-95"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>✓ אשר בקשה והורד שיר ⬇️</span>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      toggleManualSpotlight(previewItem);
+                      setPreviewItem(null);
+                    }}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white shadow-[0_0_25px_rgba(168,85,247,0.4)] text-xs font-black flex items-center gap-2 transition-all active:scale-95"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>{currentSpotlightId === previewItem.id ? 'הפסק הקרנה בבמה' : '✦ הקרן כעת למסך הבמה'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Modal Card */}
       <div className={`w-full bg-slate-950 border border-slate-800 shadow-2xl flex flex-col overflow-hidden relative transition-all duration-200 ${
         isModalMaximized 
@@ -1952,175 +2165,249 @@ export default function GuestRequestsModal({
                   </button>
                 </div>
               ) : (
-                requests.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                      item.status === 'played'
-                        ? 'bg-slate-950/40 border-slate-900 opacity-60'
-                        : item.status === 'ready'
-                        ? 'bg-slate-900/80 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                        : 'bg-slate-900/60 border-slate-800'
-                    }`}
-                  >
-                    {/* Number Badge & Track Meta */}
-                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                      {/* Sequential Number */}
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 font-black text-base flex items-center justify-center shrink-0 shadow-md font-mono">
-                        {item.formattedNum}
-                      </div>
-
-                      {/* Thumbnail or Guest Live Photo */}
-                      <div className="relative shrink-0">
-                        <img 
-                          src={item.photo || item.thumbnail} 
-                          className="w-14 h-10 object-cover rounded-lg bg-black border border-slate-800" 
-                          alt=""
-                        />
-                        {item.photo && (
-                          <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white p-0.5 rounded-full shadow-md" title="האורח צירף תמונה אמיתית מהאירוע!">
-                            <Camera className="w-2.5 h-2.5" />
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Title & Requester Details */}
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs md:text-sm font-bold text-white truncate" title={item.title}>
-                          {item.title}
+                <div className="space-y-3">
+                  {/* Content Moderation Safety Alert Banner if any unapproved requests */}
+                  {requests.some(r => !r.isApproved) && (
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/10 border border-amber-500/40 text-amber-200 text-xs font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm animate-fadeIn">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300">
+                          <ShieldAlert className="w-4 h-4 animate-bounce" />
                         </div>
-                        
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px]">
-                          <span className="text-slate-400 flex items-center gap-1 font-semibold">
-                            <User className="w-3 h-3 text-purple-400" />
-                            {item.requester}
-                          </span>
+                        <div>
+                          <span className="text-amber-300 font-extrabold">סינון תוכן פוגעני פעיל: </span>
+                          <span>יש {requests.filter(r => !r.isApproved).length} בקשות שירים הממתינות לתצוגה מקדימה ואישור הדיג'יי לפני הורדה והקרנה.</span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 shrink-0 self-start sm:self-auto">
+                        מצב בטוח 🛡️
+                      </span>
+                    </div>
+                  )}
 
-                          {item.note && (
-                            <span className="text-amber-300/90 flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                              <MessageSquareHeart className="w-3 h-3 text-amber-400" />
-                              "{item.note}"
-                            </span>
-                          )}
+                  {requests.map((item) => (
+                    <div 
+                      key={item.id} 
+                      className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                        !item.isApproved
+                          ? 'bg-amber-950/20 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.08)]'
+                          : item.status === 'played'
+                          ? 'bg-slate-950/40 border-slate-900 opacity-60'
+                          : item.status === 'ready'
+                          ? 'bg-slate-900/80 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                          : 'bg-slate-900/60 border-slate-800'
+                      }`}
+                    >
+                      {/* Number Badge & Track Meta */}
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        {/* Sequential Number */}
+                        <div className={`w-10 h-10 rounded-xl font-black text-base flex items-center justify-center shrink-0 shadow-md font-mono ${
+                          !item.isApproved 
+                            ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 ring-2 ring-amber-400/50' 
+                            : 'bg-gradient-to-br from-purple-500 to-indigo-600 text-white'
+                        }`}>
+                          {item.formattedNum}
+                        </div>
 
+                        {/* Thumbnail or Guest Live Photo */}
+                        <div className="relative shrink-0 cursor-pointer" onClick={() => setPreviewItem(item)} title="לחץ לתצוגה מקדימה של המסך">
+                          <img 
+                            src={item.photo || item.thumbnail} 
+                            className="w-14 h-10 object-cover rounded-lg bg-black border border-slate-800 hover:border-purple-400 transition-all" 
+                            alt=""
+                          />
                           {item.photo && (
-                            <span className="text-pink-300 flex items-center gap-1 bg-pink-500/10 px-2 py-0.5 rounded-md border border-pink-500/20">
-                              <Camera className="w-3 h-3 text-pink-400" />
-                              תמונת אורח צורפה 📸
+                            <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white p-0.5 rounded-full shadow-md" title="האורח צירף תמונה אמיתית מהאירוע!">
+                              <Camera className="w-2.5 h-2.5" />
                             </span>
                           )}
                         </div>
 
-                        {/* Live Download Progress Bar & Status Text */}
-                        {item.status === 'downloading' && (
-                          <div className="mt-2.5 w-full bg-slate-950/80 p-2.5 rounded-xl border border-amber-500/30 shadow-inner">
-                            <div className="flex justify-between items-center text-[11px] font-mono mb-1.5">
-                              <span className="text-amber-300 font-bold truncate flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
-                                {item.progressText || 'מוריד קובץ שמע...'}
+                        {/* Title & Requester Details */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs md:text-sm font-bold text-white truncate" title={item.title}>
+                              {item.title}
+                            </span>
+                            {!item.isApproved && (
+                              <span className="text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 animate-pulse">
+                                <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
+                                ממתין לאישור
                               </span>
-                              <span className="text-amber-400 font-black text-xs font-mono ml-2 shrink-0">
-                                {item.percent || 0}%
-                              </span>
-                            </div>
-                            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
-                              <div 
-                                className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-400 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(245,158,11,0.6)]" 
-                                style={{ width: `${Math.max(5, item.percent || 0)}%` }}
-                              />
-                            </div>
+                            )}
                           </div>
+                          
+                          <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px]">
+                            <span className="text-slate-400 flex items-center gap-1 font-semibold">
+                              <User className="w-3 h-3 text-purple-400" />
+                              {item.requester}
+                            </span>
+
+                            {item.note && (
+                              <span className="text-amber-300/90 flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 truncate max-w-[200px]" title={item.note}>
+                                <MessageSquareHeart className="w-3 h-3 text-amber-400 shrink-0" />
+                                "{item.note}"
+                              </span>
+                            )}
+
+                            {item.photo && (
+                              <span className="text-pink-300 flex items-center gap-1 bg-pink-500/10 px-2 py-0.5 rounded-md border border-pink-500/20">
+                                <Camera className="w-3 h-3 text-pink-400" />
+                                תמונה צורפה 📸
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Live Download Progress Bar & Status Text */}
+                          {item.status === 'downloading' && (
+                            <div className="mt-2.5 w-full bg-slate-950/80 p-2.5 rounded-xl border border-amber-500/30 shadow-inner">
+                              <div className="flex justify-between items-center text-[11px] font-mono mb-1.5">
+                                <span className="text-amber-300 font-bold truncate flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+                                  {item.progressText || 'מוריד קובץ שמע...'}
+                                </span>
+                                <span className="text-amber-400 font-black text-xs font-mono ml-2 shrink-0">
+                                  {item.percent || 0}%
+                                </span>
+                              </div>
+                              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
+                                <div 
+                                  className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-400 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(245,158,11,0.6)]" 
+                                  style={{ width: `${Math.max(5, item.percent || 0)}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Status & Action Buttons */}
+                      <div className="flex items-center gap-1.5 md:gap-2 shrink-0 self-end sm:self-center">
+                        
+                        {/* Always visible: Preview Button for DJ Stage Verification */}
+                        <button
+                          onClick={() => setPreviewItem(item)}
+                          className={`p-2 sm:px-3 sm:py-1.5 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold border shadow-sm active:scale-95 ${
+                            !item.isApproved
+                              ? 'bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-black border-amber-500/50 animate-pulse'
+                              : 'bg-slate-800/80 hover:bg-slate-700 text-purple-300 hover:text-white border-purple-500/30'
+                          }`}
+                          title="תצוגה מקדימה של הבמה והמסך (כולל תמונה, מיקום והקדשה)"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">תצוגה מקדימה</span>
+                        </button>
+
+                        {/* Unapproved Actions: Approve & Reject */}
+                        {!item.isApproved ? (
+                          <>
+                            <button
+                              onClick={() => handleApproveRequest(item)}
+                              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/40 text-xs font-black flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95"
+                              title="אשר את הבקשה והתחל הורדה מיידית למחשב"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>אשר והורד ✓</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleRejectRequest(item)}
+                              className="p-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold flex items-center justify-center transition-all active:scale-95"
+                              title="דחה בקשה: השיר לא יורד, התמונה נמחקת והבקשה מוסרת לחלוטין"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          /* Approved Item Actions */
+                          <>
+                            {/* Live Stage Spotlight Button */}
+                            <button 
+                              onClick={() => toggleManualSpotlight(item)}
+                              className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold border ${
+                                currentSpotlightId === item.id
+                                  ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.6)] animate-pulse'
+                                  : 'bg-slate-800/80 hover:bg-purple-900/40 text-purple-300 hover:text-white border-purple-500/30'
+                              }`}
+                              title={currentSpotlightId === item.id ? 'השיר מוקרן כעת על מסך הבמה! לחץ לביטול' : 'הקרן שיר, תמונה והקדשה זו למסך הבמה בלייב'}
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span className="hidden md:inline">
+                                {currentSpotlightId === item.id ? 'מוקרן בבמה ✦' : 'הקרן לבמה'}
+                              </span>
+                            </button>
+
+                            {/* Status Indicator */}
+                            {item.status === 'downloading' && (
+                              <span className="text-xs font-mono font-black text-amber-300 flex items-center gap-1.5 bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-500/40 shadow-sm animate-pulse">
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                                <span>{item.percent ? `${item.percent}%` : 'מוריד...'}</span>
+                              </span>
+                            )}
+
+                            {item.status === 'ready' && (
+                              <span className="text-[11px] font-mono font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                                <CheckCircle2 className="w-3 h-3" /> מוכן
+                              </span>
+                            )}
+
+                            {item.status === 'error' && (
+                              <button 
+                                onClick={() => triggerDownload(item)}
+                                className="text-[11px] font-bold text-rose-300 flex items-center gap-1 bg-rose-500/20 px-2.5 py-1 rounded-lg border border-rose-500/40 hover:bg-rose-500/30"
+                              >
+                                <AlertCircle className="w-3 h-3" /> נסה שוב
+                              </button>
+                            )}
+
+                            {/* Play Button */}
+                            {item.filePath && onPlayInternal && (
+                              <button 
+                                onClick={() => onPlayInternal(item.filePath, `${item.formattedNum} - ${item.title}`)}
+                                className="p-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-md transition-all active:scale-95"
+                                title="השמע בנגן הפנימי"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                              </button>
+                            )}
+
+                            {/* Open File Folder */}
+                            {item.filePath && onOpenPath && (
+                              <button 
+                                onClick={() => onOpenPath(item.filePath)}
+                                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
+                                title="פתח מיקום קובץ במחשב"
+                              >
+                                <FolderOpen className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+
+                            {/* Mark as Played Button */}
+                            <button 
+                              onClick={() => markAsPlayed(item.id)}
+                              className={`p-2 rounded-xl border transition-all text-xs flex items-center gap-1 font-bold ${
+                                item.status === 'played'
+                                  ? 'bg-slate-800 text-slate-400 border-slate-700'
+                                  : 'bg-slate-850 hover:bg-slate-800 text-slate-300 border-slate-800'
+                              }`}
+                              title={item.status === 'played' ? 'סמן כלא נוגן' : 'סמן כנוגן'}
+                            >
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            </button>
+
+                            {/* Delete/Reject Request Button */}
+                            <button
+                              onClick={() => handleRejectRequest(item)}
+                              className="p-2 rounded-xl bg-slate-850 hover:bg-rose-600/30 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-500/40 transition-all"
+                              title="מחק בקשה זו מהרשימה"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
-
-                    {/* Status & Action Buttons */}
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                      {/* Live Stage Spotlight Button */}
-                      <button 
-                        onClick={() => toggleManualSpotlight(item)}
-                        className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold border ${
-                          currentSpotlightId === item.id
-                            ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.6)] animate-pulse'
-                            : 'bg-slate-800/80 hover:bg-purple-900/40 text-purple-300 hover:text-white border-purple-500/30'
-                        }`}
-                        title={currentSpotlightId === item.id ? 'השיר מוקרן כעת על מסך הבמה! לחץ לביטול' : 'הקרן שיר, תמונה והקדשה זו למסך הבמה בלייב'}
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span className="hidden md:inline">
-                          {currentSpotlightId === item.id ? 'מוקרן בבמה ✦' : 'הקרן לבמה'}
-                        </span>
-                      </button>
-
-                      {/* Status Indicator */}
-                      {item.status === 'downloading' && (
-                        <span className="text-xs font-mono font-black text-amber-300 flex items-center gap-1.5 bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-500/40 shadow-sm animate-pulse">
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                          <span>{item.percent ? `${item.percent}%` : 'מוריד...'}</span>
-                        </span>
-                      )}
-
-                      {item.status === 'ready' && (
-                        <span className="text-[11px] font-mono font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/30">
-                          <CheckCircle2 className="w-3 h-3" /> מוכן
-                        </span>
-                      )}
-
-                      {item.status === 'error' && (
-                        <button 
-                          onClick={() => triggerDownload(item)}
-                          className="text-[11px] font-bold text-rose-300 flex items-center gap-1 bg-rose-500/20 px-2.5 py-1 rounded-lg border border-rose-500/40 hover:bg-rose-500/30"
-                        >
-                          <AlertCircle className="w-3 h-3" /> נסה שוב
-                        </button>
-                      )}
-
-                      {item.status === 'pending' && (
-                        <button 
-                          onClick={() => triggerDownload(item)}
-                          className="text-[11px] font-bold text-purple-300 flex items-center gap-1 bg-purple-600/20 px-2.5 py-1 rounded-lg border border-purple-500/40 hover:bg-purple-600/30"
-                        >
-                          הורד עכשיו ⬇️
-                        </button>
-                      )}
-
-                      {/* Play Button */}
-                      {item.filePath && onPlayInternal && (
-                        <button 
-                          onClick={() => onPlayInternal(item.filePath, `${item.formattedNum} - ${item.title}`)}
-                          className="p-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-md transition-all active:scale-95"
-                          title="השמע בנגן הפנימי"
-                        >
-                          <Play className="w-3.5 h-3.5 fill-current" />
-                        </button>
-                      )}
-
-                      {/* Open File Folder */}
-                      {item.filePath && onOpenPath && (
-                        <button 
-                          onClick={() => onOpenPath(item.filePath)}
-                          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
-                          title="פתח מיקום קובץ במחשב"
-                        >
-                          <FolderOpen className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-
-                      {/* Mark as Played Button */}
-                      <button 
-                        onClick={() => markAsPlayed(item.id)}
-                        className={`p-2 rounded-xl border transition-all text-xs flex items-center gap-1 font-bold ${
-                          item.status === 'played'
-                            ? 'bg-slate-800 text-slate-400 border-slate-700'
-                            : 'bg-slate-850 hover:bg-slate-800 text-slate-300 border-slate-800'
-                        }`}
-                        title={item.status === 'played' ? 'סמן כלא נוגן' : 'סמן כנוגן'}
-                      >
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -2424,8 +2711,11 @@ export default function GuestRequestsModal({
                       channel: 'Omer Adam Official',
                       url: 'https://www.youtube.com/watch?v=mock',
                       thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=120',
-                      requester: 'רועי ומיכל',
-                      note: 'מזל טוב לכולם!'
+                      photo: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200',
+                      requester: 'רועי ומיכל מהרחבה',
+                      note: 'מזל טוב מכל הלב! אוהבים אתכם!',
+                      textPosition: { x: 50, y: 75 },
+                      textScale: 1.0
                     });
                     setActiveTab('list');
                   }}
