@@ -607,6 +607,57 @@ def update_plugins():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ----------------------------------------------------
+# WIRELESS SCREEN CASTING ENDPOINTS (AirPlay & Google Cast)
+# ----------------------------------------------------
+try:
+    import cast_service
+except ImportError:
+    from backend import cast_service
+
+@app.get("/api/cast/devices")
+async def get_cast_devices():
+    """Scans and returns all wireless screens (Chromecast, Android TV, AirPlay) on local network."""
+    try:
+        devices = cast_service.scan_wireless_devices(timeout=2.0)
+        return {"status": "success", "devices": devices}
+    except Exception as e:
+        logger.error(f"Error scanning wireless screens: {e}")
+        return {"status": "error", "devices": [], "message": str(e)}
+
+@app.post("/api/cast/start")
+async def start_wireless_cast(req: Request):
+    """Starts broadcasting the Stage QR view to the chosen wireless display."""
+    try:
+        data = await req.json()
+        device_id = data.get("device_id")
+        target_url = data.get("target_url")
+        if not device_id or not target_url:
+            raise HTTPException(status_code=400, detail="device_id and target_url required")
+        res = cast_service.start_cast(device_id, target_url)
+        return {"status": "success", "result": res}
+    except Exception as e:
+        logger.error(f"Error starting wireless cast: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/cast/stop")
+async def stop_wireless_cast():
+    """Stops the active cast session."""
+    try:
+        cast_service.stop_cast()
+        return {"status": "success", "message": "Cast session stopped"}
+    except Exception as e:
+        logger.error(f"Error stopping wireless cast: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/cast/status")
+async def get_cast_status_endpoint():
+    """Returns current cast status."""
+    try:
+        return {"status": "success", "cast": cast_service.get_cast_status()}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 
 if __name__ == "__main__":
     # Mount React frontend if dist exists

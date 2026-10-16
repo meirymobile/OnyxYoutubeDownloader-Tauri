@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Onyx - Stage QR Display</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800;900&family=Space+Grotesk:wght@700;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #05020a;
+      color: #fff;
+      font-family: 'Assistant', sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Ambient Spotlight Background Canvas */
+    #bg-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      opacity: 0.65;
+      pointer-events: none;
+    }
+
+    /* Floating Content Container */
+    .stage-container {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 24px;
+      max-width: 900px;
+      width: 90%;
+      animation: fadeIn 0.8s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    /* DJ Header */
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 24px;
+      border-radius: 999px;
+      background: rgba(147, 51, 234, 0.15);
+      border: 1px solid rgba(147, 51, 234, 0.4);
+      color: #c084fc;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      margin-bottom: 16px;
+      box-shadow: 0 0 30px rgba(147, 51, 234, 0.2);
+    }
+    .live-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 15px #10b981;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .dj-names {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 56px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #ffffff 0%, #facc15 50%, #ec4899 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+      letter-spacing: -1px;
+      text-shadow: 0 0 60px rgba(250, 204, 21, 0.3);
+    }
+
+    .stage-subtitle {
+      font-size: 24px;
+      font-weight: 800;
+      color: #e2e8f0;
+      margin-bottom: 24px;
+      line-height: 1.4;
+    }
+
+    /* Ultra-High-Contrast QR Box */
+    .qr-card-glow {
+      position: relative;
+      padding: 24px;
+      background: #ffffff;
+      border-radius: 36px;
+      box-shadow: 0 0 80px rgba(168, 85, 247, 0.45), 0 20px 40px rgba(0, 0, 0, 0.8);
+      margin-bottom: 24px;
+      transition: transform 0.3s;
+    }
+    .qr-card-glow:hover {
+      transform: scale(1.02);
+    }
+    #qrcode {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #qrcode img {
+      width: 280px;
+      height: 280px;
+      display: block;
+    }
+    @media (min-height: 800px) {
+      #qrcode img {
+        width: 320px;
+        height: 320px;
+      }
+    }
+
+    /* Action Steps Footer */
+    .instructions-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: rgba(18, 10, 31, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px 28px;
+      border-radius: 20px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .instruction-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 800;
+      color: #cbd5e1;
+    }
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #9333ea;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    /* Live Song Request Toast Popup */
+    .request-toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(15, 7, 26, 0.95);
+      border: 2px solid #a855f7;
+      padding: 14px 28px;
+      border-radius: 24px;
+      box-shadow: 0 0 50px rgba(168, 85, 247, 0.6);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      opacity: 0;
+      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 100;
+      backdrop-filter: blur(20px);
+    }
+    .request-toast.active {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    .toast-thumb {
+      width: 58px;
+      height: 58px;
+      border-radius: 14px;
+      object-fit: cover;
+      border: 2px solid #facc15;
+    }
+    .toast-info {
+      text-align: right;
+    }
+    .toast-requester {
+      font-size: 13px;
+      color: #facc15;
+      font-weight: 800;
+    }
+    .toast-title {
+      font-size: 18px;
+      color: #fff;
+      font-weight: 900;
+      max-width: 400px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Fullscreen Button */
+    .fs-toggle-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 20;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+      backdrop-filter: blur(8px);
+      transition: background 0.2s;
+    }
+    .fs-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+
+  <button class="fs-toggle-btn" onclick="toggleFullScreen()">⛶ מסך מלא</button>
+
+  <div class="stage-container">
+    <div class="brand-badge">
+      <span class="live-pulse"></span>
+      <span class="live-dot"></span>
+      <span id="room-badge-text">עמדת בקשות שירים בלייב &bull; חדר SHAZZ-SONIC</span>
+    </div>
+
+    <h1 class="dj-names" id="dj-names-text">DJ Shazz &amp; DJ Sonic</h1>
+    <div class="stage-subtitle">סרקו עכשיו מהסמארטפון ובקשו שיר שיושמע ברחבה! 🎵</div>
+
+    <div class="qr-card-glow">
+      <div id="qrcode"></div>
+    </div>
+
+    <div class="instructions-bar">
+      <div class="instruction-step">
+        <span class="step-num">1</span>
+        <span>פותחים מצלמה בנייד</span>
+      </div>
+      <div style="color: #64748b;">&bull;</div>
+      <div class="instruction-step">
+        <span class="step-num">2</span>
+        <span>סורקים את הברקוד</span>
+      </div>
+      <div style="color: #64748b;">&bull;</div>
+      <div class="instruction-step">
+        <span class="step-num">3</span>
+        <span>בוחרים שיר ביוטיוב</span>
+      </div>
+      <div style="color: #64748b;">&bull;</div>
+      <div class="instruction-step" style="color: #facc15;">
+        <span class="step-num" style="background: #facc15; color: #000;">4</span>
+        <span>רוקדים לצלילי השיר! 🚀</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Toast Popup for incoming guest requests -->
+  <div id="request-toast" class="request-toast">
+    <img id="toast-thumb" class="toast-thumb" src="" alt="" />
+    <div class="toast-info">
+      <div id="toast-requester" class="toast-requester">אורח ביקש שיר עכשיו:</div>
+      <div id="toast-title" class="toast-title">שיר לדוגמה</div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = (urlParams.get('room') || 'SHAZZ-SONIC').toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+    const djNames = urlParams.get('dj') || 'DJ Shazz & DJ Sonic';
+
+    document.getElementById('room-badge-text').innerText = `עמדת בקשות שירים בלייב • חדר ${roomCode}`;
+    document.getElementById('dj-names-text').innerText = djNames;
+
+    // Construct target URL for guests
+    const guestUrl = `${window.location.origin}/?room=${encodeURIComponent(roomCode)}&live=true`;
+
+    // Render QR Code
+    new QRCode(document.getElementById("qrcode"), {
+      text: guestUrl,
+      width: 320,
+      height: 320,
+      colorDark: "#07020d",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    // Realtime MQTT Listener for incoming requests
+    function initMqttListener() {
+      try {
+        const clientId = 'stage_' + Math.random().toString(36).substring(2, 9);
+        const client = new Paho.MQTT.Client('broker.hivemq.com', 8884, '/mqtt', clientId);
+
+        client.onMessageArrived = (message) => {
+          try {
+            const payload = JSON.parse(message.payloadString);
+            if (payload && payload.title) {
+              showToast(payload);
+            }
+          } catch(e) {}
+        };
+
+        client.connect({
+          useSSL: true,
+          timeout: 5,
+          cleanSession: true,
+          onSuccess: () => {
+            client.subscribe(`onyx/requests/${roomCode}`, { qos: 0 });
+          },
+          onFailure: () => {
+            setTimeout(initMqttListener, 4000);
+          }
+        });
+      } catch(err) {
+        console.warn('MQTT stage connect err:', err);
+      }
+    }
+
+    let toastTimer = null;
+    function showToast(req) {
+      const toast = document.getElementById('request-toast');
+      document.getElementById('toast-requester').innerText = `🎉 ${req.requester || 'אורח ברחבה'} ביקש שיר עכשיו:`;
+      document.getElementById('toast-title').innerText = req.title;
+      document.getElementById('toast-thumb').src = req.thumbnail || 'favicon.png';
+
+      toast.classList.add('active');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('active');
+      }, 6000);
+    }
+
+    initMqttListener();
+
+    // Ambient Spotlight Animation on Canvas
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    let angle = 0;
+    function drawBeams() {
+      requestAnimationFrame(drawBeams);
+      angle += 0.012;
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Spotlight 1 (Purple)
+      const x1 = w * 0.3 + Math.sin(angle) * 180;
+      const y1 = h * 0.4 + Math.cos(angle * 0.8) * 120;
+      const grad1 = ctx.createRadialGradient(x1, y1, 10, x1, y1, w * 0.45);
+      grad1.addColorStop(0, 'rgba(147, 51, 234, 0.25)');
+      grad1.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad1;
+      ctx.fillRect(0, 0, w, h);
+
+      // Spotlight 2 (Amber / Gold)
+      const x2 = w * 0.7 - Math.cos(angle * 1.2) * 180;
+      const y2 = h * 0.6 - Math.sin(angle * 0.9) * 120;
+      const grad2 = ctx.createRadialGradient(x2, y2, 10, x2, y2, w * 0.4);
+      grad2.addColorStop(0, 'rgba(245, 158, 11, 0.2)');
+      grad2.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad2;
+      ctx.fillRect(0, 0, w, h);
+    }
+    drawBeams();
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+  </script>
+</body>
+</html>

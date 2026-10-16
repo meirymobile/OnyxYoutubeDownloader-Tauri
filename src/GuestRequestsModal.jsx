@@ -5,7 +5,8 @@ import {
   X, Radio, Power, RefreshCw, Copy, Check, ExternalLink, Play, 
   FolderOpen, Music, CheckCircle2, AlertCircle, Clock, Volume2, 
   QrCode, Maximize2, Minimize2, Settings2, User, MessageSquareHeart, Monitor,
-  MapPin, Navigation, Compass, Smartphone, Search, Building2, CheckCircle
+  MapPin, Navigation, Compass, Smartphone, Search, Building2, CheckCircle,
+  Tv, Cast, Wifi, Loader2, Sparkles
 } from 'lucide-react';
 
 // Popular Israeli event venues & wedding halls for 1-click DJ GPS calibration
@@ -117,6 +118,15 @@ export default function GuestRequestsModal({
   const [isCopied, setIsCopied] = useState(false);
   const [isBigQr, setIsBigQr] = useState(false);
   const [isModalMaximized, setIsModalMaximized] = useState(false);
+
+  // Wireless Screen Casting & Projector States
+  const [showCastModal, setShowCastModal] = useState(false);
+  const [screenDevices, setScreenDevices] = useState([]);
+  const [isScanningScreens, setIsScanningScreens] = useState(false);
+  const [activeCastDevice, setActiveCastDevice] = useState(null);
+  const [isCastingLoading, setIsCastingLoading] = useState(false);
+  const [castMessage, setCastMessage] = useState(null);
+  const [copiedStageUrl, setCopiedStageUrl] = useState(false);
 
   // Synchronized Refs to avoid stale closures in MQTT listeners
   const isActiveRef = useRef(isActive);
@@ -1082,6 +1092,126 @@ export default function GuestRequestsModal({
     });
   };
 
+  // Stage QR URL for wireless screens and TV browsers
+  const stageDisplayUrl = `${webHostUrl}/stage.html?room=${encodeURIComponent(roomCode)}&dj=${encodeURIComponent(djNames)}`;
+
+  // Scan all screens (unified Google Cast, AirPlay, and system monitors)
+  const scanAllScreens = async () => {
+    setIsScanningScreens(true);
+    setCastMessage(null);
+    const combinedDevices = [];
+
+    // 1. Scan system monitors (Tauri)
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const monitors = await invoke('get_available_monitors');
+      if (Array.isArray(monitors)) {
+        monitors.forEach((m, idx) => {
+          combinedDevices.push({
+            id: m.id || `monitor_${idx}`,
+            name: m.is_primary ? `${m.name} (מסך מחשב ראשי)` : `${m.name} (מקרן / מסך חיצוני)`,
+            model: `${m.width}x${m.height}`,
+            type: 'monitor',
+            protocol: 'מקרן / מסך מחובר',
+            monitorIndex: idx,
+            isPrimary: m.is_primary,
+            status: 'ready'
+          });
+        });
+      }
+    } catch (e) {
+      console.warn("Tauri monitors scan skipped or unavailable:", e);
+    }
+
+    // 2. Scan wireless devices via Python backend (Chromecast, Android TV, Google TV, AirPlay)
+    try {
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/cast/devices`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.devices)) {
+          data.devices.forEach(dev => {
+            combinedDevices.push(dev);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Backend wireless scan error:", e);
+    }
+
+    // 3. Check current cast status from backend
+    try {
+      const statusRes = await fetch(`http://127.0.0.1:${serverPort}/api/cast/status`);
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        if (statusData?.cast?.is_casting && statusData.cast.device) {
+          setActiveCastDevice(statusData.cast.device);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    setScreenDevices(combinedDevices);
+    setIsScanningScreens(false);
+  };
+
+  // Start broadcast to selected screen
+  const startCastToDevice = async (device) => {
+    setIsCastingLoading(true);
+    setCastMessage(null);
+    try {
+      if (device.type === 'monitor') {
+        // Physical / AirPlay connected screen via Tauri
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('open_qr_stage_on_monitor', { monitorIndex: device.monitorIndex, fullscreen: true });
+        setActiveCastDevice(device);
+        setCastMessage({ type: 'success', text: `המסך נפתח בהצלחה על: ${device.name} 🚀` });
+      } else {
+        // Wireless Google Cast / AirPlay via Python backend
+        const res = await fetch(`http://127.0.0.1:${serverPort}/api/cast/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            device_id: device.id,
+            target_url: stageDisplayUrl
+          })
+        });
+        const resData = await res.json();
+        if (res.ok && resData.status === 'success') {
+          setActiveCastDevice(device);
+          setCastMessage({ type: 'success', text: `משדר כעת בהצלחה אל ${device.name}! 📡` });
+        } else {
+          setCastMessage({ type: 'error', text: resData.message || 'שגיאה בהתחברות למסך האלחוטי' });
+        }
+      }
+    } catch (err) {
+      console.error("Cast error:", err);
+      setCastMessage({ type: 'error', text: `שגיאה בהפעלת השידור: ${err.message || err}` });
+    } finally {
+      setIsCastingLoading(false);
+    }
+  };
+
+  // Stop broadcast
+  const stopCastBroadcast = async () => {
+    setIsCastingLoading(true);
+    try {
+      await fetch(`http://127.0.0.1:${serverPort}/api/cast/stop`, { method: 'POST' });
+      setActiveCastDevice(null);
+      setCastMessage({ type: 'info', text: 'השידור האלחוטי הופסק.' });
+    } catch (err) {
+      console.error("Stop cast error:", err);
+    } finally {
+      setIsCastingLoading(false);
+    }
+  };
+
+  const copyStageDisplayUrl = () => {
+    navigator.clipboard.writeText(stageDisplayUrl);
+    setCopiedStageUrl(true);
+    setTimeout(() => setCopiedStageUrl(false), 2500);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -1121,6 +1251,229 @@ export default function GuestRequestsModal({
             חדר: {roomCode}
           </div>
           <p className="text-xs text-slate-400 font-medium">פותחים מצלמה &bull; סורקים &bull; בוחרים שיר &bull; שומעים ברחבה!</p>
+        </div>
+      )}
+
+      {/* Universal Wireless Display & Screen Cast Modal */}
+      {showCastModal && (
+        <div className="fixed inset-0 z-[160] bg-black/90 backdrop-blur-xl flex items-center justify-center p-3 md:p-6 animate-fadeIn" dir="rtl">
+          <div className="bg-slate-950 border border-amber-500/30 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_0_60px_rgba(245,158,11,0.25)] overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-black font-black shadow-lg">
+                  <Cast className="w-5 h-5 text-black" />
+                </div>
+                <div>
+                  <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
+                    שידור מסך אלחוטי לקהל 📡
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    זיהוי ושידור אוטומטי למסכים ברשת (Android TV, Google TV, Apple TV, Smart TV, מקרנים ומסכים מחוברים)
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowCastModal(false)}
+                className="p-2 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1">
+              
+              {/* Active Broadcast Banner if casting */}
+              {activeCastDevice && (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/80 to-slate-900 border border-emerald-500/50 flex items-center justify-between shadow-lg animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                    <div>
+                      <div className="text-xs font-black text-emerald-400 uppercase tracking-wider">
+                        שידור פעיל כעת ברחבה 🔴
+                      </div>
+                      <div className="text-sm font-bold text-white">
+                        {activeCastDevice.name} ({activeCastDevice.protocol || 'מסך חיצוני'})
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={stopCastBroadcast}
+                    disabled={isCastingLoading}
+                    className="px-3 py-1.5 rounded-xl bg-red-600/80 hover:bg-red-500 text-white text-xs font-black transition-all flex items-center gap-1 active:scale-95 shadow-md"
+                  >
+                    <span>הפסק שידור ⏹️</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Status or Error Feedback Banner */}
+              {castMessage && (
+                <div className={`p-3 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+                  castMessage.type === 'success' 
+                    ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300' 
+                    : castMessage.type === 'error'
+                    ? 'bg-red-950/60 border border-red-500/40 text-red-300'
+                    : 'bg-slate-900 border border-slate-800 text-slate-300'
+                }`}>
+                  <span>{castMessage.text}</span>
+                </div>
+              )}
+
+              {/* Scanning Header & Refresh Button */}
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>מסכים וטלוויזיות שזוהו ברשת ({screenDevices.length})</span>
+                </div>
+                <button
+                  onClick={scanAllScreens}
+                  disabled={isScanningScreens}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isScanningScreens ? 'animate-spin text-amber-400' : ''}`} />
+                  <span>{isScanningScreens ? 'סורק מסכים ברשת...' : 'רענן סריקה 🔄'}</span>
+                </button>
+              </div>
+
+              {/* Devices List */}
+              <div className="space-y-2.5">
+                {isScanningScreens && screenDevices.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-900/50 rounded-2xl border border-slate-800/80 space-y-3">
+                    <Loader2 className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
+                    <p className="text-sm font-bold text-slate-300">סורק מסכים, Apple TV וטלוויזיות ברשת ה-Wi-Fi...</p>
+                    <p className="text-xs text-slate-500">הסריקה מתבצעת באופן אוטומטי מול כל הפרוטוקולים</p>
+                  </div>
+                ) : screenDevices.length > 0 ? (
+                  screenDevices.map((dev) => {
+                    const isCurrent = activeCastDevice && (activeCastDevice.id === dev.id || activeCastDevice.name === dev.name);
+                    return (
+                      <div
+                        key={dev.id}
+                        className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between ${
+                          isCurrent 
+                            ? 'bg-amber-950/20 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)]' 
+                            : 'bg-slate-900/60 hover:bg-slate-900 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                            isCurrent
+                              ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/30'
+                              : 'bg-slate-800 text-amber-400 border border-slate-700'
+                          }`}>
+                            {dev.type === 'tv' ? <Tv className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-white flex items-center gap-2">
+                              <span>{dev.name}</span>
+                              {dev.isPrimary && (
+                                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">
+                                  ראשי
+                                </span>
+                              )}
+                              {isCurrent && (
+                                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
+                                  משדר כעת 🔴
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                              <span>{dev.model || dev.protocol}</span>
+                              <span className="text-slate-600">&bull;</span>
+                              <span className="text-amber-400/80">
+                                {dev.type === 'monitor' ? 'חיבור מקרן / מסך מחשב' : 'שידור אלחוטי ברשת'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          {isCurrent ? (
+                            <button
+                              onClick={stopCastBroadcast}
+                              disabled={isCastingLoading}
+                              className="px-3.5 py-2 rounded-xl bg-red-600/80 hover:bg-red-500 text-white text-xs font-black transition-all shadow-md active:scale-95"
+                            >
+                              נתק שידור ⏹️
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => startCastToDevice(dev)}
+                              disabled={isCastingLoading}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-black text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                            >
+                              <Cast className="w-3.5 h-3.5" />
+                              <span>שדר למסך זה 🚀</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-6 text-center bg-slate-900/40 rounded-2xl border border-slate-800 space-y-2">
+                    <Wifi className="w-8 h-8 text-slate-500 mx-auto" />
+                    <p className="text-sm font-bold text-slate-300">לא זוהו מסכים אלחוטיים או מקרנים פתוחים כרגע</p>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      ודא שהטלוויזיה, ה-Apple TV או ה-Chromecast דולקים ומחוברים לאותה רשת Wi-Fi עם מחשב הדיג'יי.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Universal Smart TV Browser Link Fallback */}
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Tv className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-bold text-white">
+                      טלוויזיה חכמה ללא סטרימר? (Samsung / LG webOS / Fire TV)
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-purple-400 font-mono bg-purple-950/60 px-2 py-0.5 rounded-full border border-purple-500/30">
+                    דפדפן טלוויזיה
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  ניתן לפתוח את דפדפן האינטרנט המובנה בטלוויזיה ולהזין את הכתובת הישירה של הבמה להצגת קוד ה-QR ועדכוני שירים בזמן אמת:
+                </p>
+                <div className="flex items-center gap-2 bg-black/60 p-2 rounded-xl border border-slate-800 font-mono text-xs text-amber-300">
+                  <input
+                    type="text"
+                    readOnly
+                    value={stageDisplayUrl}
+                    className="bg-transparent flex-1 outline-none text-[11px] text-slate-300 select-all"
+                  />
+                  <button
+                    onClick={copyStageDisplayUrl}
+                    className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-black transition-all flex items-center gap-1 shrink-0 active:scale-95"
+                  >
+                    {copiedStageUrl ? <Check className="w-3.5 h-3.5 text-black" /> : <Copy className="w-3.5 h-3.5 text-black" />}
+                    <span>{copiedStageUrl ? 'הועתק!' : 'העתק קישור 📋'}</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-800/80 bg-slate-950/80 flex items-center justify-between text-xs text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                כל הפרוטוקולים נתמכים אוטומטית (AirPlay, Cast, HDMI, Wi-Fi)
+              </span>
+              <button
+                onClick={() => setShowCastModal(false)}
+                className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-all text-xs"
+              >
+                סגור
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
 
@@ -1187,6 +1540,20 @@ export default function GuestRequestsModal({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Universal Wireless Cast Button */}
+            <button 
+              onClick={() => { setShowCastModal(true); scanAllScreens(); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 border ${
+                activeCastDevice 
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-400/40 shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse' 
+                  : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black border-amber-400/40'
+              }`}
+              title="שדר את מסך ה-QR למסכים אלחוטיים, טלוויזיות, Apple TV, מקרנים ומסכים מחוברים"
+            >
+              <Cast className="w-3.5 h-3.5" />
+              <span>{activeCastDevice ? `משדר: ${activeCastDevice.name} 🔴` : 'שידור אלחוטי 📡'}</span>
+            </button>
+
             {/* Open External Stage Window Button */}
             <button 
               onClick={openStageWindow}
@@ -1548,18 +1915,26 @@ export default function GuestRequestsModal({
               {/* External Screen / Projector Launch Buttons */}
               <div className="w-full flex flex-col sm:flex-row gap-2.5">
                 <button
+                  onClick={() => { setShowCastModal(true); scanAllScreens(); }}
+                  className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-xs md:text-sm flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(245,158,11,0.4)] transition-all active:scale-95"
+                >
+                  <Cast className="w-4 h-4 text-black" />
+                  <span>{activeCastDevice ? `משדר אלחוטית: ${activeCastDevice.name} 🔴` : 'שידור אלחוטי למסכים ומקרנים 📡'}</span>
+                </button>
+                <button
                   onClick={openStageWindow}
-                  className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white font-bold text-xs md:text-sm flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(168,85,247,0.4)] transition-all active:scale-95"
+                  className="py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs md:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+                  title="פתח חלון נפרד להצגת קוד ה-QR על מקרן או מסך חיצוני מחובר"
                 >
                   <Monitor className="w-4 h-4" />
-                  <span>פתח חלון למסך חיצוני / מקרן 🖥️</span>
+                  <span>פתח חלון במה 🖥️</span>
                 </button>
                 <button
                   onClick={() => setIsBigQr(true)}
                   className="py-3 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
                 >
                   <Maximize2 className="w-4 h-4" />
-                  <span>תצוגת מסך מלא מהירה</span>
+                  <span>מסך מלא מהיר</span>
                 </button>
               </div>
 

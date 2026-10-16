@@ -363,6 +363,60 @@ fn close_qr_stage_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn get_available_monitors(app: tauri::AppHandle) -> Result<Vec<serde_json::Value>, String> {
+    use tauri::Manager;
+    let mut monitors = Vec::new();
+    if let Ok(list) = app.available_monitors() {
+        for (i, m) in list.iter().enumerate() {
+            let name = m.name().cloned().unwrap_or_else(|| format!("מסך {}", i + 1));
+            let size = m.size();
+            let pos = m.position();
+            let is_primary = i == 0;
+            monitors.push(serde_json::json!({
+                "id": format!("monitor_{}", i),
+                "name": name,
+                "width": size.width,
+                "height": size.height,
+                "x": pos.x,
+                "y": pos.y,
+                "is_primary": is_primary
+            }));
+        }
+    }
+    Ok(monitors)
+}
+
+#[tauri::command]
+fn open_qr_stage_on_monitor(app: tauri::AppHandle, monitor_index: usize, fullscreen: bool) -> Result<(), String> {
+    use tauri::Manager;
+    let window = if app.get_webview_window("qr_stage").is_none() {
+        tauri::WebviewWindowBuilder::new(&app, "qr_stage", tauri::WebviewUrl::App("index.html?qr_stage=true".into()))
+            .title("Onyx - Stage QR Display (Guest Requests)")
+            .inner_size(1024.0, 768.0)
+            .min_inner_size(600.0, 500.0)
+            .resizable(true)
+            .build()
+            .map_err(|e| e.to_string())?
+    } else {
+        app.get_webview_window("qr_stage").unwrap()
+    };
+
+    if let Ok(monitors) = app.available_monitors() {
+        if let Some(target_monitor) = monitors.get(monitor_index) {
+            let pos = target_monitor.position();
+            let _ = window.set_position(*pos);
+        }
+    }
+
+    let _ = window.show();
+    if fullscreen {
+        let _ = window.set_fullscreen(true);
+    }
+    window.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn write_log(message: String) -> Result<(), String> {
     use std::fs::{OpenOptions, metadata, create_dir_all};
     use std::io::Write;
@@ -558,6 +612,8 @@ pub fn run() {
             search_youtube, get_info, start_download, check_updates, update_plugins, open_path, check_shared_intent, write_log, print_log, read_log, open_mixer_window, close_mixer_window, open_djay_companion, open_logs_folder,
             open_qr_stage_window,
             close_qr_stage_window,
+            get_available_monitors,
+            open_qr_stage_on_monitor,
             start_djay_drag,
             close_djay_window,
             minimize_djay_to_tray,
