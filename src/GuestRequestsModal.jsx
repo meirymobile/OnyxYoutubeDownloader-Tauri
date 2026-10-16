@@ -237,7 +237,7 @@ export default function GuestRequestsModal({
         artist: item.channel || '',
         requester: item.requester || 'אורח ברחבה',
         note: item.note || '',
-        photo: item.photo || null,
+        photo: item.photo || item.thumbnail || null,
         textPosition: item.textPosition || { x: 50, y: 75 },
         textScale: (typeof item.textScale === 'number' && item.textScale > 0) ? item.textScale : 1.0,
         timestamp: Date.now()
@@ -1059,7 +1059,7 @@ export default function GuestRequestsModal({
               artist: masterDeck.artist || matchedReq.channel || '',
               requester: matchedReq.requester || 'אורח ברחבה',
               note: matchedReq.note || '',
-              photo: matchedReq.photo || null,
+              photo: matchedReq.photo || matchedReq.thumbnail || null,
               textPosition: matchedReq.textPosition || { x: 50, y: 75 },
               textScale: matchedReq.textScale || 1.0,
               timestamp: Date.now()
@@ -1893,11 +1893,11 @@ export default function GuestRequestsModal({
                 style={{ containerType: 'inline-size' }}
               >
                 
-                {/* Background: Either Guest Photo or Cinematic Stage Backdrop */}
-                {previewItem.photo ? (
+                {/* Background: Either Guest Photo, YouTube Cover Thumbnail, or Cinematic Stage Backdrop */}
+                {(previewItem.photo || previewItem.thumbnail) ? (
                   <div className="absolute inset-0">
                     <img 
-                      src={previewItem.photo} 
+                      src={previewItem.photo || previewItem.thumbnail} 
                       className="w-full h-full object-cover filter brightness-[0.55] contrast-[1.15]" 
                       alt="Guest Stage Backdrop" 
                     />
