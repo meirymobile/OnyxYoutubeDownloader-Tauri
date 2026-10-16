@@ -231,6 +231,7 @@ export default function GuestRequestsModal({
         requester: item.requester || 'אורח ברחבה',
         note: item.note || '',
         photo: item.photo || null,
+        textPosition: item.textPosition || { x: 50, y: 75 },
         timestamp: Date.now()
       });
     }
@@ -1051,6 +1052,7 @@ export default function GuestRequestsModal({
               requester: matchedReq.requester || 'אורח ברחבה',
               note: matchedReq.note || '',
               photo: matchedReq.photo || null,
+              textPosition: matchedReq.textPosition || { x: 50, y: 75 },
               timestamp: Date.now()
             });
           }
@@ -1113,6 +1115,7 @@ export default function GuestRequestsModal({
         requester: reqItem.requester || 'אורח',
         note: reqItem.note || '',
         photo: reqItem.photo || null,
+        textPosition: reqItem.textPosition || { x: 50, y: 75 },
         timestamp: reqItem.timestamp || Date.now(),
         status: 'pending', // 'pending', 'downloading', 'ready', 'played', 'error'
         jobId: null,

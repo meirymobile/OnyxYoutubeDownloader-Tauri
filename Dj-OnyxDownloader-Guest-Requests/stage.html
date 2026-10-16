@@ -192,25 +192,33 @@
       box-shadow: inset 0 0 120px rgba(5,2,10,0.95);
     }
 
-    /* Spotlight Center Content Card */
+    /* Spotlight Dynamic Position Content Card */
     .spotlight-card {
       position: fixed;
-      inset: 0;
+      left: 50%;
+      top: 75%;
+      transform: translate(-50%, -50%) scale(0.95);
       z-index: 20;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 30px;
+      padding: 22px 30px;
+      border-radius: 28px;
+      background: rgba(10, 4, 18, 0.82);
+      border: 1.5px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75), 0 0 50px rgba(168, 85, 247, 0.25);
+      max-width: 90vw;
+      width: max-content;
       opacity: 0;
-      transform: translateY(40px) scale(0.95);
       pointer-events: none;
-      transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), left 0.6s ease, top 0.6s ease;
     }
     .spotlight-card.active {
       opacity: 1;
-      transform: translateY(0) scale(1);
+      transform: translate(-50%, -50%) scale(1);
       pointer-events: auto;
     }
 
@@ -218,34 +226,35 @@
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 28px;
+      padding: 8px 24px;
       border-radius: 999px;
       background: rgba(245, 158, 11, 0.18);
       border: 1.5px solid rgba(245, 158, 11, 0.6);
       color: #fbbf24;
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 900;
       letter-spacing: 1.5px;
-      margin-bottom: 20px;
+      margin-bottom: 14px;
       box-shadow: 0 0 35px rgba(245, 158, 11, 0.3);
       animation: pulse 2s infinite;
     }
 
+    /* Song Title & Artist: reduced font size per user request */
     .spotlight-title {
       font-family: 'Space Grotesk', 'Assistant', sans-serif;
-      font-size: 48px;
-      font-weight: 900;
+      font-size: 24px;
+      font-weight: 800;
       background: linear-gradient(135deg, #ffffff 0%, #fef08a 40%, #f472b6 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 16px;
-      max-width: 850px;
-      line-height: 1.25;
-      text-shadow: 0 0 50px rgba(244, 114, 182, 0.4);
+      margin-bottom: 12px;
+      max-width: 750px;
+      line-height: 1.3;
+      text-shadow: 0 0 30px rgba(244, 114, 182, 0.35);
     }
     @media (min-width: 1024px) {
       .spotlight-title {
-        font-size: 64px;
+        font-size: 30px;
       }
     }
 
@@ -560,8 +569,13 @@
       }
       backdrop.classList.add('active');
 
-      // Activate card
-      document.getElementById('spotlight-card').classList.add('active');
+      // Activate card and apply dynamic textPosition from guest request
+      const card = document.getElementById('spotlight-card');
+      const posX = (data.textPosition && typeof data.textPosition.x === 'number') ? data.textPosition.x : 50;
+      const posY = (data.textPosition && typeof data.textPosition.y === 'number') ? data.textPosition.y : 75;
+      card.style.left = `${posX}%`;
+      card.style.top = `${posY}%`;
+      card.classList.add('active');
 
       // Smoothly glide QR code to top-left corner
       glideQrToCorner();
