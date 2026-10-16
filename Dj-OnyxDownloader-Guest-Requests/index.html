@@ -412,9 +412,22 @@
       width: 76px;
       height: 52px;
       border-radius: 10px;
-      object-cover: cover;
+      object-fit: cover;
       background: #000;
-      shrink-0;
+      flex-shrink: 0;
+      display: block;
+    }
+    .thumb-duration {
+      position: absolute;
+      bottom: 3px;
+      left: 3px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 4px;
+      pointer-events: none;
     }
     .result-info {
       flex: 1;
@@ -1203,7 +1216,19 @@
       if (closedTitle) closedTitle.innerText = names;
     }
 
-    // YouTube Search (Supports Direct oEmbed + YouTube Public Scraping API)
+    let currentSearchResults = [];
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // High-Speed Search (YouTube Innertube + Vercel Serverless + Apple Fallback)
     async function performSearch() {
       if (!isRoomActive) {
         showClosedState({ reason: 'inactive' });
@@ -1217,45 +1242,70 @@
       searchBtn.disabled = true;
 
       const resultsList = document.getElementById('results-list');
-      resultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 20px;">מחפש שירים...</div>';
+      resultsList.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 20px;">מחפש שירים ברשת... 🎧</div>';
 
       try {
-        // 1. If user pasted direct YouTube link
+        // 1. Direct YouTube link pasted by guest
         if (query.includes('youtube.com') || query.includes('youtu.be')) {
-          const res = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(query)}`);
-          const data = await res.json();
-          if (data && data.title) {
-            renderResults([{
-              id: query,
-              url: query,
-              title: data.title,
-              channel: data.author_name || 'YouTube',
-              thumbnail: data.thumbnail_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150'
-            }]);
-            return;
-          }
+          try {
+            const res = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(query)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.title) {
+                renderResults([{
+                  id: query,
+                  url: query,
+                  title: data.title,
+                  channel: data.author_name || 'YouTube',
+                  thumbnail: data.thumbnail_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150',
+                  duration: ''
+                }]);
+                return;
+              }
+            }
+          } catch(e) {}
         }
 
-        // 2. High-speed, official music search (supports Hebrew & English, zero CORS issues)
-        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15`;
-        const resp = await fetch(itunesUrl);
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data && data.results && data.results.length > 0) {
-            const cleanTracks = data.results.map(t => ({
-              id: String(t.trackId),
-              url: `ytsearch1:${t.artistName} ${t.trackName}`,
-              title: `${t.artistName} - ${t.trackName}`,
-              channel: t.collectionName || t.artistName,
-              thumbnail: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '300x300bb') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150'
-            }));
-            renderResults(cleanTracks);
-            return;
+        // 2. High-speed YouTube Search via same-origin Vercel Serverless Function
+        try {
+          const apiResp = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+          if (apiResp.ok) {
+            const apiData = await apiResp.json();
+            if (apiData && Array.isArray(apiData.results) && apiData.results.length > 0) {
+              renderResults(apiData.results);
+              return;
+            }
           }
+        } catch(apiErr) {
+          console.warn('/api/search error, falling back:', apiErr);
         }
+
+        // 3. Fallback: Apple iTunes API (Direct client fallback with Israel store)
+        try {
+          const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15&country=IL`;
+          const resp = await fetch(itunesUrl);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.results && data.results.length > 0) {
+              const cleanTracks = data.results.map(t => ({
+                id: String(t.trackId),
+                url: `ytsearch1:${t.artistName} ${t.trackName}`,
+                title: `${t.artistName} - ${t.trackName}`,
+                channel: t.collectionName || t.artistName,
+                thumbnail: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '300x300bb') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150',
+                duration: ''
+              }));
+              renderResults(cleanTracks);
+              return;
+            }
+          }
+        } catch(itunesErr) {
+          console.warn('iTunes fallback error:', itunesErr);
+        }
+
         fallbackMockSearch(query);
       } catch (err) {
-        console.warn('Online search error, applying fallback', err);
+        console.warn('Search error, applying fallback', err);
         fallbackMockSearch(query);
       } finally {
         searchBtn.innerText = 'חפש';
@@ -1269,29 +1319,51 @@
           id: 'yt_1',
           url: `ytsearch1:${query}`,
           title: query,
-          channel: 'YouTube Audio',
-          thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=150'
+          channel: 'חיפוש ישיר ביוטיוב',
+          thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=150',
+          duration: ''
         }
       ]);
     }
 
     function renderResults(tracks) {
+      currentSearchResults = Array.isArray(tracks) ? tracks : [];
       const container = document.getElementById('results-list');
-      if (!tracks.length) {
+      if (!currentSearchResults.length) {
         container.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 20px;">לא נמצאו תוצאות. נסו חיפוש אחר.</div>';
         return;
       }
 
-      container.innerHTML = tracks.map((t, idx) => `
+      container.innerHTML = currentSearchResults.map((t, idx) => {
+        const safeTitle = escapeHtml(t.title || 'שיר ללא כותרת');
+        const safeChannel = escapeHtml(t.channel || 'YouTube');
+        const thumb = escapeHtml(t.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150');
+        const durationTag = t.duration ? `<span class="thumb-duration">${escapeHtml(t.duration)}</span>` : '';
+
+        return `
         <div class="result-item">
-          <img src="${t.thumbnail}" class="result-thumb" alt="" />
-          <div class="result-info">
-            <div class="result-title" title="${t.title}">${t.title}</div>
-            <div class="result-channel">${t.channel}</div>
+          <div style="position: relative; flex-shrink: 0; width: 76px; height: 52px;">
+            <img src="${thumb}" class="result-thumb" alt="" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150';" />
+            ${durationTag}
           </div>
-          <button class="request-btn" onclick='openModal(${JSON.stringify(t)})'>בקש שיר</button>
+          <div class="result-info">
+            <div class="result-title" title="${safeTitle}">${safeTitle}</div>
+            <div class="result-channel">${safeChannel}</div>
+          </div>
+          <button class="request-btn" onclick="openModalByIndex(${idx})">בקש שיר</button>
         </div>
-      `).join('');
+      `;
+      }).join('');
+    }
+
+    function openModalByIndex(idx) {
+      if (!isRoomActive) {
+        showClosedState({ reason: 'inactive' });
+        return;
+      }
+      const track = currentSearchResults[idx];
+      if (!track) return;
+      openModal(track);
     }
 
     function openModal(track) {
