@@ -366,7 +366,7 @@ export default function QrStageWindow() {
 
             {/* Explanatory Subtitle */}
             <p className="text-base sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-cyan-200 leading-snug drop-shadow-md">
-              השיר שתבחרו ביוטיוב ייכנס מיידית לעמדת הדיג'יי 🎧
+              בחרו שיר והקדשה והם ישלחו מיידית לבדיקת ה Dj ברחבה 🎵
             </p>
 
             {/* Visual Step-by-Step Pill Badge for Dancefloor Crowd */}

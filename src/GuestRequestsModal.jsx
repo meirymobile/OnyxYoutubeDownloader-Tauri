@@ -1497,7 +1497,7 @@ export default function GuestRequestsModal({
               סרקו מהטלפון ובקשו שיר ישירות לדיג'יי! 🎵
             </h3>
             <p className="text-base md:text-xl font-bold text-slate-200">
-              השיר שתבחרו ביוטיוב ייכנס מיידית לעמדת הדיג'יי
+              בחרו שיר והקדשה והם ישלחו מיידית לבדיקת ה Dj ברחבה 🎵
             </p>
           </div>
 
