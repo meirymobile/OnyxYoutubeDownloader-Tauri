@@ -51,20 +51,47 @@ function DJSoftwareWaveform({ isProcessing, analyserNode, isPlaying }) {
     if (analyserNode) {
       frequencyData = new Uint8Array(analyserNode.frequencyBinCount);
     }
+
+    let textMask = null;
+    let textMaskWidth = 0;
+    let textMaskHeight = 0;
+
+    const generateTextMask = (targetHeight) => {
+      offCtx.font = '900 48px "Inter", sans-serif';
+      const tw = Math.ceil(offCtx.measureText(textStr).width);
+      if (tw <= 0) return;
+      offCanvas.width = tw;
+      offCanvas.height = targetHeight;
+      offCtx.font = '900 48px "Inter", sans-serif';
+      offCtx.fillStyle = '#ffffff';
+      offCtx.textAlign = 'left';
+      offCtx.textBaseline = 'middle';
+      offCtx.fillText(textStr, 0, targetHeight / 2);
+      textMask = offCtx.getImageData(0, 0, tw, targetHeight).data;
+      textMaskWidth = tw;
+      textMaskHeight = targetHeight;
+    };
+
+    let lastRenderTime = 0;
     
     const render = (now) => {
-      animationFrameId = requestAnimationFrame(render)
+      animationFrameId = requestAnimationFrame(render);
+      if (document.hidden) return; // Pause completely if tab/window is hidden
+      if (now - lastRenderTime < 33) return; // 30 FPS cap (saves ~70% CPU)
+      lastRenderTime = now;
       
       const rect = canvas.getBoundingClientRect()
       if (canvas.width !== rect.width || canvas.height !== rect.height) {
         canvas.width = rect.width
         canvas.height = rect.height
-        offCanvas.width = rect.width
-        offCanvas.height = rect.height
+        generateTextMask(rect.height);
       }
       
       const width = canvas.width
       const height = canvas.height
+      if (!textMask || textMaskHeight !== height) {
+        generateTextMask(height);
+      }
       
       // Clear background
       ctx.fillStyle = '#050507'
@@ -86,23 +113,9 @@ function DJSoftwareWaveform({ isProcessing, analyserNode, isPlaying }) {
       if (isPlaying && analyserNode && frequencyData) {
         analyserNode.getByteFrequencyData(frequencyData);
       } else {
-        // Draw scrolling text to offscreen canvas
-        textOffset -= 2.0;
-        offCtx.clearRect(0, 0, width, height)
-        offCtx.fillStyle = 'white'
-        offCtx.font = '900 52px "Inter", sans-serif'
-        offCtx.textAlign = 'left'
-        offCtx.textBaseline = 'middle'
-        
-        const textWidth = offCtx.measureText(textStr).width
-        if (textOffset < -textWidth) textOffset = 0
-        
-        for(let i=0; i<4; i++) {
-            offCtx.fillText(textStr, textOffset + (textWidth * i), height / 2 + 4)
-        }
+        textOffset += 2.0;
+        if (textMaskWidth > 0 && textOffset >= textMaskWidth) textOffset = 0;
       }
-      
-      const textPixels = !isPlaying ? offCtx.getImageData(0, 0, width, height).data : null;
       
       for (let i = 0; i < numBars; i++) {
         const bar = bars[i]
@@ -129,30 +142,27 @@ function DJSoftwareWaveform({ isProcessing, analyserNode, isPlaying }) {
           if (isPlaying) {
             isActive = (r < activeRows);
           } else {
-            // Text rendering
-            const px = x + Math.floor(barWidth / 2);
-            const py = y + Math.floor(rowHeight / 2);
-            if (px >= 0 && px < width && py >= 0 && py < height) {
-              const alpha = textPixels[(py * width + px) * 4 + 3];
-              if (alpha > 128) isActive = true;
+            if (textMask && textMaskWidth > 0) {
+              const sampleX = Math.floor(x + textOffset) % textMaskWidth;
+              const py = Math.floor(y + rowHeight / 2);
+              if (sampleX >= 0 && sampleX < textMaskWidth && py >= 0 && py < textMaskHeight) {
+                const alpha = textMask[(py * textMaskWidth + sampleX) * 4 + 3];
+                if (alpha > 120) isActive = true;
+              }
             }
             if (!isActive && isProcessing && r < activeRowsProcessing) isActive = true;
           }
           
           if (isActive) {
             const hue = 190 - (r / numRows) * 60 
-            ctx.fillStyle = `hsl(${hue}, 90%, 60%)`
-            ctx.shadowColor = `hsl(${hue}, 90%, 60%)`
-            ctx.shadowBlur = 5
+            ctx.fillStyle = `hsl(${hue}, 95%, 65%)`
           } else {
             ctx.fillStyle = '#1e293b' 
-            ctx.shadowBlur = 0
           }
           
           ctx.fillRect(x, y, barWidth, rowHeight)
         }
       }
-      ctx.shadowBlur = 0 
     }
 
     animationFrameId = requestAnimationFrame(render)

@@ -150,9 +150,17 @@ export default function MixerScreen({ mixerConfig, onClose, onOpenSettings }) {
 
                 // Merge local VUs with existing (which contains remote VUs)
                 setVuLevels(prev => ({ ...prev, ...newLevels }));
-                animationRef.current = requestAnimationFrame(updateVU);
             };
-            updateVU();
+
+            let lastVuTime = 0;
+            const loopVU = (now) => {
+                animationRef.current = requestAnimationFrame(loopVU);
+                if (document.hidden) return;
+                if (now - lastVuTime < 33) return; // 30 FPS cap
+                lastVuTime = now;
+                updateVU();
+            };
+            loopVU(performance.now());
         };
 
         initAudio();

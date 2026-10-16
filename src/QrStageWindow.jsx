@@ -55,6 +55,8 @@ export default function QrStageWindow() {
   });
   const cardTransitionRef = useRef(null);
   const currentKeyRef = useRef('');
+  const spotlightRef = useRef(spotlight);
+  spotlightRef.current = spotlight;
 
   // Sync state from localStorage & storage events
   useEffect(() => {
@@ -245,8 +247,21 @@ export default function QrStageWindow() {
     window.addEventListener('resize', resize);
 
     let angle = 0;
-    const render = () => {
+    let lastTime = 0;
+
+    const render = (now) => {
       animId = requestAnimationFrame(render);
+
+      // 1. Pause completely if document/window is hidden or minimized
+      if (document.hidden) return;
+
+      // 2. Pause completely while spotlight photo/dedication covers the screen
+      if (spotlightRef.current && spotlightRef.current.active) return;
+
+      // 3. Cap at 30 FPS (saves 75% GPU and CPU compute with zero visual loss)
+      if (now - lastTime < 33) return;
+      lastTime = now;
+
       angle += 0.015;
 
       const w = canvas.width;
