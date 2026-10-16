@@ -344,15 +344,19 @@ export default function QrStageWindow() {
         {/* LINE 2: Dedication Note - Large & Colorful */}
         {spotlight.note && spotlight.note.trim() && (
           <div 
-            className="flex items-center justify-center gap-[0.3vw] font-extrabold text-[1.85vw] bg-gradient-to-r from-yellow-200 via-amber-400 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_1.5vw_rgba(245,158,11,0.35)] leading-tight mb-[0.5vw] max-w-[68vw]"
+            className="flex items-center justify-center gap-[0.35vw] font-black text-[2.25vw] bg-clip-text text-transparent leading-tight mb-[0.4vw] max-w-[70vw]"
             dir="rtl"
-            style={{ unicodeBidi: 'plaintext' }}
+            style={{
+              backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #fde047 30%, #fb7185 65%, #e879f9 100%)',
+              filter: 'drop-shadow(0 0 1.5vw rgba(251,113,133,0.4))',
+              unicodeBidi: 'plaintext'
+            }}
           >
-            <span className="text-[2.3vw] font-serif text-amber-400 opacity-90 leading-none select-none" style={{ WebkitTextFillColor: '#fbbf24' }}>“</span>
-            <p className="italic text-center">
+            <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>“</span>
+            <p className="text-center font-black">
               {spotlight.note}
             </p>
-            <span className="text-[2.3vw] font-serif text-amber-400 opacity-90 leading-none select-none" style={{ WebkitTextFillColor: '#fbbf24' }}>”</span>
+            <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>”</span>
           </div>
         )}
 

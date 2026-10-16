@@ -1972,22 +1972,23 @@ export default function GuestRequestsModal({
                     {/* LINE 2: Dedication Note - Large & Colorful */}
                     {previewItem.note && previewItem.note.trim() && (
                       <div 
-                        className="flex items-center justify-center font-extrabold bg-gradient-to-r from-yellow-200 via-amber-400 to-pink-400 bg-clip-text text-transparent leading-tight"
+                        className="flex items-center justify-center font-black bg-clip-text text-transparent leading-tight"
                         dir="rtl"
                         style={{
-                          gap: '0.3cqw',
-                          fontSize: '1.85cqw',
-                          marginBottom: '0.5cqw',
-                          maxWidth: '68cqw',
+                          gap: '0.35cqw',
+                          fontSize: '2.25cqw',
+                          marginBottom: '0.4cqw',
+                          maxWidth: '70cqw',
                           unicodeBidi: 'plaintext',
-                          filter: 'drop-shadow(0 0 1.5cqw rgba(245,158,11,0.35))'
+                          backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #fde047 30%, #fb7185 65%, #e879f9 100%)',
+                          filter: 'drop-shadow(0 0 1.5cqw rgba(251,113,133,0.4))'
                         }}
                       >
-                        <span className="font-serif text-amber-400 opacity-90 leading-none select-none" style={{ fontSize: '2.3cqw', WebkitTextFillColor: '#fbbf24' }}>“</span>
-                        <p className="italic text-center">
+                        <span className="font-serif text-amber-300 opacity-95 leading-none select-none" style={{ fontSize: '2.4cqw', WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8cqw rgba(253,224,71,0.5))' }}>“</span>
+                        <p className="text-center font-black">
                           {previewItem.note}
                         </p>
-                        <span className="font-serif text-amber-400 opacity-90 leading-none select-none" style={{ fontSize: '2.3cqw', WebkitTextFillColor: '#fbbf24' }}>”</span>
+                        <span className="font-serif text-amber-300 opacity-95 leading-none select-none" style={{ fontSize: '2.4cqw', WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8cqw rgba(253,224,71,0.5))' }}>”</span>
                       </div>
                     )}
 
