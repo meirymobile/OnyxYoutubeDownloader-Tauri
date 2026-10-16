@@ -65,18 +65,25 @@ export default function QrStageWindow() {
 
   // Butter-Smooth Glide to Top-Left Corner
   useEffect(() => {
-    if (spotlight.active) {
-      if (qrRef.current) {
-        const rect = qrRef.current.getBoundingClientRect();
-        const targetX = 32;
-        const targetY = 32;
-        const deltaX = targetX - rect.left;
-        const deltaY = targetY - rect.top;
-        setQrTransform(`translate(${deltaX}px, ${deltaY}px) scale(0.62)`);
+    const handleGlide = () => {
+      if (spotlight.active) {
+        if (qrRef.current) {
+          qrRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+          const rect = qrRef.current.getBoundingClientRect();
+          const targetX = 32;
+          const targetY = 32;
+          const deltaX = targetX - rect.left;
+          const deltaY = targetY - rect.top;
+          setQrTransform(`translate(${deltaX}px, ${deltaY}px) scale(0.62)`);
+        }
+      } else {
+        setQrTransform('translate(0px, 0px) scale(1)');
       }
-    } else {
-      setQrTransform('translate(0px, 0px) scale(1)');
-    }
+    };
+
+    handleGlide();
+    window.addEventListener('resize', handleGlide);
+    return () => window.removeEventListener('resize', handleGlide);
   }, [spotlight.active]);
 
   const buildTargetUrl = () => {
@@ -192,8 +199,8 @@ export default function QrStageWindow() {
       <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-0" />
 
       {/* Floating Controls Top Bar */}
-      <div className="w-full flex justify-between items-center z-20 shrink-0" data-tauri-drag-region="true">
-        <div className="flex items-center gap-3">
+      <div className="w-full flex justify-between items-center z-30 shrink-0 pointer-events-none" data-tauri-drag-region="true">
+        <div className={`flex items-center gap-3 transition-all duration-700 pointer-events-auto ${spotlight.active ? 'opacity-0 -translate-y-8 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
           <div className="px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/60 backdrop-blur-md flex items-center gap-2">
             <Radio className={`w-3.5 h-3.5 ${isActive ? 'text-emerald-400 animate-pulse' : 'text-rose-400'}`} />
             <span className="text-xs font-bold font-mono tracking-wider">
@@ -213,7 +220,7 @@ export default function QrStageWindow() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 transition-all duration-700 pointer-events-auto ${spotlight.active ? 'opacity-30 hover:opacity-100' : 'opacity-100'}`}>
           <button 
             onClick={toggleFullscreen} 
             className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 backdrop-blur-md transition-all shadow"
@@ -292,7 +299,7 @@ export default function QrStageWindow() {
       </div>
 
       {/* Center Stage Presentation */}
-      <div className="flex-1 flex flex-col items-center justify-center text-center z-10 w-full max-w-4xl my-auto animate-fadeIn px-2 md:px-4">
+      <div className="flex-1 flex flex-col items-center justify-center text-center z-40 w-full max-w-4xl my-auto animate-fadeIn px-2 md:px-4">
         
         {/* DJ Main Title */}
         <div className={`mb-3 md:mb-5 transition-all duration-700 ${spotlight.active ? 'opacity-0 -translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
@@ -375,7 +382,7 @@ export default function QrStageWindow() {
       </div>
 
       {/* Stage Footer */}
-      <footer className="text-[11px] font-mono text-slate-500 tracking-widest text-center z-10 shrink-0 uppercase">
+      <footer className={`text-[11px] font-mono text-slate-500 tracking-widest text-center z-10 shrink-0 uppercase transition-all duration-700 ${spotlight.active ? 'opacity-0 translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
         POWERED BY ONYX &bull; {djNames} &bull; LIVE STAGE DISPLAY
       </footer>
     </div>
