@@ -220,7 +220,7 @@
       width: max-content;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), left 0.6s ease, top 0.6s ease;
+      transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .spotlight-card.active {
       opacity: 1;
@@ -582,35 +582,58 @@
       }
     });
 
+    let cardTransitionTimeout = null;
+    let currentSpotlightKey = '';
+
     function activateSpotlight(data) {
       document.body.classList.add('spotlight-mode');
       
-      // Update texts
-      document.getElementById('spotlight-title').innerText = data.songTitle || 'שיר לבקשת הקהל';
-      document.getElementById('spotlight-requester').innerText = data.requester || 'אורח ברחבה';
-      
-      const noteBox = document.getElementById('spotlight-note-box');
-      const noteText = document.getElementById('spotlight-note');
-      if (data.note && data.note.trim()) {
-        noteText.innerText = data.note;
-        noteBox.style.display = 'flex';
-      } else {
-        noteBox.style.display = 'none';
-      }
+      const card = document.getElementById('spotlight-card');
+      const isCardActive = card.classList.contains('active');
+      const newKey = `${data.requester || ''}:::${data.songTitle || ''}:::${data.note || ''}:::${data.photo || ''}:::${data.textPosition?.x ?? 50}:::${data.textPosition?.y ?? 75}:::${data.textScale ?? 1}`;
 
       // Update photo / backdrop with smooth dual-buffer crossfade
       updateSpotlightPhoto(data.photo);
       document.getElementById('spotlight-backdrop').classList.add('active');
 
-      // Activate card and apply dynamic textPosition and textScale from guest request
-      const card = document.getElementById('spotlight-card');
-      const posX = (data.textPosition && typeof data.textPosition.x === 'number') ? data.textPosition.x : 50;
-      const posY = (data.textPosition && typeof data.textPosition.y === 'number') ? data.textPosition.y : 75;
-      const scale = (typeof data.textScale === 'number' && data.textScale > 0) ? data.textScale : 1.0;
-      card.style.left = `${posX}%`;
-      card.style.top = `${posY}%`;
-      card.style.setProperty('--card-scale', scale);
-      card.classList.add('active');
+      const applyCardData = () => {
+        document.getElementById('spotlight-title').innerText = data.songTitle || 'שיר לבקשת הקהל';
+        document.getElementById('spotlight-requester').innerText = data.requester || 'אורח ברחבה';
+        
+        const noteBox = document.getElementById('spotlight-note-box');
+        const noteText = document.getElementById('spotlight-note');
+        if (data.note && data.note.trim()) {
+          noteText.innerText = data.note;
+          noteBox.style.display = 'flex';
+        } else {
+          noteBox.style.display = 'none';
+        }
+
+        const posX = (data.textPosition && typeof data.textPosition.x === 'number') ? data.textPosition.x : 50;
+        const posY = (data.textPosition && typeof data.textPosition.y === 'number') ? data.textPosition.y : 75;
+        const scale = (typeof data.textScale === 'number' && data.textScale > 0) ? data.textScale : 1.0;
+        card.style.left = `${posX}%`;
+        card.style.top = `${posY}%`;
+        card.style.setProperty('--card-scale', scale);
+        
+        requestAnimationFrame(() => {
+          card.classList.add('active');
+        });
+      };
+
+      if (isCardActive && currentSpotlightKey && currentSpotlightKey !== newKey) {
+        // Fade out previous text card smoothly, update content while invisible, then fade back in
+        clearTimeout(cardTransitionTimeout);
+        card.classList.remove('active');
+        cardTransitionTimeout = setTimeout(() => {
+          applyCardData();
+        }, 400);
+      } else if (!isCardActive || currentSpotlightKey !== newKey) {
+        clearTimeout(cardTransitionTimeout);
+        applyCardData();
+      }
+
+      currentSpotlightKey = newKey;
 
       // Smoothly glide QR code to top-left corner
       glideQrToCorner();
@@ -658,6 +681,8 @@
     }
 
     function deactivateSpotlight() {
+      clearTimeout(cardTransitionTimeout);
+      currentSpotlightKey = '';
       document.body.classList.remove('spotlight-mode');
       document.getElementById('spotlight-backdrop').classList.remove('active');
       document.getElementById('spotlight-card').classList.remove('active');

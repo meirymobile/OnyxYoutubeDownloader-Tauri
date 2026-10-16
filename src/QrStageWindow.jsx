@@ -34,6 +34,28 @@ export default function QrStageWindow() {
   const [photoB, setPhotoB] = useState('');
   const [activePhotoSlot, setActivePhotoSlot] = useState('none');
 
+  // Spotlight card fade transition state
+  const [displayedSpotlight, setDisplayedSpotlight] = useState(() => {
+    try {
+      const saved = localStorage.getItem('onyx_stage_spotlight');
+      const parsed = saved ? JSON.parse(saved) : null;
+      return (parsed && parsed.active) ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
+  const [cardVisible, setCardVisible] = useState(() => {
+    try {
+      const saved = localStorage.getItem('onyx_stage_spotlight');
+      const parsed = saved ? JSON.parse(saved) : null;
+      return !!(parsed && parsed.active);
+    } catch {
+      return false;
+    }
+  });
+  const cardTransitionRef = useRef(null);
+  const currentKeyRef = useRef('');
+
   // Sync state from localStorage & storage events
   useEffect(() => {
     const syncState = () => {
@@ -107,6 +129,48 @@ export default function QrStageWindow() {
     };
     img.src = newPhoto;
   }, [spotlight.photo, spotlight.active]);
+
+  // Smoothly fade out text card, update content/position, and fade back in
+  useEffect(() => {
+    if (!spotlight || !spotlight.active) {
+      currentKeyRef.current = '';
+      if (cardTransitionRef.current) clearTimeout(cardTransitionRef.current);
+      setCardVisible(false);
+      const timer = setTimeout(() => {
+        setDisplayedSpotlight(null);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    const newKey = `${spotlight.requester || ''}:::${spotlight.songTitle || ''}:::${spotlight.note || ''}:::${spotlight.photo || ''}:::${spotlight.textPosition?.x ?? 50}:::${spotlight.textPosition?.y ?? 75}:::${spotlight.textScale ?? 1}`;
+
+    if (newKey === currentKeyRef.current && cardVisible) {
+      return;
+    }
+
+    if (cardVisible && displayedSpotlight) {
+      // Transitioning between two spotlights: fade out old card, update content, fade in new card
+      if (cardTransitionRef.current) clearTimeout(cardTransitionRef.current);
+      setCardVisible(false);
+      cardTransitionRef.current = setTimeout(() => {
+        currentKeyRef.current = newKey;
+        setDisplayedSpotlight(spotlight);
+        setCardVisible(true);
+      }, 400);
+    } else {
+      // First activation or immediate update
+      if (cardTransitionRef.current) clearTimeout(cardTransitionRef.current);
+      currentKeyRef.current = newKey;
+      setDisplayedSpotlight(spotlight);
+      requestAnimationFrame(() => {
+        setCardVisible(true);
+      });
+    }
+
+    return () => {
+      if (cardTransitionRef.current) clearTimeout(cardTransitionRef.current);
+    };
+  }, [spotlight]);
 
   // Butter-Smooth Glide to Top-Left Corner
   useEffect(() => {
@@ -313,63 +377,65 @@ export default function QrStageWindow() {
         <div className="absolute inset-0 bg-radial-[circle_at_center,rgba(5,2,10,0.25)_20%,rgba(5,2,10,0.9)_85%]" />
       </div>
 
-      {/* Spotlight Dedication Card - Positioned dynamically from guest mobile simulator */}
-      <div 
-        className={`fixed z-20 flex flex-col items-center justify-center text-center p-[1.2vw_2.2vw] rounded-[2.2vw] bg-[rgba(10,4,18,0.88)] border border-white/20 backdrop-blur-2xl shadow-[0_1vw_3vw_rgba(0,0,0,0.85),0_0_2vw_rgba(168,85,247,0.35)] transition-opacity duration-700 pointer-events-none max-w-[75vw] w-max ${
-          spotlight.active ? 'opacity-100' : 'opacity-0'
-        }`}
-        style={{
-          left: `${spotlight.textPosition?.x ?? 50}%`,
-          top: `${spotlight.textPosition?.y ?? 75}%`,
-          transform: `translate(-50%, -50%) scale(${spotlight.textScale ?? 1})`,
-        }}
-      >
-        <div className="inline-flex items-center gap-[0.35vw] px-[0.9vw] py-[0.25vw] rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black text-[1.05vw] tracking-wider shadow-[0_0_1.5vw_rgba(245,158,11,0.3)] animate-pulse mb-[0.4vw] whitespace-nowrap">
-          <Sparkles className="w-[1.05vw] h-[1.05vw] text-amber-400" />
-          <span>מתנגן עכשיו לבקשת הקהל!</span>
-          <Sparkles className="w-[1.05vw] h-[1.05vw] text-amber-400" />
-        </div>
-
-        {/* LINE 1: Requester Name - Large & Colorful */}
+      {/* Spotlight Dedication Card - Positioned dynamically from guest mobile simulator with smooth fade transitions */}
+      {displayedSpotlight && (
         <div 
-          className="inline-flex items-center justify-center gap-[0.4vw] font-black text-[2.25vw] bg-gradient-to-r from-white via-cyan-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_0_1.5vw_rgba(56,189,248,0.4)] leading-tight mb-[0.4vw] max-w-[70vw] whitespace-nowrap"
-          dir="rtl"
-          style={{ unicodeBidi: 'plaintext' }}
+          className={`fixed z-20 flex flex-col items-center justify-center text-center p-[1.2vw_2.2vw] rounded-[2.2vw] bg-[rgba(10,4,18,0.88)] border border-white/20 backdrop-blur-2xl shadow-[0_1vw_3vw_rgba(0,0,0,0.85),0_0_2vw_rgba(168,85,247,0.35)] transition-all duration-500 ease-out pointer-events-none max-w-[75vw] w-max ${
+            cardVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          }`}
+          style={{
+            left: `${displayedSpotlight.textPosition?.x ?? 50}%`,
+            top: `${displayedSpotlight.textPosition?.y ?? 75}%`,
+            transform: `translate(-50%, -50%) scale(${(displayedSpotlight.textScale ?? 1) * (cardVisible ? 1 : 0.95)})`,
+          }}
         >
-          <span className="text-[1.9vw] text-pink-400" style={{ WebkitTextFillColor: 'initial' }}>❤️</span>
-          <span>הוקדש ע״י </span>
-          <span>{spotlight.requester || 'אורח ברחבה'}</span>
-        </div>
-
-        {/* LINE 2: Dedication Note - Large & Colorful */}
-        {spotlight.note && spotlight.note.trim() && (
-          <div 
-            className="flex items-center justify-center gap-[0.35vw] font-black text-[2.25vw] bg-clip-text text-transparent leading-tight mb-[0.4vw] max-w-[70vw]"
-            dir="rtl"
-            style={{
-              backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #fde047 30%, #fb7185 65%, #e879f9 100%)',
-              filter: 'drop-shadow(0 0 1.5vw rgba(251,113,133,0.4))',
-              unicodeBidi: 'plaintext'
-            }}
-          >
-            <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>“</span>
-            <p className="text-center font-black">
-              {spotlight.note}
-            </p>
-            <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>”</span>
+          <div className="inline-flex items-center gap-[0.35vw] px-[0.9vw] py-[0.25vw] rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-300 font-black text-[1.05vw] tracking-wider shadow-[0_0_1.5vw_rgba(245,158,11,0.3)] animate-pulse mb-[0.4vw] whitespace-nowrap">
+            <Sparkles className="w-[1.05vw] h-[1.05vw] text-amber-400" />
+            <span>מתנגן עכשיו לבקשת הקהל!</span>
+            <Sparkles className="w-[1.05vw] h-[1.05vw] text-amber-400" />
           </div>
-        )}
 
-        {/* LINE 3: Song Title & Artist - Smallest at the bottom */}
-        <div 
-          className="inline-flex items-center justify-center gap-[0.4vw] text-[1.15vw] font-bold text-slate-200 bg-[rgba(15,7,26,0.7)] px-[1.2vw] py-[0.3vw] rounded-full border border-white/15 backdrop-blur-md shadow-md mb-[0.2vw] max-w-[68vw] truncate whitespace-nowrap"
-          dir="rtl"
-          style={{ unicodeBidi: 'plaintext' }}
-        >
-          <span className="text-[1.1vw]">🎵</span>
-          <span>{spotlight.songTitle || 'שיר לבקשת הקהל'}</span>
+          {/* LINE 1: Requester Name - Large & Colorful */}
+          <div 
+            className="inline-flex items-center justify-center gap-[0.4vw] font-black text-[2.25vw] bg-gradient-to-r from-white via-cyan-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_0_1.5vw_rgba(56,189,248,0.4)] leading-tight mb-[0.4vw] max-w-[70vw] whitespace-nowrap"
+            dir="rtl"
+            style={{ unicodeBidi: 'plaintext' }}
+          >
+            <span className="text-[1.9vw] text-pink-400" style={{ WebkitTextFillColor: 'initial' }}>❤️</span>
+            <span>הוקדש ע״י </span>
+            <span>{displayedSpotlight.requester || 'אורח ברחבה'}</span>
+          </div>
+
+          {/* LINE 2: Dedication Note - Large & Colorful */}
+          {displayedSpotlight.note && displayedSpotlight.note.trim() && (
+            <div 
+              className="flex items-center justify-center gap-[0.35vw] font-black text-[2.25vw] bg-clip-text text-transparent leading-tight mb-[0.4vw] max-w-[70vw]"
+              dir="rtl"
+              style={{
+                backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #fde047 30%, #fb7185 65%, #e879f9 100%)',
+                filter: 'drop-shadow(0 0 1.5vw rgba(251,113,133,0.4))',
+                unicodeBidi: 'plaintext'
+              }}
+            >
+              <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>“</span>
+              <p className="text-center font-black">
+                {displayedSpotlight.note}
+              </p>
+              <span className="text-[2.4vw] font-serif text-amber-300 opacity-95 leading-none select-none" style={{ WebkitTextFillColor: '#fde047', filter: 'drop-shadow(0 0 0.8vw rgba(253,224,71,0.5))' }}>”</span>
+            </div>
+          )}
+
+          {/* LINE 3: Song Title & Artist - Smallest at the bottom */}
+          <div 
+            className="inline-flex items-center justify-center gap-[0.4vw] text-[1.15vw] font-bold text-slate-200 bg-[rgba(15,7,26,0.7)] px-[1.2vw] py-[0.3vw] rounded-full border border-white/15 backdrop-blur-md shadow-md mb-[0.2vw] max-w-[68vw] truncate whitespace-nowrap"
+            dir="rtl"
+            style={{ unicodeBidi: 'plaintext' }}
+          >
+            <span className="text-[1.1vw]">🎵</span>
+            <span>{displayedSpotlight.songTitle || 'שיר לבקשת הקהל'}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Center Stage Presentation */}
       <div className="flex-1 flex flex-col items-center justify-center text-center z-40 w-full max-w-4xl my-auto animate-fadeIn px-2 md:px-4">
