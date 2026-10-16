@@ -17,6 +17,7 @@ export default function QrStageWindow() {
   const [isActive, setIsActive] = useState(() => localStorage.getItem('onyx_guest_active') === 'true');
   const [spotlight, setSpotlight] = useState(() => {
     try {
+      if (localStorage.getItem('onyx_guest_active') !== 'true') return { active: false };
       const saved = localStorage.getItem('onyx_stage_spotlight');
       return saved ? JSON.parse(saved) : { active: false };
     } catch {
@@ -37,6 +38,7 @@ export default function QrStageWindow() {
   // Spotlight card fade transition state
   const [displayedSpotlight, setDisplayedSpotlight] = useState(() => {
     try {
+      if (localStorage.getItem('onyx_guest_active') !== 'true') return null;
       const saved = localStorage.getItem('onyx_stage_spotlight');
       const parsed = saved ? JSON.parse(saved) : null;
       return (parsed && parsed.active) ? parsed : null;
@@ -46,6 +48,7 @@ export default function QrStageWindow() {
   });
   const [cardVisible, setCardVisible] = useState(() => {
     try {
+      if (localStorage.getItem('onyx_guest_active') !== 'true') return false;
       const saved = localStorage.getItem('onyx_stage_spotlight');
       const parsed = saved ? JSON.parse(saved) : null;
       return !!(parsed && parsed.active);
@@ -58,6 +61,8 @@ export default function QrStageWindow() {
   const spotlightRef = useRef(spotlight);
   spotlightRef.current = spotlight;
 
+  const isSpotlightActive = isActive && !!(spotlight && spotlight.active);
+
   // Sync state from localStorage & storage events
   useEffect(() => {
     const syncState = () => {
@@ -65,11 +70,21 @@ export default function QrStageWindow() {
       setDjNames(localStorage.getItem('onyx_guest_dj_names') || 'DJ Shazz & DJ Sonic');
       const savedHost = localStorage.getItem('onyx_guest_host_url');
       setWebHostUrl((savedHost && (savedHost.startsWith('http://') || savedHost.startsWith('https://')) && !savedHost.includes('onyx-requests.vercel.app')) ? savedHost : 'https://dj-onyxdownloader-guest-requests.vercel.app');
-      setIsActive(localStorage.getItem('onyx_guest_active') === 'true');
+      const activeState = localStorage.getItem('onyx_guest_active') === 'true';
+      setIsActive(activeState);
       setGeoEnabled(localStorage.getItem('onyx_guest_geo_enabled') !== 'false');
       setGeoRadius(localStorage.getItem('onyx_guest_geo_radius') || '30');
       setDjLat(localStorage.getItem('onyx_guest_lat'));
       setDjLon(localStorage.getItem('onyx_guest_lon'));
+
+      if (!activeState) {
+        setSpotlight({ active: false });
+        setDisplayedSpotlight(null);
+        setCardVisible(false);
+        setActivePhotoSlot('none');
+        setQrTransform('translate(0px, 0px) scale(1)');
+        return;
+      }
 
       try {
         const savedSpotlight = localStorage.getItem('onyx_stage_spotlight');
@@ -96,6 +111,17 @@ export default function QrStageWindow() {
     };
   }, []);
 
+  // Guarantee stage screen resets spotlight when turned off
+  useEffect(() => {
+    if (!isActive) {
+      setSpotlight({ active: false });
+      setDisplayedSpotlight(null);
+      setCardVisible(false);
+      setActivePhotoSlot('none');
+      setQrTransform('translate(0px, 0px) scale(1)');
+    }
+  }, [isActive]);
+
   // Guarantee stage screen returns to main QR screen whenever room changes (e.g. New Event)
   const lastRoomRef = useRef(null);
   useEffect(() => {
@@ -108,7 +134,7 @@ export default function QrStageWindow() {
 
   // Dual-layer image crossfade controller
   useEffect(() => {
-    if (!spotlight.active || !spotlight.photo) {
+    if (!isActive || !spotlight.active || !spotlight.photo) {
       setActivePhotoSlot('none');
       return;
     }
@@ -130,11 +156,11 @@ export default function QrStageWindow() {
       }
     };
     img.src = newPhoto;
-  }, [spotlight.photo, spotlight.active]);
+  }, [spotlight.photo, spotlight.active, isActive]);
 
   // Smoothly fade out text card, update content/position, and fade back in
   useEffect(() => {
-    if (!spotlight || !spotlight.active) {
+    if (!isActive || !spotlight || !spotlight.active) {
       currentKeyRef.current = '';
       if (cardTransitionRef.current) clearTimeout(cardTransitionRef.current);
       setCardVisible(false);
@@ -172,12 +198,12 @@ export default function QrStageWindow() {
     return () => {
       if (cardTransitionRef.current) clearTimeout(cardTransitionRef.current);
     };
-  }, [spotlight]);
+  }, [spotlight, isActive]);
 
   // Butter-Smooth Glide to Top-Left Corner
   useEffect(() => {
     const handleGlide = () => {
-      if (spotlight.active) {
+      if (isActive && spotlight.active) {
         if (qrRef.current) {
           qrRef.current.style.transform = 'translate(0px, 0px) scale(1)';
           const rect = qrRef.current.getBoundingClientRect();
@@ -195,7 +221,7 @@ export default function QrStageWindow() {
     handleGlide();
     window.addEventListener('resize', handleGlide);
     return () => window.removeEventListener('resize', handleGlide);
-  }, [spotlight.active]);
+  }, [spotlight.active, isActive]);
 
   const buildTargetUrl = () => {
     try {
@@ -256,7 +282,7 @@ export default function QrStageWindow() {
       if (document.hidden) return;
 
       // 2. Pause completely while spotlight photo/dedication covers the screen
-      if (spotlightRef.current && spotlightRef.current.active) return;
+      if (isActive && spotlightRef.current && spotlightRef.current.active) return;
 
       // 3. Cap at 30 FPS (saves 75% GPU and CPU compute with zero visual loss)
       if (now - lastTime < 33) return;
@@ -327,7 +353,7 @@ export default function QrStageWindow() {
 
       {/* Floating Controls Top Bar */}
       <div className="w-full flex justify-between items-center z-30 shrink-0 pointer-events-none" data-tauri-drag-region="true">
-        <div className={`flex items-center gap-3 transition-all duration-700 pointer-events-auto ${spotlight.active ? 'opacity-0 -translate-y-8 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+        <div className={`flex items-center gap-3 transition-all duration-700 pointer-events-auto ${isSpotlightActive ? 'opacity-0 -translate-y-8 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
           <div className="px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/60 backdrop-blur-md flex items-center gap-2">
             <Radio className={`w-3.5 h-3.5 ${isActive ? 'text-emerald-400 animate-pulse' : 'text-rose-400'}`} />
             <span className="text-xs font-bold font-mono tracking-wider">
@@ -347,7 +373,7 @@ export default function QrStageWindow() {
           )}
         </div>
 
-        <div className={`flex items-center gap-2 transition-all duration-700 pointer-events-auto ${spotlight.active ? 'opacity-30 hover:opacity-100' : 'opacity-100'}`}>
+        <div className={`flex items-center gap-2 transition-all duration-700 pointer-events-auto ${isSpotlightActive ? 'opacity-30 hover:opacity-100' : 'opacity-100'}`}>
           <button 
             onClick={toggleFullscreen} 
             className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 backdrop-blur-md transition-all shadow"
@@ -369,10 +395,10 @@ export default function QrStageWindow() {
       {/* Spotlight Media Backdrop with Dual-Layer Crossfade */}
       <div 
         className={`fixed inset-0 z-[5] pointer-events-none transition-opacity duration-1000 overflow-hidden ${
-          spotlight.active ? 'opacity-100' : 'opacity-0'
+          isSpotlightActive ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {photoA && (
+        {isSpotlightActive && photoA && (
           <img 
             src={photoA} 
             alt="" 
@@ -382,7 +408,7 @@ export default function QrStageWindow() {
             style={{ transitionProperty: 'opacity, transform', transitionDuration: '1400ms, 16000ms' }}
           />
         )}
-        {photoB && (
+        {isSpotlightActive && photoB && (
           <img 
             src={photoB} 
             alt="" 
@@ -396,7 +422,7 @@ export default function QrStageWindow() {
       </div>
 
       {/* Spotlight Dedication Card - Positioned dynamically from guest mobile simulator with smooth fade transitions */}
-      {displayedSpotlight && (
+      {isSpotlightActive && displayedSpotlight && (
         <div 
           className={`fixed z-20 flex flex-col items-center justify-center text-center p-[1.2vw_2.2vw] rounded-[2.2vw] bg-[rgba(10,4,18,0.88)] border border-white/20 backdrop-blur-2xl shadow-[0_1vw_3vw_rgba(0,0,0,0.85),0_0_2vw_rgba(168,85,247,0.35)] transition-all duration-500 ease-out pointer-events-none max-w-[75vw] w-max ${
             cardVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
@@ -459,7 +485,7 @@ export default function QrStageWindow() {
       <div className="flex-1 flex flex-col items-center justify-center text-center z-40 w-full max-w-4xl my-auto animate-fadeIn px-2 md:px-4">
         
         {/* DJ Main Title */}
-        <div className={`mb-3 md:mb-5 transition-all duration-700 ${spotlight.active ? 'opacity-0 -translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+        <div className={`mb-3 md:mb-5 transition-all duration-700 ${isSpotlightActive ? 'opacity-0 -translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(168,85,247,0.5)]">
             {djNames}
           </h1>
@@ -492,7 +518,7 @@ export default function QrStageWindow() {
               )}
               
               <div className="mt-2.5 pt-2 border-t border-slate-200/80 w-full flex justify-between items-center text-slate-900 font-mono font-bold text-xs sm:text-sm">
-                <span>{spotlight.active ? 'סרקו גם אתם!' : 'ONYX STAGE DISPLAY'}</span>
+                <span>{isSpotlightActive ? 'סרקו גם אתם!' : 'ONYX STAGE DISPLAY'}</span>
                 <span className="text-amber-600 tracking-wider">#{roomCode}</span>
               </div>
             </div>
@@ -512,7 +538,7 @@ export default function QrStageWindow() {
 
         {/* Bottom Callout Instructions - Enriched, Huge Font & Crystal-Clear for Dancefloor Crowd */}
         {isActive && (
-          <div className={`mt-5 md:mt-7 space-y-2 md:space-y-3 w-full max-w-3xl px-2 transition-all duration-700 ${spotlight.active ? 'opacity-0 translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`} dir="rtl">
+          <div className={`mt-5 md:mt-7 space-y-2 md:space-y-3 w-full max-w-3xl px-2 transition-all duration-700 ${isSpotlightActive ? 'opacity-0 translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`} dir="rtl">
             {/* Primary Action Title */}
             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white flex items-center justify-center gap-2 md:gap-3 drop-shadow-[0_4px_20px_rgba(245,158,11,0.6)]">
               <Music className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 text-amber-400 shrink-0 animate-bounce" />
@@ -539,7 +565,7 @@ export default function QrStageWindow() {
       </div>
 
       {/* Stage Footer */}
-      <footer className={`text-[11px] font-mono text-slate-500 tracking-widest text-center z-10 shrink-0 uppercase transition-all duration-700 ${spotlight.active ? 'opacity-0 translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+      <footer className={`text-[11px] font-mono text-slate-500 tracking-widest text-center z-10 shrink-0 uppercase transition-all duration-700 ${isSpotlightActive ? 'opacity-0 translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
         POWERED BY ONYX &bull; {djNames} &bull; LIVE STAGE DISPLAY
       </footer>
     </div>

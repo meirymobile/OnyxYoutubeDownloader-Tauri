@@ -225,6 +225,7 @@ export default function GuestRequestsModal({
   };
 
   const toggleManualSpotlight = (item) => {
+    if (!isActiveRef.current) return;
     if (currentSpotlightId === item.id) {
       setCurrentSpotlightId(null);
       broadcastSpotlight({ active: false, timestamp: Date.now() });
@@ -1005,6 +1006,20 @@ export default function GuestRequestsModal({
 
     const checkMasterDeckAndSpotlight = async () => {
       try {
+        if (isCancelled) return;
+        if (!isActiveRef.current) {
+          if (autoSpotlightReqId !== null) {
+            autoSpotlightReqId = null;
+            setCurrentSpotlightId(null);
+            broadcastSpotlight({ active: false, timestamp: Date.now() });
+            try {
+              localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
+              window.dispatchEvent(new Event('storage'));
+            } catch (e) {}
+          }
+          return;
+        }
+
         const { invoke } = await import('@tauri-apps/api/core');
         const resText = await invoke('get_djay_tracks_native');
         if (!resText || isCancelled) return;
@@ -1398,7 +1413,17 @@ export default function GuestRequestsModal({
     const nextState = !isActive;
     setIsActive(nextState);
     isActiveRef.current = nextState;
+    localStorage.setItem('onyx_guest_active', String(nextState));
     localStorage.setItem('onyx_room_active_' + roomCode, String(nextState));
+    if (!nextState) {
+      setCurrentSpotlightId(null);
+      setPreviewItem(null);
+      broadcastSpotlight({ active: false, timestamp: Date.now() });
+      try {
+        localStorage.setItem('onyx_stage_spotlight', JSON.stringify({ active: false }));
+        window.dispatchEvent(new Event('storage'));
+      } catch (e) {}
+    }
     broadcastRoomStatus(nextState);
     // Burst broadcasts to guarantee instant pickup on all mobile networks
     setTimeout(() => broadcastRoomStatus(nextState), 300);
