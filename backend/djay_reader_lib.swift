@@ -85,21 +85,35 @@ public func get_djay_tracks_json() -> UnsafeMutablePointer<CChar>? {
         let elements = findLabeledElements(app, prefix: prefix, depth: 0)
         
         var trackInfo: [String: String] = ["deck": "\(deckNumber)"]
+        var lineVolumeFound: String? = nil
+        var fallbackVolume: String? = nil
         
         for (label, val) in elements {
             let lower = label.lowercased()
-            if lower.starts(with: "title,") { trackInfo["title"] = val }
-            else if lower.starts(with: "artist,") { trackInfo["artist"] = val }
-            else if lower.starts(with: "play /") { trackInfo["is_playing"] = (val == "Active") ? "true" : "false" }
-            else if (lower.contains("volume") || lower.contains("fader")) &&
-                    !lower.contains("crossfader") &&
-                    !lower.contains("meter") &&
-                    !lower.contains("level") &&
-                    !lower.contains("headphone") &&
-                    !lower.contains("cue") &&
-                    !lower.contains("gain") {
-                trackInfo["volume"] = val
+            if lower.starts(with: "title,") { 
+                trackInfo["title"] = val 
+            } else if lower.starts(with: "artist,") { 
+                trackInfo["artist"] = val 
+            } else if lower.starts(with: "play /") { 
+                trackInfo["is_playing"] = (val == "Active") ? "true" : "false" 
+            } else if lower.contains("line volume") {
+                lineVolumeFound = val
+            } else if (lower.contains("volume") || lower.contains("fader")) &&
+                      !lower.contains("neural mix") &&
+                      !lower.contains("crossfader") &&
+                      !lower.contains("meter") &&
+                      !lower.contains("level") &&
+                      !lower.contains("headphone") &&
+                      !lower.contains("cue") &&
+                      !lower.contains("gain") {
+                fallbackVolume = val
             }
+        }
+        
+        if let lineVol = lineVolumeFound {
+            trackInfo["volume"] = lineVol
+        } else if let fbVol = fallbackVolume {
+            trackInfo["volume"] = fbVol
         }
         
         if trackInfo["title"] != nil {
