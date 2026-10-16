@@ -95,7 +95,15 @@ func main() {
             if lower.starts(with: "title,") { trackInfo["title"] = val }
             else if lower.starts(with: "artist,") { trackInfo["artist"] = val }
             else if lower.starts(with: "play /") { trackInfo["is_playing"] = (val == "Active") ? "true" : "false" }
-            else if lower.contains("volume") || lower.contains("fader") { trackInfo["volume"] = val }
+            else if (lower.contains("volume") || lower.contains("fader")) &&
+                    !lower.contains("crossfader") &&
+                    !lower.contains("meter") &&
+                    !lower.contains("level") &&
+                    !lower.contains("headphone") &&
+                    !lower.contains("cue") &&
+                    !lower.contains("gain") {
+                trackInfo["volume"] = val
+            }
         }
         
         if trackInfo["title"] != nil {

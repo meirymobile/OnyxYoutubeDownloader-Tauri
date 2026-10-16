@@ -1057,20 +1057,33 @@ export default function GuestRequestsModal({
           return;
         }
 
+        // Helper to reliably parse volume from string ("50%", "5%", "0.05", "1.0", NSNumber) to normalized 0.0 - 1.0 range
+        const parseDeckVolume = (volRaw) => {
+          if (volRaw === undefined || volRaw === null || volRaw === '') return 0.0;
+          const str = String(volRaw).trim();
+          let num = parseFloat(str);
+          if (isNaN(num)) return 0.0;
+          // If formatted as percentage e.g. "5%" or on 0-100 scale:
+          if (str.includes('%') || num > 1.0) {
+            num = num / 100.0;
+          }
+          return Math.max(0.0, Math.min(1.0, num));
+        };
+
         // Upfader-Only Logic: Exclude crossfader entirely.
         // A deck is audible on speakers if is_playing is true AND vertical volume slider >= 0.15 (15%)
         const audibleDecks = data.decks.filter(d => {
           const isPlaying = d.is_playing === 'true' || d.is_playing === true;
-          const vol = d.volume !== undefined ? parseFloat(d.volume) : 1.0;
-          return isPlaying && !isNaN(vol) && vol >= 0.15;
+          const vol = parseDeckVolume(d.volume);
+          return isPlaying && vol >= 0.15;
         });
 
         let masterDeck = null;
         if (audibleDecks.length === 1) {
           masterDeck = audibleDecks[0];
         } else if (audibleDecks.length > 1) {
-          // If both decks are active, the track with the higher channel fader is the Master track
-          audibleDecks.sort((a, b) => (parseFloat(b.volume) || 0) - (parseFloat(a.volume) || 0));
+          // If both decks are active, the track with the higher channel fader is strictly the Master track
+          audibleDecks.sort((a, b) => parseDeckVolume(b.volume) - parseDeckVolume(a.volume));
           masterDeck = audibleDecks[0];
         }
 
