@@ -229,6 +229,15 @@ export default function GuestRequestsModal({
     sendToClient(hiveClientRef.current, 'HiveMQ');
     sendToClient(emqxClientRef.current, 'EMQX');
 
+    // 2. Dual-Engine HTTPS Broadcast via ntfy (Port 443 - 100% reliable on cellular networks)
+    try {
+      fetch(`https://ntfy.sh/onyx_notify_${cleanRoom.toLowerCase()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payloadStr
+      }).catch(() => {});
+    } catch(e) {}
+
     // Update in local state for DJ visual feedback
     setRequests(prev => prev.map(r => r.id === item.id ? { ...r, notifiedStatus: type } : r));
   };
@@ -266,6 +275,16 @@ export default function GuestRequestsModal({
 
     sendToClient(hiveClientRef.current, 'HiveMQ');
     sendToClient(emqxClientRef.current, 'EMQX');
+
+    // 2. Dual-Engine HTTPS Broadcast via ntfy (Port 443)
+    try {
+      fetch(`https://ntfy.sh/onyx_fx_${cleanRoom.toLowerCase()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payloadStr
+      }).catch(() => {});
+    } catch(e) {}
+
     setActiveCrowdFx(mode === 'off' ? null : mode);
   };
 

@@ -27,7 +27,6 @@ export default function QrStageWindow() {
   });
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [qrTransform, setQrTransform] = useState('translate(0px, 0px) scale(1)');
   const canvasRef = useRef(null);
   const qrRef = useRef(null);
 
@@ -83,7 +82,6 @@ export default function QrStageWindow() {
         setDisplayedSpotlight(null);
         setCardVisible(false);
         setActivePhotoSlot('none');
-        setQrTransform('translate(0px, 0px) scale(1)');
         return;
       }
 
@@ -119,7 +117,6 @@ export default function QrStageWindow() {
       setDisplayedSpotlight(null);
       setCardVisible(false);
       setActivePhotoSlot('none');
-      setQrTransform('translate(0px, 0px) scale(1)');
     }
   }, [isActive]);
 
@@ -200,29 +197,6 @@ export default function QrStageWindow() {
       if (cardTransitionRef.current) clearTimeout(cardTransitionRef.current);
     };
   }, [spotlight, isActive]);
-
-  // Butter-Smooth Glide to Top-Left Corner
-  useEffect(() => {
-    const handleGlide = () => {
-      if (isActive && spotlight.active) {
-        if (qrRef.current) {
-          qrRef.current.style.transform = 'translate(0px, 0px) scale(1)';
-          const rect = qrRef.current.getBoundingClientRect();
-          const targetX = 32;
-          const targetY = 32;
-          const deltaX = targetX - rect.left;
-          const deltaY = targetY - rect.top;
-          setQrTransform(`translate(${deltaX}px, ${deltaY}px) scale(0.62)`);
-        }
-      } else {
-        setQrTransform('translate(0px, 0px) scale(1)');
-      }
-    };
-
-    handleGlide();
-    window.addEventListener('resize', handleGlide);
-    return () => window.removeEventListener('resize', handleGlide);
-  }, [spotlight.active, isActive]);
 
   const buildTargetUrl = () => {
     try {
@@ -512,15 +486,15 @@ export default function QrStageWindow() {
         </div>
 
         {isActive ? (
-          /* ACTIVE EVENT: OPTIMIZED STAGE QR CODE CARD WITH SMOOTH CORNER GLIDE */
+          /* ACTIVE EVENT: OPTIMIZED STAGE QR CODE CARD PINNED TO TOP-LEFT IN SPOTLIGHT */
           <div 
             ref={qrRef} 
-            className="relative group origin-top-left"
-            style={{ 
-              transform: qrTransform, 
-              transition: 'transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 1s ease',
-              zIndex: 50 
-            }}
+            className={`group transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] z-50 ${
+              isSpotlightActive
+                ? 'fixed top-7 left-7 scale-[0.52] origin-top-left shadow-[0_15px_40px_rgba(0,0,0,0.85)]'
+                : 'relative scale-100 origin-center'
+            }`}
+            style={isSpotlightActive ? { position: 'fixed', top: '28px', left: '28px', zIndex: 60 } : undefined}
           >
             {/* Luminous Neon Frame */}
             <div className="absolute -inset-3 bg-gradient-to-r from-purple-600 via-pink-500 to-amber-500 rounded-[34px] blur-xl opacity-75 group-hover:opacity-100 transition-opacity animate-pulse duration-1000" />

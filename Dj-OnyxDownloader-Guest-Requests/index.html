@@ -2429,6 +2429,49 @@
     // ========================================================
     let currentActiveNotifyTicket = null;
     let toastTimeout = null;
+    let guestAudioCtx = null;
+    window._sessionTickets = window._sessionTickets || [];
+    window._photoCache = window._photoCache || new Map();
+    const processedNotifications = new Set();
+
+    function unlockAudioContext() {
+      try {
+        if (!guestAudioCtx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) guestAudioCtx = new AudioCtx();
+        }
+        if (guestAudioCtx && guestAudioCtx.state === 'suspended') {
+          guestAudioCtx.resume();
+        }
+      } catch(e) {}
+    }
+    document.addEventListener('click', unlockAudioContext, { passive: true });
+    document.addEventListener('touchstart', unlockAudioContext, { passive: true });
+
+    function cleanupLocalStorageQuota() {
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('onyx_requests_') || k.startsWith('onyx_debug_'))) {
+            localStorage.removeItem(k);
+          }
+        }
+        const key = getMyTicketsKey();
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const tickets = JSON.parse(raw);
+          const sanitized = tickets.map(t => {
+            if (t.photo && t.photo.length > 3000) {
+              return { ...t, photo: null, hasPhoto: true };
+            }
+            return t;
+          }).slice(0, 10);
+          localStorage.setItem(key, JSON.stringify(sanitized));
+        }
+      } catch(e) {
+        console.warn('[Storage Cleanup] Handled:', e);
+      }
+    }
 
     function getMyTicketsKey() {
       return 'onyx_my_tickets_' + cleanRoom;
@@ -2443,25 +2486,71 @@
     }
 
     function saveMyRequest(req) {
-      const tickets = getMyTickets();
-      const filtered = tickets.filter(t => t.id !== req.id);
-      filtered.unshift(req);
-      localStorage.setItem(getMyTicketsKey(), JSON.stringify(filtered.slice(0, 15)));
+      if (!req) return;
+      try {
+        if (!window._sessionTickets) window._sessionTickets = [];
+        window._sessionTickets = window._sessionTickets.filter(t => t.id !== req.id);
+        window._sessionTickets.unshift(req);
+
+        if (req.photo) {
+          if (!window._photoCache) window._photoCache = new Map();
+          window._photoCache.set(req.id, req.photo);
+        }
+
+        const tickets = getMyTickets();
+        const lightweightReq = {
+          id: req.id,
+          title: req.title,
+          channel: req.channel,
+          url: req.url,
+          thumbnail: req.thumbnail,
+          requester: req.requester,
+          note: req.note,
+          hasPhoto: !!req.photo,
+          timestamp: req.timestamp || Date.now(),
+          status: req.status || 'pending'
+        };
+
+        const filtered = tickets.filter(t => t.id !== req.id);
+        filtered.unshift(lightweightReq);
+
+        try {
+          localStorage.setItem(getMyTicketsKey(), JSON.stringify(filtered.slice(0, 10)));
+        } catch (quotaErr) {
+          console.warn('[Storage Quota] Auto-pruning to preserve tickets:', quotaErr);
+          cleanupLocalStorageQuota();
+          try {
+            localStorage.setItem(getMyTicketsKey(), JSON.stringify(filtered.slice(0, 4)));
+          } catch(e2) {}
+        }
+      } catch(err) {
+        console.warn('[saveMyRequest error]', err);
+      }
       renderMyTickets();
     }
 
     function updateTicketStatus(reqId, newStatus) {
+      if (window._sessionTickets) {
+        window._sessionTickets = window._sessionTickets.map(t => {
+          if (t.id === reqId || (!reqId && t.status !== newStatus)) {
+            return { ...t, status: newStatus };
+          }
+          return t;
+        });
+      }
       const tickets = getMyTickets();
       let updated = false;
       const newList = tickets.map(t => {
-        if (t.id === reqId) {
+        if (t.id === reqId || (!reqId && t.status !== newStatus)) {
           updated = true;
           return { ...t, status: newStatus };
         }
         return t;
       });
       if (updated) {
-        localStorage.setItem(getMyTicketsKey(), JSON.stringify(newList));
+        try {
+          localStorage.setItem(getMyTicketsKey(), JSON.stringify(newList));
+        } catch(e) {}
         renderMyTickets();
       }
       return updated;
@@ -2516,7 +2605,7 @@
           `;
         }
 
-        const thumb = t.photo || t.thumbnail || 'favicon.png';
+        const thumb = (window._photoCache && window._photoCache.get(t.id)) || t.photo || t.thumbnail || 'favicon.png';
 
         return `
           <div class="my-ticket-card ${isUpNext ? 'is-up-next' : ''} ${isPlaying ? 'is-playing' : ''}" id="ticket-${t.id}">
@@ -2549,15 +2638,14 @@
 
     function playGuestChime() {
       try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
+        unlockAudioContext();
+        const ctx = guestAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(523.25, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
         osc.connect(gain);
         gain.connect(ctx.destination);
@@ -2566,16 +2654,71 @@
       } catch (e) {}
     }
 
+    function isNotificationForMe(payload) {
+      if (!payload) return false;
+      const allTickets = [
+        ...(window._sessionTickets || []),
+        ...getMyTickets()
+      ];
+      // 1. Direct ID match
+      if (payload.reqId && allTickets.some(t => t.id === payload.reqId)) {
+        return true;
+      }
+      // 2. Requester name match
+      const savedName = (localStorage.getItem('onyx_guest_name') || '').trim().toLowerCase();
+      const currentInputName = (document.getElementById('requester-name')?.value || '').trim().toLowerCase();
+      const notifRequester = (payload.requester || '').trim().toLowerCase();
+      if (notifRequester && notifRequester !== 'אורח אנונימי' && notifRequester !== 'guest') {
+        if (savedName && (savedName === notifRequester || notifRequester.includes(savedName) || savedName.includes(notifRequester))) {
+          return true;
+        }
+        if (currentInputName && (currentInputName === notifRequester || notifRequester.includes(currentInputName) || currentInputName.includes(notifRequester))) {
+          return true;
+        }
+        if (allTickets.some(t => (t.requester || '').trim().toLowerCase() === notifRequester)) {
+          return true;
+        }
+      }
+      // 3. Song title match
+      const notifTitle = (payload.title || '').trim().toLowerCase();
+      if (notifTitle && allTickets.some(t => {
+        const tTitle = (t.title || '').trim().toLowerCase();
+        return tTitle === notifTitle || tTitle.includes(notifTitle) || notifTitle.includes(tTitle);
+      })) {
+        return true;
+      }
+      // 4. Fallback: if user sent a request on this device and no other song id was given
+      if (allTickets.length > 0 && !payload.reqId) {
+        return true;
+      }
+      return false;
+    }
+
     function handleGuestNotification(payload) {
       if (!payload) return;
+
+      const dedupeKey = `${payload.type}_${payload.reqId || ''}_${payload.title || ''}`;
+      if (processedNotifications.has(dedupeKey)) return;
+      processedNotifications.add(dedupeKey);
+      setTimeout(() => processedNotifications.delete(dedupeKey), 25000);
+
       console.log('[Guest Notify] Received live notification:', payload);
 
-      const myTickets = getMyTickets();
-      const matchingTicket = myTickets.find(t => t.id === payload.reqId) || (myTickets.length > 0 ? myTickets[0] : null);
+      const allTickets = [
+        ...(window._sessionTickets || []),
+        ...getMyTickets()
+      ];
 
-      if (payload.reqId && !matchingTicket) {
+      // Check if this notification is for this device's request
+      const isForMe = isNotificationForMe(payload);
+      if (!isForMe) {
+        console.log('[Guest Notify] Notification is for another guest request, ignoring banner.');
         return;
       }
+
+      let matchingTicket = allTickets.find(t => t.id === payload.reqId) ||
+                           allTickets.find(t => t.title && payload.title && t.title.toLowerCase().trim() === payload.title.toLowerCase().trim()) ||
+                           (allTickets.length > 0 ? allTickets[0] : null);
 
       currentActiveNotifyTicket = matchingTicket;
       if (matchingTicket && payload.type) {
@@ -2583,7 +2726,9 @@
       }
 
       if (navigator.vibrate) {
-        navigator.vibrate([250, 100, 250, 100, 450]);
+        try {
+          navigator.vibrate([250, 100, 250, 100, 450]);
+        } catch(e) {}
       }
 
       playGuestChime();
@@ -2605,14 +2750,16 @@
       const desc = document.getElementById('notify-desc');
       if (!toast) return;
 
+      const songName = payload.title || (matchingTicket && matchingTicket.title) || 'השיר שלך';
+
       if (payload.type === 'up_next') {
-        icon.innerText = '🔥';
-        title.innerText = 'השיר שלך עולה בעוד 2 שירים!';
-        desc.innerText = `"${payload.title || (matchingTicket && matchingTicket.title) || 'השיר שלך'}" עולה בקרוב לרמקולים! כולם לרחבה! 💃🕺`;
+        if (icon) icon.innerText = '🔥';
+        if (title) title.innerText = 'השיר שלך עולה בעוד 2 שירים!';
+        if (desc) desc.innerText = `"${songName}" עולה בקרוב לרמקולים! כולם לרחבה! 💃🕺`;
       } else {
-        icon.innerText = '🎉';
-        title.innerText = 'השיר שלך מתנגן עכשיו בלייב!';
-        desc.innerText = `"${payload.title || (matchingTicket && matchingTicket.title) || 'השיר שלך'}" מנוגן כעת ברחבה! תנו בראש! 🎧`;
+        if (icon) icon.innerText = '🎉';
+        if (title) title.innerText = 'השיר שלך מתנגן עכשיו בלייב!';
+        if (desc) desc.innerText = `"${songName}" מנוגן כעת ברחבה! תנו בראש! 🎧`;
       }
 
       toast.classList.add('show');
@@ -2641,6 +2788,51 @@
         const tickets = getMyTickets();
         if (tickets.length > 0) openStoryCardForTicket(tickets[0].id);
       }
+    }
+
+    // Dual-Engine SSE listener for Port 443 notifications
+    let notifySseClient = null;
+    let fxSseClient = null;
+
+    function initNotifySseListener() {
+      // 1. Live Mobile Notifications via standard HTTPS (Port 443 SSE - 100% cellular reliability)
+      try {
+        const notifUrl = `https://ntfy.sh/onyx_notify_${cleanRoom.toLowerCase()}/sse`;
+        notifySseClient = new EventSource(notifUrl);
+        notifySseClient.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'message') {
+              const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+              if (payload) {
+                console.log('[SSE Notify] Received live notification:', payload);
+                handleGuestNotification(payload);
+              }
+            }
+          } catch(e) {
+            console.warn('[SSE Notify] Parse error:', e);
+          }
+        };
+      } catch (err) {
+        console.warn('[SSE Notify] Init error:', err);
+      }
+
+      // 2. Crowd FX via standard HTTPS (Port 443 SSE)
+      try {
+        const fxUrl = `https://ntfy.sh/onyx_fx_${cleanRoom.toLowerCase()}/sse`;
+        fxSseClient = new EventSource(fxUrl);
+        fxSseClient.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'message') {
+              const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+              if (payload && payload.mode) {
+                handleCrowdFx(payload);
+              }
+            }
+          } catch(e) {}
+        };
+      } catch (err) {}
     }
 
     // ========================================================
@@ -2737,12 +2929,18 @@
     let currentStoryTicket = null;
 
     function openStoryCardForTicket(ticketId) {
-      const tickets = getMyTickets();
-      const ticket = tickets.find(t => t.id === ticketId) || tickets[0];
+      const allTickets = [
+        ...(window._sessionTickets || []),
+        ...getMyTickets()
+      ];
+      const ticket = allTickets.find(t => t.id === ticketId) || (allTickets.length > 0 ? allTickets[0] : null);
       if (!ticket) return;
 
-      currentStoryTicket = ticket;
-      generateStoryCard(ticket);
+      const cachedPhoto = (window._photoCache && window._photoCache.get(ticket.id)) || ticket.photo || null;
+      const effectiveTicket = { ...ticket, photo: cachedPhoto };
+
+      currentStoryTicket = effectiveTicket;
+      generateStoryCard(effectiveTicket);
     }
 
     function closeStoryModal() {
@@ -3928,17 +4126,30 @@
           }).catch(() => {});
         } catch(e) {}
 
-        // 4. LocalStorage for same-browser testing
-        const key = 'onyx_requests_' + cleanRoom;
+        // 4. LocalStorage for same-browser testing (localhost only, stripped photo)
         try {
-          const current = JSON.parse(localStorage.getItem(key) || '[]');
-          current.push(payload);
-          localStorage.setItem(key, JSON.stringify(current));
-          window.dispatchEvent(new Event('storage'));
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            const key = 'onyx_requests_' + cleanRoom;
+            const current = JSON.parse(localStorage.getItem(key) || '[]');
+            current.push({ ...payload, photo: null });
+            localStorage.setItem(key, JSON.stringify(current.slice(-10)));
+            window.dispatchEvent(new Event('storage'));
+          }
         } catch(e) {}
 
+        // Save requester name for notifications
+        if (requester && requester !== 'אורח אנונימי') {
+          try {
+            localStorage.setItem('onyx_guest_name', requester);
+          } catch(e) {}
+        }
+
         // Save to My Active Tickets & Render (Feature 3)
-        saveMyRequest(payload);
+        try {
+          saveMyRequest(payload);
+        } catch(e) {
+          console.warn('[saveMyRequest fallback]', e);
+        }
 
         // Optional celebration confetti on submit
         if (window.confetti) {
@@ -3963,8 +4174,10 @@
     });
 
     // Start
+    cleanupLocalStorageQuota();
     checkConsentModal();
     checkStatus();
+    initNotifySseListener();
     renderMyTickets();
   </script>
 </body>

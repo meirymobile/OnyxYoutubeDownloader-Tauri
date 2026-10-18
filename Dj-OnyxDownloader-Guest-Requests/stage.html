@@ -129,8 +129,19 @@
       box-shadow: 0 0 80px rgba(168, 85, 247, 0.45), 0 20px 40px rgba(0, 0, 0, 0.8);
       margin-bottom: 24px;
       transform-origin: top left;
-      transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 1s ease;
+      transition: all 1s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 1s ease;
       z-index: 50;
+    }
+    body.spotlight-mode #stage-qr-card {
+      position: fixed !important;
+      top: 28px !important;
+      left: 28px !important;
+      right: auto !important;
+      bottom: auto !important;
+      margin: 0 !important;
+      transform: scale(0.55) !important;
+      transform-origin: top left !important;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.9) !important;
     }
     .qr-corner-badge {
       display: none;
@@ -563,31 +574,14 @@
     function glideQrToCorner() {
       isQrCorner = true;
       const qr = document.getElementById('stage-qr-card');
-      if (!qr) return;
-      const rect = qr.getBoundingClientRect();
-      const currentX = rect.left;
-      const currentY = rect.top;
-      const targetX = 32;
-      const targetY = 32;
-      const deltaX = targetX - currentX;
-      const deltaY = targetY - currentY;
-      
-      qr.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(0.62)`;
+      if (qr) qr.style.transform = '';
     }
 
     function glideQrToCenter() {
       isQrCorner = false;
       const qr = document.getElementById('stage-qr-card');
-      if (!qr) return;
-      qr.style.transform = 'translate(0px, 0px) scale(1)';
+      if (qr) qr.style.transform = '';
     }
-
-    window.addEventListener('resize', () => {
-      if (isQrCorner) {
-        glideQrToCenter();
-        requestAnimationFrame(() => glideQrToCorner());
-      }
-    });
 
     let cardTransitionTimeout = null;
     let currentSpotlightKey = '';
