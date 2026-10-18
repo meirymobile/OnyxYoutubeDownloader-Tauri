@@ -8,7 +8,7 @@ import {
   QrCode, Maximize2, Minimize2, Settings2, User, MessageSquareHeart, Monitor,
   MapPin, Navigation, Compass, Smartphone, Search, Building2, CheckCircle,
   Tv, Cast, Wifi, Loader2, Sparkles, Camera, Image as ImageIcon,
-  Eye, Trash2, ShieldAlert
+  Eye, Trash2, ShieldAlert, Zap, Share2
 } from 'lucide-react';
 
 // Popular Israeli event venues & wedding halls for 1-click DJ GPS calibration
@@ -184,8 +184,90 @@ export default function GuestRequestsModal({
     currentSpotlightIdRef.current = currentSpotlightId;
   }, [currentSpotlightId]);
 
+  // Feature 4: Synchronized Crowd Light Show & BPM Strobe Wave state
+  const [activeCrowdFx, setActiveCrowdFx] = useState(null); // 'strobe' | 'candle' | 'glow' | 'white' | null
+  const [crowdBpm, setCrowdBpm] = useState(128);
+
   const hiveClientRef = useRef(null);
   const emqxClientRef = useRef(null);
+
+  // Feature 3: Send Live Notification & Haptic Vibration to Guest Phone ("השיר עולה בעוד 2 שירים / מתנגן עכשיו")
+  const sendGuestNotification = (item, type = 'up_next') => {
+    if (!item) return;
+    const cleanRoom = (roomCode || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+    const notifyTopic = `onyx/requests/${cleanRoom}/notify`;
+    const message = type === 'up_next' 
+      ? `🔥 השיר שלך "${item.title}" עולה בעוד 2 שירים! היכון לרחבה!` 
+      : `🎉 השיר שלך "${item.title}" מתנגן עכשיו בשידור חי! 🎧`;
+
+    const payload = {
+      type, // 'up_next' | 'playing'
+      reqId: item.id,
+      title: item.title,
+      requester: item.requester,
+      message,
+      timestamp: Date.now()
+    };
+    const payloadStr = JSON.stringify(payload);
+
+    const sendToClient = (client, name) => {
+      try {
+        if (client && client.isConnected()) {
+          const MqttMessage = Paho?.Message || (Paho?.default && Paho.default.Message) || (window.Paho && window.Paho.Message);
+          if (MqttMessage) {
+            const msg = new MqttMessage(payloadStr);
+            msg.destinationName = notifyTopic;
+            msg.qos = 0;
+            client.send(msg);
+          }
+        }
+      } catch (err) {
+        console.warn(`[Onyx Notify] Failed to send notification to ${name}:`, err);
+      }
+    };
+
+    sendToClient(hiveClientRef.current, 'HiveMQ');
+    sendToClient(emqxClientRef.current, 'EMQX');
+
+    // Update in local state for DJ visual feedback
+    setRequests(prev => prev.map(r => r.id === item.id ? { ...r, notifiedStatus: type } : r));
+  };
+
+  // Feature 4: Broadcast Crowd Light Show & BPM Strobe Wave to All Guest Phones
+  const broadcastCrowdFx = (mode, options = {}) => {
+    const cleanRoom = (roomCode || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+    const fxTopic = `onyx/stage/${cleanRoom}/fx`;
+    const bpm = options.bpm || crowdBpm || 128;
+    const payload = {
+      mode, // 'strobe' | 'candle' | 'glow' | 'white' | 'off'
+      bpm,
+      color: options.color || '#f59e0b',
+      title: options.title || '',
+      timestamp: Date.now()
+    };
+    const payloadStr = JSON.stringify(payload);
+
+    const sendToClient = (client, name) => {
+      try {
+        if (client && client.isConnected()) {
+          const MqttMessage = Paho?.Message || (Paho?.default && Paho.default.Message) || (window.Paho && window.Paho.Message);
+          if (MqttMessage) {
+            const msg = new MqttMessage(payloadStr);
+            msg.destinationName = fxTopic;
+            msg.qos = 0;
+            msg.retained = true; // Retain so any device opening the page immediately syncs!
+            client.send(msg);
+          }
+        }
+      } catch (err) {
+        console.warn(`[Onyx Crowd FX] Failed to broadcast to ${name}:`, err);
+      }
+    };
+
+    sendToClient(hiveClientRef.current, 'HiveMQ');
+    sendToClient(emqxClientRef.current, 'EMQX');
+    setActiveCrowdFx(mode === 'off' ? null : mode);
+  };
 
   // Broadcast Live Stage Experience Spotlight (Song, Requester, Dedication, Guest Photo)
   const broadcastSpotlight = (spotlightData, targetRoom = null) => {
@@ -236,6 +318,7 @@ export default function GuestRequestsModal({
       broadcastSpotlight({ active: false, timestamp: Date.now() });
     } else {
       setCurrentSpotlightId(item.id);
+      sendGuestNotification(item, 'playing'); // Automatically alert guest that their song & photo is now on stage!
       const isGuestPhoto = !!(item.photo && item.photo.trim() && item.photo !== item.thumbnail && !item.photo.includes('ytimg.com') && !item.photo.includes('youtube.com'));
       broadcastSpotlight({
         active: true,
@@ -2379,6 +2462,115 @@ export default function GuestRequestsModal({
           {/* TAB 1: REQUESTS LIST */}
           {activeTab === 'list' && (
             <div className="space-y-3">
+              {/* Feature 4: Crowd FX Control Bar (מופע אורות וסטרוב קהל 📱✨) */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-900 to-indigo-950/40 border border-purple-500/30 shadow-[0_4px_25px_rgba(147,51,234,0.15)] flex flex-col xl:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 w-full xl:w-auto">
+                  <div className={`p-2 rounded-xl border shrink-0 ${activeCrowdFx ? 'bg-amber-500 text-black border-amber-300 shadow-[0_0_15px_#f59e0b] animate-pulse' : 'bg-purple-900/40 border-purple-500/40 text-purple-300'}`}>
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-black text-white">מופע אורות וסטרוב קהל (Crowd FX) 📱</span>
+                      {activeCrowdFx && (
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
+                          פעיל כעת: {activeCrowdFx === 'strobe' ? '⚡ סטרוב BPM' : activeCrowdFx === 'candle' ? '🕯️ סלואו זהב' : activeCrowdFx === 'glow' ? '🟣 רייב ניאון' : '🤍 פנס לבן'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      סנכרן את כל מסכי הסמארטפון של האורחים למופע אורות, סלואו רומנטי או סטרוב דרופ מטורף
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 w-full xl:w-auto justify-end">
+                  {/* Strobe Drop */}
+                  <div className="flex items-center bg-slate-900/90 rounded-xl p-0.5 border border-slate-700">
+                    <button
+                      onClick={() => broadcastCrowdFx('strobe', { bpm: crowdBpm })}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                        activeCrowdFx === 'strobe'
+                          ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black border-yellow-300 shadow-[0_0_15px_rgba(245,158,11,0.5)] animate-pulse'
+                          : 'bg-transparent text-amber-300 hover:text-white border-transparent'
+                      }`}
+                      title="סטרוב דרופ מטורף מסונכרן BPM לכל מסכי האורחים ברחבה"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>⚡ סטרוב דרופ</span>
+                    </button>
+                    {/* BPM Selector */}
+                    <select
+                      value={crowdBpm}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setCrowdBpm(val);
+                        if (activeCrowdFx === 'strobe') broadcastCrowdFx('strobe', { bpm: val });
+                      }}
+                      className="bg-slate-950 text-amber-400 text-[11px] font-mono font-bold px-1.5 py-1 rounded border-0 outline-none cursor-pointer"
+                      title="קצב BPM עבור הסטרוב"
+                    >
+                      <option value="120">120 BPM</option>
+                      <option value="124">124 BPM</option>
+                      <option value="128">128 BPM</option>
+                      <option value="132">132 BPM</option>
+                      <option value="140">140 BPM</option>
+                      <option value="150">150 BPM</option>
+                    </select>
+                  </div>
+
+                  {/* Candle Slow Dance */}
+                  <button
+                    onClick={() => broadcastCrowdFx('candle', { title: 'סלואו קסום ✨' })}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                      activeCrowdFx === 'candle'
+                        ? 'bg-gradient-to-r from-amber-600 to-rose-500 text-white border-amber-300 shadow-[0_0_15px_rgba(244,63,94,0.5)] animate-pulse'
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-pink-300 border-pink-500/30'
+                    }`}
+                    title="תאורת נר זהובה רומנטית לסלואו ולרגעים מרגשים"
+                  >
+                    <span>🕯️ סלואו זהב</span>
+                  </button>
+
+                  {/* Neon Rave */}
+                  <button
+                    onClick={() => broadcastCrowdFx('glow', { title: 'רייב ניאון 🟣' })}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                      activeCrowdFx === 'glow'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.5)] animate-pulse'
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-purple-300 border-purple-500/30'
+                    }`}
+                    title="גל צבעי ניאון פסיכדליים לכל הקהל"
+                  >
+                    <span>🟣 גל ניאון</span>
+                  </button>
+
+                  {/* Crowd Torch */}
+                  <button
+                    onClick={() => broadcastCrowdFx('white', { title: 'האירו את הרחבה! 🤍' })}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                      activeCrowdFx === 'white'
+                        ? 'bg-white text-black border-slate-200 shadow-[0_0_15px_rgba(255,255,255,0.7)] font-black'
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-600'
+                    }`}
+                    title="פנס לבן מקסימלי בכל מכשירי הקהל להארת הרחבה"
+                  >
+                    <span>🤍 פנס לבן</span>
+                  </button>
+
+                  {/* Off Button */}
+                  {activeCrowdFx && (
+                    <button
+                      onClick={() => broadcastCrowdFx('off')}
+                      className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-600/30 hover:bg-rose-600 text-rose-200 border border-rose-500/50 transition-all flex items-center gap-1"
+                      title="כבה את מופע האורות בכל מכשירי הקהל"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>כיבוי</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {requests.length === 0 ? (
                 <div className="py-20 flex flex-col items-center justify-center text-center text-slate-500 space-y-3">
                   <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800">
@@ -2568,6 +2760,35 @@ export default function GuestRequestsModal({
                         ) : (
                           /* Approved Item Actions */
                           <>
+                            {/* Feature 3: Live Guest Notification (Up Next / Playing Now with haptic vibration on phone) */}
+                            <div className="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800 shrink-0">
+                              <button
+                                onClick={() => sendGuestNotification(item, 'up_next')}
+                                className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 border ${
+                                  item.notifiedStatus === 'up_next'
+                                    ? 'bg-amber-500 text-black border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.5)] font-black'
+                                    : 'bg-slate-900 hover:bg-amber-950/40 text-amber-300 hover:text-white border-amber-500/20'
+                                }`}
+                                title="שלח התראה ורטט לטלפון של האורח שהשיר עולה בעוד 2 שירים!"
+                              >
+                                <Clock className="w-3 h-3 text-amber-400" />
+                                <span>{item.notifiedStatus === 'up_next' ? 'עולה בקרוב ✓' : 'הבא בתור ⏳'}</span>
+                              </button>
+
+                              <button
+                                onClick={() => sendGuestNotification(item, 'playing')}
+                                className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 border ${
+                                  item.notifiedStatus === 'playing'
+                                    ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white border-pink-300 shadow-[0_0_10px_rgba(236,72,153,0.5)] font-black'
+                                    : 'bg-slate-900 hover:bg-pink-950/40 text-pink-300 hover:text-white border-pink-500/20'
+                                }`}
+                                title="שלח התראה ורטט לטלפון שהשיר מתנגן עכשיו ברחבה בלייב!"
+                              >
+                                <Radio className="w-3 h-3 text-pink-400" />
+                                <span>{item.notifiedStatus === 'playing' ? 'מתנגן כעת! 🎧' : 'מתנגן 🎧'}</span>
+                              </button>
+                            </div>
+
                             {/* Live Stage Spotlight Button */}
                             <button 
                               onClick={() => toggleManualSpotlight(item)}

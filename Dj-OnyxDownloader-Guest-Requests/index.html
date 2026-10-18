@@ -15,6 +15,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <!-- Paho MQTT WebSocket Client for Instant Cloud Delivery -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <!-- QRCode.js & Canvas Confetti for Story Cards & Live Celebration -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -1212,6 +1215,475 @@
       cursor: not-allowed;
       opacity: 0.6;
     }
+
+    /* ======================================================== */
+    /* FEATURE 3: LIVE GUEST TICKETS & NOTIFICATION TOAST       */
+    /* ======================================================== */
+    .my-tickets-wrap {
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .my-tickets-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #cbd5e1;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+    .my-ticket-card {
+      background: rgba(22, 11, 33, 0.85);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      border-radius: 20px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .my-ticket-card.is-up-next {
+      border-color: #f59e0b;
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.35);
+      animation: ticketPulseAmber 2s infinite alternate;
+    }
+    .my-ticket-card.is-playing {
+      border-color: #ec4899;
+      box-shadow: 0 0 30px rgba(236, 72, 153, 0.4);
+      animation: ticketPulsePink 1.8s infinite alternate;
+    }
+    @keyframes ticketPulseAmber {
+      from { box-shadow: 0 0 15px rgba(245, 158, 11, 0.25); }
+      to { box-shadow: 0 0 35px rgba(245, 158, 11, 0.6); }
+    }
+    @keyframes ticketPulsePink {
+      from { box-shadow: 0 0 18px rgba(236, 72, 153, 0.3); }
+      to { box-shadow: 0 0 40px rgba(236, 72, 153, 0.7); }
+    }
+    .my-ticket-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .ticket-badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+    }
+    .ticket-badge-pending {
+      background: rgba(148, 163, 184, 0.15);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+    .ticket-badge-ready {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .ticket-badge-up-next {
+      background: rgba(245, 158, 11, 0.25);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.6);
+      animation: pulse 1.2s infinite;
+    }
+    .ticket-badge-playing {
+      background: linear-gradient(135deg, rgba(236, 72, 153, 0.3), rgba(168, 85, 247, 0.3));
+      color: #f472b6;
+      border: 1px solid rgba(236, 72, 153, 0.6);
+      animation: pulse 1s infinite;
+    }
+    .ticket-song-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ticket-song-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: #000;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      flex-shrink: 0;
+    }
+    .ticket-song-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .ticket-song-title {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ticket-requester-sub {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ticket-actions-bar {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ticket-story-btn {
+      padding: 6px 14px;
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 11.5px;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 15px rgba(236, 72, 153, 0.35);
+      transition: all 0.2s;
+    }
+    .ticket-story-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Sound Equalizer Bars Animation */
+    .eq-bars {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 12px;
+    }
+    .eq-bar {
+      width: 2.5px;
+      background: #f472b6;
+      border-radius: 1px;
+      animation: eqDance 0.8s infinite alternate ease-in-out;
+    }
+    .eq-bar:nth-child(1) { height: 60%; animation-delay: 0.1s; }
+    .eq-bar:nth-child(2) { height: 100%; animation-delay: 0.3s; }
+    .eq-bar:nth-child(3) { height: 40%; animation-delay: 0.2s; }
+    @keyframes eqDance {
+      0% { height: 25%; }
+      100% { height: 100%; }
+    }
+
+    /* High-Priority Floating Notification Banner (Toast) */
+    #live-notify-toast {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      max-width: 440px;
+      margin: 0 auto;
+      z-index: 99998;
+      background: linear-gradient(135deg, rgba(24, 12, 38, 0.98), rgba(42, 14, 56, 0.98));
+      border: 2px solid #f59e0b;
+      border-radius: 22px;
+      padding: 16px 18px;
+      color: #fff;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(245, 158, 11, 0.5);
+      backdrop-filter: blur(20px);
+      display: none;
+      transform: translateY(-120%);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    #live-notify-toast.show {
+      display: block;
+      transform: translateY(0);
+    }
+    .notify-content {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .notify-icon-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .notify-text-box {
+      flex: 1;
+      min-width: 0;
+    }
+    .notify-title {
+      font-size: 15px;
+      font-weight: 900;
+      color: #fef08a;
+      line-height: 1.3;
+    }
+    .notify-desc {
+      font-size: 12.5px;
+      color: #e2e8f0;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .notify-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    /* ======================================================== */
+    /* FEATURE 4: SYNCHRONIZED CROWD FX OVERLAY                 */
+    /* ======================================================== */
+    #crowd-fx-overlay {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 99999;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 30px 20px 40px;
+      text-align: center;
+      overflow: hidden;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    #crowd-fx-overlay.active {
+      display: flex;
+    }
+    .fx-top-bar {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+    .fx-live-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font-size: 11px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 0.5px;
+    }
+    .fx-close-btn {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+      transition: all 0.2s;
+    }
+    .fx-center-content {
+      z-index: 10;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .fx-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(32px, 10vw, 48px);
+      font-weight: 900;
+      line-height: 1.15;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      text-shadow: 0 4px 25px rgba(0, 0, 0, 0.8);
+    }
+    .fx-subtitle {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.5;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+      opacity: 0.95;
+    }
+
+    /* Candle Glow Animation */
+    .fx-mode-candle {
+      background: radial-gradient(circle at 50% 50%, #f59e0b 0%, #b45309 35%, #451a03 70%, #0c0402 100%) !important;
+    }
+    .candle-aura {
+      position: absolute;
+      width: 450px;
+      height: 450px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(254, 240, 138, 0.45) 0%, rgba(245, 158, 11, 0.25) 45%, transparent 75%);
+      filter: blur(40px);
+      animation: candleBreathe 3.5s infinite ease-in-out;
+      pointer-events: none;
+    }
+    @keyframes candleBreathe {
+      0%, 100% { transform: scale(0.92); opacity: 0.8; }
+      50% { transform: scale(1.18); opacity: 1; }
+    }
+
+    /* Neon Rave Flow Animation */
+    .fx-mode-glow {
+      background: linear-gradient(135deg, #7928ca 0%, #ff0080 50%, #0070f3 100%) !important;
+      background-size: 400% 400% !important;
+      animation: neonFlow 6s ease infinite !important;
+    }
+    @keyframes neonFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* White Torch Mode */
+    .fx-mode-white {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+    .fx-mode-white .fx-live-indicator,
+    .fx-mode-white .fx-close-btn {
+      background: rgba(0, 0, 0, 0.15) !important;
+      color: #000 !important;
+      border-color: rgba(0, 0, 0, 0.25) !important;
+    }
+    .fx-mode-white .fx-title {
+      color: #000 !important;
+      text-shadow: none !important;
+    }
+    .fx-mode-white .fx-subtitle {
+      color: #333 !important;
+      text-shadow: none !important;
+    }
+
+    /* Strobe Flash (Managed via CSS or high-speed JS interval) */
+    .fx-mode-strobe-on {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+    .fx-mode-strobe-off {
+      background: #000000 !important;
+      color: #ffffff !important;
+    }
+
+    /* ======================================================== */
+    /* FEATURE 5: VIRAL SOUVENIR STORY CARD (9:16 MODAL)        */
+    /* ======================================================== */
+    #story-card-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 1, 10, 0.88);
+      backdrop-filter: blur(18px);
+      z-index: 99999;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow-y: auto;
+    }
+    #story-card-modal.open {
+      display: flex;
+    }
+    .story-modal-card {
+      background: rgba(18, 10, 31, 0.95);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 28px;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.85), 0 0 40px rgba(245, 158, 11, 0.2);
+      position: relative;
+    }
+    .story-preview-frame {
+      width: 220px;
+      height: 391px; /* 9:16 aspect ratio */
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(168, 85, 247, 0.3);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      margin: 14px 0;
+      background: #000;
+    }
+    .story-preview-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .story-btn-primary {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%);
+      border: none;
+      border-radius: 16px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 6px 25px rgba(236, 72, 153, 0.45);
+      transition: all 0.2s;
+      margin-bottom: 8px;
+    }
+    .story-btn-primary:active {
+      transform: scale(0.97);
+    }
+    .story-btn-secondary {
+      width: 100%;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 14px;
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .story-btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -1335,11 +1807,19 @@
       <p class="active-subtitle">חפשו שיר והדיג'יי ינגן אותו ברחבה!</p>
     </div>
 
-    <!-- Active Success Confirmation Card (if already submitted) -->
-    <div id="success-banner" class="success-card">
-      <div style="font-size: 13px; color: #a7f3d0; font-weight: 700;">הבקשה שלך התקבלה בהצלחה! 🎉</div>
-      <div class="success-number" id="ticket-number">#01</div>
-      <div style="font-size: 12px; color: #6ee7b7;" id="ticket-track-name">Track Name</div>
+    <!-- My Active Tickets & Live Song Tracking (Feature 3) -->
+    <div id="my-tickets-wrap" class="my-tickets-wrap">
+      <div class="my-tickets-title">
+        <span>הבקשות שלי באירוע 🎵</span>
+        <span id="my-tickets-count-badge" style="font-size: 11px; color: #a7f3d0; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 8px; border-radius: 10px;">0 שירים</span>
+      </div>
+      <div id="my-tickets-list"></div>
+    </div>
+
+    <!-- Hidden compatibility elements for legacy calls -->
+    <div id="success-banner" style="display: none;">
+      <div id="ticket-number"></div>
+      <div id="ticket-track-name"></div>
     </div>
 
     <!-- Search Card -->
@@ -1580,6 +2060,76 @@
         <span>✓ סיום ואישור תצוגה</span>
       </button>
     </div>
+  </div>
+
+  <!-- High-Priority Floating Notification Banner (Feature 3) -->
+  <div id="live-notify-toast" onclick="handleToastClick()">
+    <div class="notify-content">
+      <div class="notify-icon-box" id="notify-icon">🔥</div>
+      <div class="notify-text-box">
+        <div class="notify-title" id="notify-title">השיר שלך עולה בעוד 2 שירים!</div>
+        <div class="notify-desc" id="notify-desc">התכוננו לרחבה, הדיג'יי מכין את השיר שלכם!</div>
+        <div class="notify-actions">
+          <button id="notify-story-btn" class="ticket-story-btn" onclick="event.stopPropagation(); openStoryCardForCurrentNotify()">
+            <span>📸 צור סטורי מזכרת</span>
+          </button>
+          <button style="background: none; border: none; color: #94a3b8; font-size: 12px; cursor: pointer; text-decoration: underline;" onclick="event.stopPropagation(); closeNotifyToast()">
+            הבנתי, סגור
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Synchronized Crowd Light Show & BPM Strobe Wave (Feature 4) -->
+  <div id="crowd-fx-overlay">
+    <div class="candle-aura" id="candle-aura" style="display: none;"></div>
+    
+    <div class="fx-top-bar">
+      <div class="fx-live-indicator">
+        <span class="status-dot"></span>
+        <span id="fx-badge-text">ONYX CROWD LIVE ✨</span>
+      </div>
+      <button class="fx-close-btn" onclick="stopCrowdFx(true)" title="מזער מופע אורות">&times;</button>
+    </div>
+
+    <div class="fx-center-content">
+      <h1 class="fx-title" id="fx-main-title">סלואו קסום ✨</h1>
+      <p class="fx-subtitle" id="fx-sub-title">הרימו את הטלפון אל על והאירו את הרחבה!</p>
+    </div>
+
+    <div style="font-size: 11px; opacity: 0.8; z-index: 10; letter-spacing: 1px; font-weight: 700;">
+      ONYX DJ™ SYNCHRONIZED EXPERIENCE
+    </div>
+  </div>
+
+  <!-- Viral Branded Souvenir Story Card Modal (Feature 5) -->
+  <div id="story-card-modal">
+    <div class="story-modal-card">
+      <button class="modal-close" onclick="closeStoryModal()">&times;</button>
+      
+      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #facc15; font-size: 11px; font-weight: 800; margin-bottom: 8px;">
+        <span>📸 סטורי מזכרת ממותג</span>
+      </div>
+
+      <h3 style="font-size: 18px; font-weight: 900; color: #fff; text-align: center;">השיר שלך ברחבה! 🎉</h3>
+      <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 4px;">שתפו לאינסטגרם, טיקטוק או וואטסאפ ישירות בלחיצה אחת!</p>
+
+      <div class="story-preview-frame">
+        <img id="story-preview-img" class="story-preview-img" src="" alt="Story Preview" />
+      </div>
+
+      <button id="story-share-btn" class="story-btn-primary" onclick="shareStoryCard()">
+        <span>📲 שתף ישירות לסטורי</span>
+      </button>
+
+      <button class="story-btn-secondary" onclick="downloadStoryCard()">
+        <span>💾 הורד תמונה למכשיר (PNG)</span>
+      </button>
+    </div>
+
+    <!-- Offscreen 1080x1920 9:16 Canvas for High-Resolution Story Generation -->
+    <canvas id="story-canvas" width="1080" height="1920" style="display: none;"></canvas>
   </div>
 
   <script>
@@ -1874,20 +2424,620 @@
       }
     }
 
-    // 3. MQTT WEBSOCKET BROKER LISTENER (HiveMQ + EMQX)
+    // ========================================================
+    // FEATURE 3: LIVE GUEST TICKETS & NOTIFICATION LOGIC
+    // ========================================================
+    let currentActiveNotifyTicket = null;
+    let toastTimeout = null;
+
+    function getMyTicketsKey() {
+      return 'onyx_my_tickets_' + cleanRoom;
+    }
+
+    function getMyTickets() {
+      try {
+        return JSON.parse(localStorage.getItem(getMyTicketsKey()) || '[]');
+      } catch(e) {
+        return [];
+      }
+    }
+
+    function saveMyRequest(req) {
+      const tickets = getMyTickets();
+      const filtered = tickets.filter(t => t.id !== req.id);
+      filtered.unshift(req);
+      localStorage.setItem(getMyTicketsKey(), JSON.stringify(filtered.slice(0, 15)));
+      renderMyTickets();
+    }
+
+    function updateTicketStatus(reqId, newStatus) {
+      const tickets = getMyTickets();
+      let updated = false;
+      const newList = tickets.map(t => {
+        if (t.id === reqId) {
+          updated = true;
+          return { ...t, status: newStatus };
+        }
+        return t;
+      });
+      if (updated) {
+        localStorage.setItem(getMyTicketsKey(), JSON.stringify(newList));
+        renderMyTickets();
+      }
+      return updated;
+    }
+
+    function renderMyTickets() {
+      const wrap = document.getElementById('my-tickets-wrap');
+      const list = document.getElementById('my-tickets-list');
+      const countBadge = document.getElementById('my-tickets-count-badge');
+      if (!wrap || !list) return;
+
+      const tickets = getMyTickets();
+      if (!tickets || tickets.length === 0) {
+        wrap.style.display = 'none';
+        return;
+      }
+
+      wrap.style.display = 'block';
+      if (countBadge) countBadge.innerText = `${tickets.length} ${tickets.length === 1 ? 'שיר' : 'שירים'}`;
+
+      list.innerHTML = tickets.map((t, idx) => {
+        const isUpNext = t.status === 'up_next';
+        const isPlaying = t.status === 'playing';
+
+        let badgeHtml = '';
+        if (isPlaying) {
+          badgeHtml = `
+            <span class="ticket-badge-status ticket-badge-playing">
+              <span class="eq-bars">
+                <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
+              </span>
+              מתנגן עכשיו ברחבה! 🎧
+            </span>
+          `;
+        } else if (isUpNext) {
+          badgeHtml = `
+            <span class="ticket-badge-status ticket-badge-up-next">
+              🔥 עולה בעוד 2 שירים! היכון לרחבה!
+            </span>
+          `;
+        } else if (t.status === 'ready') {
+          badgeHtml = `
+            <span class="ticket-badge-status ticket-badge-ready">
+              ✨ אושר ע״י הדיג'יי (ינוגן בהמשך)
+            </span>
+          `;
+        } else {
+          badgeHtml = `
+            <span class="ticket-badge-status ticket-badge-pending">
+              ⏳ ממתין לבדיקת הדיג'יי
+            </span>
+          `;
+        }
+
+        const thumb = t.photo || t.thumbnail || 'favicon.png';
+
+        return `
+          <div class="my-ticket-card ${isUpNext ? 'is-up-next' : ''} ${isPlaying ? 'is-playing' : ''}" id="ticket-${t.id}">
+            <div class="my-ticket-header">
+              <span style="font-size: 11px; font-weight: 800; color: #a78bfa; font-family: monospace;">#0${idx + 1}</span>
+              ${badgeHtml}
+            </div>
+
+            <div class="ticket-song-row">
+              <img src="${thumb}" class="ticket-song-thumb" alt="" />
+              <div class="ticket-song-info">
+                <div class="ticket-song-title" title="${t.title}">${t.title}</div>
+                <div class="ticket-requester-sub">
+                  <span>👤 ${t.requester || 'אורח'}</span>
+                  ${t.note ? `<span style="color: #facc15; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">• "${t.note}"</span>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div class="ticket-actions-bar">
+              <span style="font-size: 10px; color: #64748b;">ONYX DJ™ • REQUEST TRACKER</span>
+              <button type="button" class="ticket-story-btn" onclick="openStoryCardForTicket('${t.id}')">
+                <span>📸 סטורי מזכרת ממותג</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function playGuestChime() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      } catch (e) {}
+    }
+
+    function handleGuestNotification(payload) {
+      if (!payload) return;
+      console.log('[Guest Notify] Received live notification:', payload);
+
+      const myTickets = getMyTickets();
+      const matchingTicket = myTickets.find(t => t.id === payload.reqId) || (myTickets.length > 0 ? myTickets[0] : null);
+
+      if (payload.reqId && !matchingTicket) {
+        return;
+      }
+
+      currentActiveNotifyTicket = matchingTicket;
+      if (matchingTicket && payload.type) {
+        updateTicketStatus(matchingTicket.id, payload.type);
+      }
+
+      if (navigator.vibrate) {
+        navigator.vibrate([250, 100, 250, 100, 450]);
+      }
+
+      playGuestChime();
+
+      if (window.confetti) {
+        try {
+          window.confetti({
+            particleCount: 80,
+            spread: 70,
+            origin: { y: 0.15 },
+            colors: ['#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#ffffff']
+          });
+        } catch(e) {}
+      }
+
+      const toast = document.getElementById('live-notify-toast');
+      const icon = document.getElementById('notify-icon');
+      const title = document.getElementById('notify-title');
+      const desc = document.getElementById('notify-desc');
+      if (!toast) return;
+
+      if (payload.type === 'up_next') {
+        icon.innerText = '🔥';
+        title.innerText = 'השיר שלך עולה בעוד 2 שירים!';
+        desc.innerText = `"${payload.title || (matchingTicket && matchingTicket.title) || 'השיר שלך'}" עולה בקרוב לרמקולים! כולם לרחבה! 💃🕺`;
+      } else {
+        icon.innerText = '🎉';
+        title.innerText = 'השיר שלך מתנגן עכשיו בלייב!';
+        desc.innerText = `"${payload.title || (matchingTicket && matchingTicket.title) || 'השיר שלך'}" מנוגן כעת ברחבה! תנו בראש! 🎧`;
+      }
+
+      toast.classList.add('show');
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        closeNotifyToast();
+      }, 14000);
+    }
+
+    function closeNotifyToast() {
+      const toast = document.getElementById('live-notify-toast');
+      if (toast) toast.classList.remove('show');
+    }
+
+    function handleToastClick() {
+      closeNotifyToast();
+      const wrap = document.getElementById('my-tickets-wrap');
+      if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function openStoryCardForCurrentNotify() {
+      closeNotifyToast();
+      if (currentActiveNotifyTicket) {
+        openStoryCardForTicket(currentActiveNotifyTicket.id);
+      } else {
+        const tickets = getMyTickets();
+        if (tickets.length > 0) openStoryCardForTicket(tickets[0].id);
+      }
+    }
+
+    // ========================================================
+    // FEATURE 4: SYNCHRONIZED CROWD FX (STROBE & GLOW WAVE)
+    // ========================================================
+    let crowdFxInterval = null;
+    let isStrobePhase = false;
+    let currentFxMode = null;
+
+    function handleCrowdFx(payload) {
+      if (!payload) return;
+      console.log('[Crowd FX] Incoming command:', payload);
+
+      if (payload.mode === 'off' || !payload.mode) {
+        stopCrowdFx();
+      } else {
+        startCrowdFx(payload.mode, payload.bpm, payload.color, payload.title);
+      }
+    }
+
+    function startCrowdFx(mode, bpm = 128, color = '#f59e0b', title = '') {
+      currentFxMode = mode;
+      const overlay = document.getElementById('crowd-fx-overlay');
+      const candleAura = document.getElementById('candle-aura');
+      const mainTitle = document.getElementById('fx-main-title');
+      const subTitle = document.getElementById('fx-sub-title');
+      const badgeText = document.getElementById('fx-badge-text');
+      if (!overlay) return;
+
+      if (crowdFxInterval) clearInterval(crowdFxInterval);
+      overlay.className = '';
+      if (candleAura) candleAura.style.display = 'none';
+
+      overlay.classList.add('active');
+
+      if (mode === 'strobe') {
+        badgeText.innerText = `⚡ STROBE DROP • ${bpm} BPM`;
+        mainTitle.innerText = title || '⚡ DROP! עפים באוויר! ⚡';
+        subTitle.innerText = 'הרם את הטלפון גבוה לרחבה!';
+        
+        const flashRateMs = Math.max(70, Math.round((60000 / (bpm || 128)) / 2));
+        isStrobePhase = false;
+
+        crowdFxInterval = setInterval(() => {
+          isStrobePhase = !isStrobePhase;
+          if (isStrobePhase) {
+            overlay.classList.remove('fx-mode-strobe-off');
+            overlay.classList.add('fx-mode-strobe-on');
+            if (navigator.vibrate) navigator.vibrate(25);
+          } else {
+            overlay.classList.remove('fx-mode-strobe-on');
+            overlay.classList.add('fx-mode-strobe-off');
+          }
+        }, flashRateMs);
+
+      } else if (mode === 'candle') {
+        overlay.classList.add('fx-mode-candle');
+        if (candleAura) candleAura.style.display = 'block';
+        badgeText.innerText = '✨ סלואו קסום ✨';
+        mainTitle.innerText = title || 'סלואו קסום ברחבה ✨';
+        subTitle.innerText = 'הרימו את הטלפון והאירו את הרגע המרגש...';
+
+      } else if (mode === 'glow') {
+        overlay.classList.add('fx-mode-glow');
+        badgeText.innerText = '🟣 RAVE NEON WAVE 🟣';
+        mainTitle.innerText = title || 'גל ניאון פסיכדלי 🟣';
+        subTitle.innerText = 'רוקדים יחד באותה אנרגיה ברחבה!';
+
+      } else if (mode === 'white') {
+        overlay.classList.add('fx-mode-white');
+        badgeText.innerText = '🤍 CROWD TORCH 🤍';
+        mainTitle.innerText = title || 'האירו את הרחבה! 🤍';
+        subTitle.innerText = 'אלומת אור ענקית מהקהל לבמה!';
+      }
+    }
+
+    function stopCrowdFx(userDismissed = false) {
+      const overlay = document.getElementById('crowd-fx-overlay');
+      if (crowdFxInterval) {
+        clearInterval(crowdFxInterval);
+        crowdFxInterval = null;
+      }
+      if (overlay) {
+        overlay.className = '';
+        overlay.classList.remove('active');
+      }
+      currentFxMode = null;
+    }
+
+    // ========================================================
+    // FEATURE 5: VIRAL SOUVENIR STORY CARD (CANVAS 9:16)
+    // ========================================================
+    let currentStoryBlob = null;
+    let currentStoryTicket = null;
+
+    function openStoryCardForTicket(ticketId) {
+      const tickets = getMyTickets();
+      const ticket = tickets.find(t => t.id === ticketId) || tickets[0];
+      if (!ticket) return;
+
+      currentStoryTicket = ticket;
+      generateStoryCard(ticket);
+    }
+
+    function closeStoryModal() {
+      const modal = document.getElementById('story-card-modal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    async function generateStoryCard(ticket) {
+      const canvas = document.getElementById('story-canvas');
+      const previewImg = document.getElementById('story-preview-img');
+      const modal = document.getElementById('story-card-modal');
+      if (!canvas || !previewImg || !modal) return;
+
+      const ctx = canvas.getContext('2d');
+      const W = 1080;
+      const H = 1920;
+      canvas.width = W;
+      canvas.height = H;
+
+      // 1. Luxury Dark Gradient Background
+      const bgGrad = ctx.createRadialGradient(W / 2, H * 0.35, 100, W / 2, H / 2, W * 0.95);
+      bgGrad.addColorStop(0, '#241038');
+      bgGrad.addColorStop(0.45, '#120520');
+      bgGrad.addColorStop(1, '#05010a');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Gold Nebula Glow Accent at Top & Bottom
+      const topNebula = ctx.createRadialGradient(W / 2, 0, 50, W / 2, 0, 600);
+      topNebula.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
+      topNebula.addColorStop(0.6, 'rgba(236, 72, 153, 0.12)');
+      topNebula.addColorStop(1, 'transparent');
+      ctx.fillStyle = topNebula;
+      ctx.fillRect(0, 0, W, H);
+
+      // 2. Vinyl Grooves Background Texture
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+      ctx.lineWidth = 1.5;
+      for (let r = 180; r < 950; r += 24) {
+        ctx.beginPath();
+        ctx.arc(W / 2, 850, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 3. Top Header: ONYX DJ™ Branding
+      ctx.textAlign = 'center';
+      
+      const badgeW = 460;
+      const badgeH = 56;
+      const badgeX = (W - badgeW) / 2;
+      const badgeY = 130;
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+      ctx.beginPath();
+      ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 28);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#fde68a';
+      ctx.font = 'bold 22px "Space Grotesk", "Heebo", sans-serif';
+      ctx.fillText('ONYX DJ™ • LIVE EXPERIENCE', W / 2, badgeY + 36);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 48px "Heebo", sans-serif';
+      ctx.fillText('השיר שהקפיץ את הרחבה! 🎉', W / 2, 260);
+
+      const activeDjName = document.getElementById('active-dj-title')?.innerText || 'DJ SHAZZ & DJ SONIC';
+      ctx.fillStyle = '#fb923c';
+      ctx.font = 'bold 26px "Space Grotesk", sans-serif';
+      ctx.fillText(`🎧 ${activeDjName}`, W / 2, 310);
+
+      // 4. Center Visual: Guest Real Photo or Turntable Vinyl
+      const imgSize = 560;
+      const imgX = (W - imgSize) / 2;
+      const imgY = 400;
+
+      const imgSrc = ticket.photo || ticket.thumbnail;
+      if (imgSrc) {
+        try {
+          const img = await loadImage(imgSrc);
+
+          ctx.save();
+          ctx.shadowColor = ticket.photo ? 'rgba(236, 72, 153, 0.5)' : 'rgba(245, 158, 11, 0.4)';
+          ctx.shadowBlur = 45;
+          ctx.shadowOffsetY = 15;
+
+          ctx.beginPath();
+          ctx.roundRect(imgX, imgY, imgSize, imgSize, 36);
+          ctx.fillStyle = '#000000';
+          ctx.fill();
+          ctx.restore();
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(imgX, imgY, imgSize, imgSize, 36);
+          ctx.clip();
+          ctx.drawImage(img, imgX, imgY, imgSize, imgSize);
+          ctx.restore();
+
+          ctx.save();
+          ctx.strokeStyle = ticket.photo ? 'rgba(244, 114, 182, 0.7)' : 'rgba(245, 158, 11, 0.6)';
+          ctx.lineWidth = 6;
+          ctx.beginPath();
+          ctx.roundRect(imgX, imgY, imgSize, imgSize, 36);
+          ctx.stroke();
+          ctx.restore();
+
+          if (ticket.photo) {
+            ctx.fillStyle = '#db2777';
+            ctx.beginPath();
+            ctx.roundRect(imgX + imgSize - 140, imgY + 20, 120, 44, 22);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 20px "Heebo", sans-serif';
+            ctx.fillText('📸 LIVE', imgX + imgSize - 80, imgY + 50);
+          }
+        } catch(e) {
+          console.warn('Failed loading image for canvas:', e);
+        }
+      }
+
+      // 5. Track Details & Requester
+      const metaY = imgY + imgSize + 90;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 46px "Heebo", sans-serif';
+      wrapCanvasText(ctx, ticket.title || 'שיר נבחר', W / 2, metaY, 920, 56);
+
+      const requesterY = metaY + 140;
+      ctx.fillStyle = 'rgba(168, 85, 247, 0.2)';
+      ctx.beginPath();
+      ctx.roundRect((W - 520) / 2, requesterY - 35, 520, 60, 30);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#e9d5ff';
+      ctx.font = 'bold 28px "Heebo", sans-serif';
+      ctx.fillText(`הוקדש באהבה ע״י ${ticket.requester || 'אורח ברחבה'} ❤️`, W / 2, requesterY + 7);
+
+      if (ticket.note) {
+        ctx.fillStyle = '#fde047';
+        ctx.font = 'italic 500 30px "Heebo", sans-serif';
+        wrapCanvasText(ctx, `“${ticket.note}”`, W / 2, requesterY + 80, 880, 40);
+      }
+
+      // 6. Footer: Dynamic QR Code & Official Copyright
+      const qrSize = 150;
+      const qrX = (W - qrSize) / 2;
+      const qrY = H - 320;
+
+      try {
+        const qrUrl = window.location.href;
+        const qrDataUrl = await generateQrDataUrl(qrUrl, qrSize);
+        if (qrDataUrl) {
+          const qrImg = await loadImage(qrDataUrl);
+          
+          ctx.save();
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.roundRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 16);
+          ctx.fill();
+          ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+          ctx.restore();
+        }
+      } catch(e) {}
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '600 22px "Heebo", sans-serif';
+      ctx.fillText('סרקו גם אתם להזמנת שיר באירוע 📲', W / 2, qrY + qrSize + 45);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = '500 18px "Space Grotesk", sans-serif';
+      ctx.fillText('© 2026 Onyx DJ™ Systems by Meir.Y • All rights reserved.', W / 2, H - 45);
+
+      canvas.toBlob((blob) => {
+        currentStoryBlob = blob;
+        const dataUrl = URL.createObjectURL(blob);
+        previewImg.src = dataUrl;
+        modal.classList.add('open');
+      }, 'image/png');
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Image load failed'));
+        img.src = src;
+      });
+    }
+
+    function generateQrDataUrl(text, size) {
+      return new Promise((resolve) => {
+        if (!window.QRCode) return resolve(null);
+        const tempDiv = document.createElement('div');
+        new window.QRCode(tempDiv, {
+          text: text,
+          width: size,
+          height: size,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: window.QRCode.CorrectLevel.M
+        });
+        setTimeout(() => {
+          const img = tempDiv.querySelector('img');
+          const canvas = tempDiv.querySelector('canvas');
+          if (img && img.src) resolve(img.src);
+          else if (canvas) resolve(canvas.toDataURL('image/png'));
+          else resolve(null);
+        }, 100);
+      });
+    }
+
+    function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+      const words = (text || '').split(' ');
+      let line = '';
+      let testY = y;
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && n > 0) {
+          ctx.fillText(line.trim(), x, testY);
+          line = words[n] + ' ';
+          testY += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line.trim(), x, testY);
+    }
+
+    async function shareStoryCard() {
+      if (!currentStoryBlob) {
+        alert('התמונה עדיין מעובדת, נסו שוב בעוד רגע');
+        return;
+      }
+      const file = new File([currentStoryBlob], 'onyx-dj-story.png', { type: 'image/png' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'השיר שלי ב-ONYX DJ™',
+            text: 'ביקשתי שיר ברחבה והדיג\'יי ניגן אותו! 🔥 #OnyxDJ'
+          });
+        } catch(e) {
+          if (e.name !== 'AbortError') downloadStoryCard();
+        }
+      } else {
+        downloadStoryCard();
+      }
+    }
+
+    function downloadStoryCard() {
+      if (!currentStoryBlob) return;
+      const url = URL.createObjectURL(currentStoryBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `onyx-story-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // 3. MQTT WEBSOCKET BROKER LISTENER (HiveMQ + EMQX with Notify & Crowd FX support)
     function initMqttStatusListener() {
       const statusTopic = `onyx/status/${cleanRoom}`;
+      const notifyTopic = `onyx/requests/${cleanRoom}/notify`;
+      const fxTopic = `onyx/stage/${cleanRoom}/fx`;
       const PahoLib = window.Paho;
       const Client = (PahoLib && PahoLib.MQTT && PahoLib.MQTT.Client) || (PahoLib && PahoLib.Client);
       if (!Client) return;
 
       const handleMsg = (msg) => {
         try {
-          const statusInfo = JSON.parse(msg.payloadString);
-          console.log('[Guest MQTT] Received room status update:', statusInfo);
-          applyRoomStatus(statusInfo);
+          const topic = msg.destinationName || '';
+          const payload = JSON.parse(msg.payloadString);
+          console.log('[Guest MQTT] Received on', topic, payload);
+
+          if (topic.includes('/fx')) {
+            handleCrowdFx(payload);
+          } else if (topic.includes('/notify')) {
+            handleGuestNotification(payload);
+          } else {
+            applyRoomStatus(payload);
+          }
         } catch(e) {
-          console.warn('[Guest MQTT] Error parsing status payload:', e);
+          console.warn('[Guest MQTT] Error parsing message payload:', e);
         }
       };
 
@@ -1902,7 +3052,12 @@
           cleanSession: true,
           onSuccess: () => {
             mqttStatusClient.subscribe(statusTopic, { qos: 0 });
-            if (cleanRoom !== 'SHAZZ-SONIC') mqttStatusClient.subscribe('onyx/status/SHAZZ-SONIC', { qos: 0 });
+            mqttStatusClient.subscribe(notifyTopic, { qos: 0 });
+            mqttStatusClient.subscribe(fxTopic, { qos: 0 });
+            if (cleanRoom !== 'SHAZZ-SONIC') {
+              mqttStatusClient.subscribe('onyx/status/SHAZZ-SONIC', { qos: 0 });
+              mqttStatusClient.subscribe('onyx/stage/SHAZZ-SONIC/fx', { qos: 0 });
+            }
           },
           onFailure: tryEmqxFallback
         });
@@ -1921,7 +3076,12 @@
             cleanSession: true,
             onSuccess: () => {
               emqx.subscribe(statusTopic, { qos: 0 });
-              if (cleanRoom !== 'SHAZZ-SONIC') emqx.subscribe('onyx/status/SHAZZ-SONIC', { qos: 0 });
+              emqx.subscribe(notifyTopic, { qos: 0 });
+              emqx.subscribe(fxTopic, { qos: 0 });
+              if (cleanRoom !== 'SHAZZ-SONIC') {
+                emqx.subscribe('onyx/status/SHAZZ-SONIC', { qos: 0 });
+                emqx.subscribe('onyx/stage/SHAZZ-SONIC/fx', { qos: 0 });
+              }
             }
           });
         } catch(e) {}
@@ -2777,9 +3937,16 @@
           window.dispatchEvent(new Event('storage'));
         } catch(e) {}
 
-        // Show Ticket on UI
-        document.getElementById('success-banner').style.display = 'block';
-        document.getElementById('ticket-track-name').innerText = selectedTrack.title;
+        // Save to My Active Tickets & Render (Feature 3)
+        saveMyRequest(payload);
+
+        // Optional celebration confetti on submit
+        if (window.confetti) {
+          try {
+            window.confetti({ particleCount: 50, spread: 60, origin: { y: 0.3 } });
+          } catch(e) {}
+        }
+
         closeModal();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
@@ -2798,6 +3965,7 @@
     // Start
     checkConsentModal();
     checkStatus();
+    renderMyTickets();
   </script>
 </body>
 </html>
