@@ -2907,8 +2907,75 @@
       }
     }
 
+    // ========================================================
+    // SCREEN WAKE LOCK & ANTI-SLEEP CONTROLLER
+    // Keeps mobile screens alive during live Crowd FX shows
+    // ========================================================
+    let crowdWakeLock = null;
+    let noSleepVideo = null;
+
+    async function acquireWakeLock() {
+      // 1. Official Native Screen Wake Lock API (Android Chrome & iOS 16.4+ Safari)
+      try {
+        if ('wakeLock' in navigator && !crowdWakeLock) {
+          crowdWakeLock = await navigator.wakeLock.request('screen');
+          crowdWakeLock.addEventListener('release', () => {
+            console.log('[WakeLock] Screen wake lock released');
+            crowdWakeLock = null;
+          });
+          console.log('[WakeLock] Native Screen Wake Lock active');
+        }
+      } catch (err) {
+        console.warn('[WakeLock] Native lock request failed:', err);
+      }
+
+      // 2. Continuous Video Playback Fallback (Guaranteed to keep all iOS Safari versions awake)
+      try {
+        if (!noSleepVideo) {
+          noSleepVideo = document.createElement('video');
+          noSleepVideo.setAttribute('playsinline', '');
+          noSleepVideo.setAttribute('webkit-playsinline', '');
+          noSleepVideo.setAttribute('muted', '');
+          noSleepVideo.muted = true;
+          noSleepVideo.loop = true;
+          noSleepVideo.style.position = 'fixed';
+          noSleepVideo.style.top = '-9999px';
+          noSleepVideo.style.left = '-9999px';
+          noSleepVideo.style.width = '1px';
+          noSleepVideo.style.height = '1px';
+          noSleepVideo.style.opacity = '0';
+          noSleepVideo.style.pointerEvents = 'none';
+          noSleepVideo.src = 'data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAW1wNDJpc29tYXZjMQAAADpmcmVlAAAALW1kYXQAAAGZAAEAEx//v9/f39/f39/f39/f39/f39/f39/f39/f39/f398AAAAmbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAACWAAAAlgAAQAAAQAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAACXRyYWsAAABcdGtoZAAAAAEAAAAAAAAAAAAAAAEAAAAAAAACWAAAAAAAAAAAAAAAEA';
+          document.body.appendChild(noSleepVideo);
+        }
+        noSleepVideo.play().catch(() => {});
+      } catch (e) {}
+    }
+
+    function releaseWakeLock() {
+      if (crowdWakeLock) {
+        try {
+          crowdWakeLock.release();
+        } catch(e) {}
+        crowdWakeLock = null;
+      }
+      if (noSleepVideo) {
+        try {
+          noSleepVideo.pause();
+        } catch(e) {}
+      }
+    }
+
+    // Automatically re-acquire wake lock if user switches back to the tab while FX is active
+    document.addEventListener('visibilitychange', async () => {
+      if (currentFxMode && document.visibilityState === 'visible') {
+        await acquireWakeLock();
+      }
+    });
+
     function startCrowdFx(mode, bpm = 128, color = '#f59e0b', title = '') {
       currentFxMode = mode;
+      acquireWakeLock();
       const overlay = document.getElementById('crowd-fx-overlay');
       const candleAura = document.getElementById('candle-aura');
       const mainTitle = document.getElementById('fx-main-title');
@@ -2980,6 +3047,7 @@
     }
 
     function stopCrowdFx(userDismissed = false) {
+      releaseWakeLock();
       const overlay = document.getElementById('crowd-fx-overlay');
       if (crowdFxInterval) {
         clearInterval(crowdFxInterval);
