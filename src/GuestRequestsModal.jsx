@@ -226,6 +226,10 @@ export default function GuestRequestsModal({
 
   const toggleManualSpotlight = (item) => {
     if (!isActiveRef.current) return;
+    if (!item || !item.isApproved) {
+      console.warn('[Onyx Stage Live] Cannot broadcast unapproved request to stage screen');
+      return;
+    }
     if (currentSpotlightId === item.id) {
       setCurrentSpotlightId(null);
       broadcastSpotlight({ active: false, timestamp: Date.now() });
@@ -2511,31 +2515,46 @@ export default function GuestRequestsModal({
                       {/* Status & Action Buttons */}
                       <div className="flex items-center gap-1.5 md:gap-2 shrink-0 self-end sm:self-center">
                         
-                        {/* Always visible: Preview Button for DJ Stage Verification */}
-                        <button
-                          onClick={() => setPreviewItem(item)}
-                          className={`p-2 sm:px-3 sm:py-1.5 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold border shadow-sm active:scale-95 ${
-                            !item.isApproved
-                              ? 'bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-black border-amber-500/50 animate-pulse'
-                              : 'bg-slate-800/80 hover:bg-slate-700 text-purple-300 hover:text-white border-purple-500/30'
-                          }`}
-                          title="תצוגה מקדימה של הבמה והמסך (כולל תמונה, מיקום והקדשה)"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">תצוגה מקדימה</span>
-                        </button>
+                        {/* For requests with photo: Require DJ to open and review preview before approval */}
+                        {!item.isApproved && item.photo ? (
+                          <button
+                            onClick={() => setPreviewItem(item)}
+                            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white border border-amber-400/50 text-xs font-black flex items-center gap-1.5 transition-all shadow-[0_0_18px_rgba(245,158,11,0.4)] active:scale-95 animate-pulse"
+                            title="חובה לפתוח תצוגה מקדימה כדי לבדוק ולאשר את התמונה לפני שניתן להוריד או להקרין"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>בדוק תמונה ואשר 👁️</span>
+                          </button>
+                        ) : (
+                          /* Standard Preview Button for items without photo or approved items */
+                          <button
+                            onClick={() => setPreviewItem(item)}
+                            className={`p-2 sm:px-3 sm:py-1.5 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold border shadow-sm active:scale-95 ${
+                              !item.isApproved
+                                ? 'bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-black border-amber-500/50 animate-pulse'
+                                : 'bg-slate-800/80 hover:bg-slate-700 text-purple-300 hover:text-white border-purple-500/30'
+                            }`}
+                            title="תצוגה מקדימה של הבמה והמסך (כולל תמונה, מיקום והקדשה)"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">תצוגה מקדימה</span>
+                          </button>
+                        )}
 
                         {/* Unapproved Actions: Approve & Reject */}
                         {!item.isApproved ? (
                           <>
-                            <button
-                              onClick={() => handleApproveRequest(item)}
-                              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/40 text-xs font-black flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95"
-                              title="אשר את הבקשה והתחל הורדה מיידית למחשב"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>אשר והורד ✓</span>
-                            </button>
+                            {/* If item has NO photo, allow direct quick approval. If it has a photo, approval is done inside the preview modal! */}
+                            {!item.photo && (
+                              <button
+                                onClick={() => handleApproveRequest(item)}
+                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/40 text-xs font-black flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95"
+                                title="אשר את הבקשה והתחל הורדה מיידית למחשב"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>אשר והורד ✓</span>
+                              </button>
+                            )}
 
                             <button
                               onClick={() => handleRejectRequest(item)}
