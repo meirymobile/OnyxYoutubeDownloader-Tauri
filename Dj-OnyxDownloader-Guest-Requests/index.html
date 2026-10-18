@@ -1590,52 +1590,96 @@
       background: #ffffff !important;
       color: #000000 !important;
     }
+    .fx-mode-strobe-rainbow-on {
+      opacity: 1 !important;
+      color: #000000 !important;
+    }
     .fx-mode-strobe-off {
       background: #000000 !important;
       color: #ffffff !important;
     }
 
     /* ======================================================== */
-    /* FEATURE 5: VIRAL SOUVENIR STORY CARD (9:16 MODAL)        */
+    /* FEATURE 5: SOUVENIR STAGE & STORY CARD MODAL             */
     /* ======================================================== */
     #story-card-modal {
       position: fixed;
       inset: 0;
-      background: rgba(4, 1, 10, 0.88);
-      backdrop-filter: blur(18px);
+      background: rgba(4, 1, 10, 0.92);
+      backdrop-filter: blur(20px);
       z-index: 99999;
       display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 16px;
+      padding: 14px;
       overflow-y: auto;
     }
     #story-card-modal.open {
       display: flex;
     }
     .story-modal-card {
-      background: rgba(18, 10, 31, 0.95);
-      border: 1px solid rgba(245, 158, 11, 0.35);
+      background: rgba(18, 10, 31, 0.96);
+      border: 1px solid rgba(245, 158, 11, 0.4);
       border-radius: 28px;
-      padding: 24px 20px;
+      padding: 20px 18px;
       width: 100%;
-      max-width: 380px;
+      max-width: 390px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.85), 0 0 40px rgba(245, 158, 11, 0.2);
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.9), 0 0 40px rgba(245, 158, 11, 0.25);
       position: relative;
     }
+    .story-format-toggle {
+      display: flex;
+      gap: 6px;
+      margin: 10px 0 4px;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 4px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      width: 100%;
+    }
+    .fmt-btn {
+      flex: 1;
+      padding: 8px 6px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      color: #94a3b8;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+    .fmt-btn.active {
+      background: rgba(245, 158, 11, 0.22);
+      color: #fde047;
+      border-color: rgba(245, 158, 11, 0.55);
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+    }
     .story-preview-frame {
-      width: 220px;
-      height: 391px; /* 9:16 aspect ratio */
-      border-radius: 18px;
+      width: 100%;
+      border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(168, 85, 247, 0.3);
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      margin: 14px 0;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.85), 0 0 25px rgba(168, 85, 247, 0.35);
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      margin: 10px 0 14px;
       background: #000;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .story-preview-frame.is-stage {
+      max-width: 340px;
+      aspect-ratio: 16 / 9;
+    }
+    .story-preview-frame.is-story {
+      max-width: 200px;
+      aspect-ratio: 9 / 16;
     }
     .story-preview-img {
       width: 100%;
@@ -2103,19 +2147,29 @@
     </div>
   </div>
 
-  <!-- Viral Branded Souvenir Story Card Modal (Feature 5) -->
+  <!-- Viral Branded Souvenir Stage & Story Card Modal (Feature 5) -->
   <div id="story-card-modal">
     <div class="story-modal-card">
       <button class="modal-close" onclick="closeStoryModal()">&times;</button>
       
-      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #facc15; font-size: 11px; font-weight: 800; margin-bottom: 8px;">
-        <span>📸 סטורי מזכרת ממותג</span>
+      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #facc15; font-size: 11px; font-weight: 800; margin-bottom: 6px;">
+        <span>📸 צילום מסך במה ומזכרת VIP</span>
       </div>
 
-      <h3 style="font-size: 18px; font-weight: 900; color: #fff; text-align: center;">השיר שלך ברחבה! 🎉</h3>
-      <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 4px;">שתפו לאינסטגרם, טיקטוק או וואטסאפ ישירות בלחיצה אחת!</p>
+      <h3 style="font-size: 18px; font-weight: 900; color: #fff; text-align: center;">ההקדשה שלך על הבמה! 🎉</h3>
+      <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 2px;">תמונת מסך אותנטית כפי שהוקרנה ברחבה – לשיתוף בסטורי ובוואטסאפ!</p>
 
-      <div class="story-preview-frame">
+      <!-- Format Switcher Buttons -->
+      <div class="story-format-toggle">
+        <button id="fmt-stage-btn" type="button" class="fmt-btn active" onclick="switchStoryFormat('stage')">
+          <span>🖥️ מסך הבמה (16:9)</span>
+        </button>
+        <button id="fmt-story-btn" type="button" class="fmt-btn" onclick="switchStoryFormat('story')">
+          <span>📱 סטורי מלא (9:16)</span>
+        </button>
+      </div>
+
+      <div id="story-preview-frame" class="story-preview-frame is-stage">
         <img id="story-preview-img" class="story-preview-img" src="" alt="Story Preview" />
       </div>
 
@@ -2128,8 +2182,8 @@
       </button>
     </div>
 
-    <!-- Offscreen 1080x1920 9:16 Canvas for High-Resolution Story Generation -->
-    <canvas id="story-canvas" width="1080" height="1920" style="display: none;"></canvas>
+    <!-- Offscreen Canvas for High-Resolution Stage / Story Generation -->
+    <canvas id="story-canvas" style="display: none;"></canvas>
   </div>
 
   <script>
@@ -2864,26 +2918,42 @@
 
       if (crowdFxInterval) clearInterval(crowdFxInterval);
       overlay.className = '';
+      overlay.style.backgroundColor = '';
       if (candleAura) candleAura.style.display = 'none';
 
       overlay.classList.add('active');
 
-      if (mode === 'strobe') {
-        badgeText.innerText = `⚡ STROBE DROP • ${bpm} BPM`;
-        mainTitle.innerText = title || '⚡ DROP! עפים באוויר! ⚡';
-        subTitle.innerText = 'הרם את הטלפון גבוה לרחבה!';
+      if (mode === 'strobe' || mode === 'strobe_rainbow') {
+        const isRainbow = (mode === 'strobe_rainbow');
+        badgeText.innerText = isRainbow ? `🎨 MULTI-COLOR STROBE • ${bpm} BPM` : `⚡ STROBE DROP • ${bpm} BPM`;
+        mainTitle.innerText = title || (isRainbow ? '🎨 מופע צבעים ברחבה! 🌈' : '⚡ DROP! עפים באוויר! ⚡');
+        subTitle.innerText = 'הרימו את הטלפון גבוה לרחבה!';
         
-        const flashRateMs = Math.max(70, Math.round((60000 / (bpm || 128)) / 2));
+        const flashRateMs = Math.max(50, Math.round((60000 / (bpm || 128)) / 2));
         isStrobePhase = false;
+
+        const RAINBOW_PALETTE = [
+          '#ff0055', '#00ffcc', '#ffcc00', '#ff00ff', '#00e5ff', 
+          '#ff3300', '#a855f7', '#10b981', '#f43f5e', '#3b82f6',
+          '#facc15', '#ec4899', '#06b6d4', '#84cc16', '#fb923c'
+        ];
 
         crowdFxInterval = setInterval(() => {
           isStrobePhase = !isStrobePhase;
           if (isStrobePhase) {
             overlay.classList.remove('fx-mode-strobe-off');
-            overlay.classList.add('fx-mode-strobe-on');
-            if (navigator.vibrate) navigator.vibrate(25);
+            if (isRainbow) {
+              const randColor = RAINBOW_PALETTE[Math.floor(Math.random() * RAINBOW_PALETTE.length)];
+              overlay.style.backgroundColor = randColor;
+              overlay.classList.add('fx-mode-strobe-rainbow-on');
+            } else {
+              overlay.style.backgroundColor = '';
+              overlay.classList.add('fx-mode-strobe-on');
+            }
+            if (navigator.vibrate) try { navigator.vibrate(25); } catch(e) {}
           } else {
-            overlay.classList.remove('fx-mode-strobe-on');
+            overlay.classList.remove('fx-mode-strobe-on', 'fx-mode-strobe-rainbow-on');
+            overlay.style.backgroundColor = '';
             overlay.classList.add('fx-mode-strobe-off');
           }
         }, flashRateMs);
@@ -2916,6 +2986,7 @@
         crowdFxInterval = null;
       }
       if (overlay) {
+        overlay.style.backgroundColor = '';
         overlay.className = '';
         overlay.classList.remove('active');
       }
@@ -2923,10 +2994,63 @@
     }
 
     // ========================================================
-    // FEATURE 5: VIRAL SOUVENIR STORY CARD (CANVAS 9:16)
+    // FEATURE 5: SOUVENIR STAGE & STORY CARD (16:9 & 9:16)
     // ========================================================
     let currentStoryBlob = null;
     let currentStoryTicket = null;
+    let currentStoryFormat = 'stage'; // 'stage' (16:9) or 'story' (9:16)
+
+    function switchStoryFormat(fmt) {
+      currentStoryFormat = fmt;
+      const stageBtn = document.getElementById('fmt-stage-btn');
+      const storyBtn = document.getElementById('fmt-story-btn');
+      const frame = document.getElementById('story-preview-frame');
+      if (fmt === 'stage') {
+        if (stageBtn) stageBtn.classList.add('active');
+        if (storyBtn) storyBtn.classList.remove('active');
+        if (frame) {
+          frame.classList.add('is-stage');
+          frame.classList.remove('is-story');
+        }
+      } else {
+        if (stageBtn) stageBtn.classList.remove('active');
+        if (storyBtn) storyBtn.classList.add('active');
+        if (frame) {
+          frame.classList.remove('is-stage');
+          frame.classList.add('is-story');
+        }
+      }
+      if (currentStoryTicket) {
+        generateStoryCard(currentStoryTicket, fmt);
+      }
+    }
+
+    function drawImageProp(ctx, img, x, y, w, h, offsetX = 0.5, offsetY = 0.5) {
+      const iw = img.width;
+      const ih = img.height;
+      const r = Math.min(w / iw, h / ih);
+      let nw = iw * r;
+      let nh = ih * r;
+      let cx, cy, cw, ch, ar = 1;
+
+      if (nw < w) ar = w / nw;                             
+      if (Math.abs(ar - 1) < 1e-14 && nh < h) ar = h / nh; 
+      nw *= ar;
+      nh *= ar;
+
+      cw = iw / (nw / w);
+      ch = ih / (nh / h);
+
+      cx = (iw - cw) * offsetX;
+      cy = (ih - ch) * offsetY;
+
+      if (cx < 0) cx = 0;
+      if (cy < 0) cy = 0;
+      if (cw > iw) cw = iw;
+      if (ch > ih) ch = ih;
+
+      ctx.drawImage(img, cx, cy, cw, ch, x, y, w, h);
+    }
 
     function openStoryCardForTicket(ticketId) {
       const allTickets = [
@@ -2940,7 +3064,7 @@
       const effectiveTicket = { ...ticket, photo: cachedPhoto };
 
       currentStoryTicket = effectiveTicket;
-      generateStoryCard(effectiveTicket);
+      generateStoryCard(effectiveTicket, currentStoryFormat);
     }
 
     function closeStoryModal() {
@@ -2948,177 +3072,237 @@
       if (modal) modal.classList.remove('open');
     }
 
-    async function generateStoryCard(ticket) {
+    async function generateStoryCard(ticket, format = currentStoryFormat) {
       const canvas = document.getElementById('story-canvas');
       const previewImg = document.getElementById('story-preview-img');
       const modal = document.getElementById('story-card-modal');
       if (!canvas || !previewImg || !modal) return;
 
-      const ctx = canvas.getContext('2d');
-      const W = 1080;
-      const H = 1920;
+      const isStage = (format === 'stage');
+      const W = isStage ? 1920 : 1080;
+      const H = isStage ? 1080 : 1920;
       canvas.width = W;
       canvas.height = H;
+      const ctx = canvas.getContext('2d');
 
-      // 1. Luxury Dark Gradient Background
-      const bgGrad = ctx.createRadialGradient(W / 2, H * 0.35, 100, W / 2, H / 2, W * 0.95);
-      bgGrad.addColorStop(0, '#241038');
-      bgGrad.addColorStop(0.45, '#120520');
-      bgGrad.addColorStop(1, '#05010a');
+      // 1. Base dark luxury gradient
+      const bgGrad = ctx.createRadialGradient(W / 2, H / 2, 80, W / 2, H / 2, Math.max(W, H) * 0.7);
+      bgGrad.addColorStop(0, '#1c0b30');
+      bgGrad.addColorStop(0.5, '#0b0416');
+      bgGrad.addColorStop(1, '#040108');
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, W, H);
 
-      // Gold Nebula Glow Accent at Top & Bottom
-      const topNebula = ctx.createRadialGradient(W / 2, 0, 50, W / 2, 0, 600);
-      topNebula.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
-      topNebula.addColorStop(0.6, 'rgba(236, 72, 153, 0.12)');
-      topNebula.addColorStop(1, 'transparent');
-      ctx.fillStyle = topNebula;
-      ctx.fillRect(0, 0, W, H);
-
-      // 2. Vinyl Grooves Background Texture
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
-      ctx.lineWidth = 1.5;
-      for (let r = 180; r < 950; r += 24) {
-        ctx.beginPath();
-        ctx.arc(W / 2, 850, r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // 3. Top Header: ONYX DJ™ Branding
-      ctx.textAlign = 'center';
-      
-      const badgeW = 460;
-      const badgeH = 56;
-      const badgeX = (W - badgeW) / 2;
-      const badgeY = 130;
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
-      ctx.beginPath();
-      ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 28);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.fillStyle = '#fde68a';
-      ctx.font = 'bold 22px "Space Grotesk", "Heebo", sans-serif';
-      ctx.fillText('ONYX DJ™ • LIVE EXPERIENCE', W / 2, badgeY + 36);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 48px "Heebo", sans-serif';
-      ctx.fillText('השיר שהקפיץ את הרחבה! 🎉', W / 2, 260);
-
-      const activeDjName = document.getElementById('active-dj-title')?.innerText || 'DJ SHAZZ & DJ SONIC';
-      ctx.fillStyle = '#fb923c';
-      ctx.font = 'bold 26px "Space Grotesk", sans-serif';
-      ctx.fillText(`🎧 ${activeDjName}`, W / 2, 310);
-
-      // 4. Center Visual: Guest Real Photo or Turntable Vinyl
-      const imgSize = 560;
-      const imgX = (W - imgSize) / 2;
-      const imgY = 400;
-
+      // 2. Full-bleed background photo (Cover entire canvas - no wasted empty margins!)
       const imgSrc = ticket.photo || ticket.thumbnail;
       if (imgSrc) {
         try {
           const img = await loadImage(imgSrc);
-
           ctx.save();
-          ctx.shadowColor = ticket.photo ? 'rgba(236, 72, 153, 0.5)' : 'rgba(245, 158, 11, 0.4)';
-          ctx.shadowBlur = 45;
-          ctx.shadowOffsetY = 15;
+          drawImageProp(ctx, img, 0, 0, W, H);
 
-          ctx.beginPath();
-          ctx.roundRect(imgX, imgY, imgSize, imgSize, 36);
-          ctx.fillStyle = '#000000';
-          ctx.fill();
+          // Subtle cinematic dark vignette overlay so text & card pop with maximum contrast
+          const vignette = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.75);
+          vignette.addColorStop(0, 'rgba(5, 2, 12, 0.35)');
+          vignette.addColorStop(1, 'rgba(5, 2, 12, 0.78)');
+          ctx.fillStyle = vignette;
+          ctx.fillRect(0, 0, W, H);
           ctx.restore();
-
-          ctx.save();
-          ctx.beginPath();
-          ctx.roundRect(imgX, imgY, imgSize, imgSize, 36);
-          ctx.clip();
-          ctx.drawImage(img, imgX, imgY, imgSize, imgSize);
-          ctx.restore();
-
-          ctx.save();
-          ctx.strokeStyle = ticket.photo ? 'rgba(244, 114, 182, 0.7)' : 'rgba(245, 158, 11, 0.6)';
-          ctx.lineWidth = 6;
-          ctx.beginPath();
-          ctx.roundRect(imgX, imgY, imgSize, imgSize, 36);
-          ctx.stroke();
-          ctx.restore();
-
-          if (ticket.photo) {
-            ctx.fillStyle = '#db2777';
-            ctx.beginPath();
-            ctx.roundRect(imgX + imgSize - 140, imgY + 20, 120, 44, 22);
-            ctx.fill();
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 20px "Heebo", sans-serif';
-            ctx.fillText('📸 LIVE', imgX + imgSize - 80, imgY + 50);
-          }
         } catch(e) {
-          console.warn('Failed loading image for canvas:', e);
+          console.warn('Canvas image load fallback:', e);
         }
       }
 
-      // 5. Track Details & Requester
-      const metaY = imgY + imgSize + 90;
+      // 3. Top-Left Stage QR Card
+      const qrBoxW = isStage ? 180 : 160;
+      const qrBoxH = isStage ? 220 : 200;
+      const qrBoxX = isStage ? 55 : 45;
+      const qrBoxY = isStage ? 45 : 45;
+      const qrImgSize = isStage ? 140 : 125;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+      ctx.shadowBlur = 35;
+      ctx.shadowOffsetY = 12;
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 46px "Heebo", sans-serif';
-      wrapCanvasText(ctx, ticket.title || 'שיר נבחר', W / 2, metaY, 920, 56);
-
-      const requesterY = metaY + 140;
-      ctx.fillStyle = 'rgba(168, 85, 247, 0.2)';
       ctx.beginPath();
-      ctx.roundRect((W - 520) / 2, requesterY - 35, 520, 60, 30);
+      ctx.roundRect(qrBoxX, qrBoxY, qrBoxW, qrBoxH, 20);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(168, 85, 247, 0.5)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.fillStyle = '#e9d5ff';
-      ctx.font = 'bold 28px "Heebo", sans-serif';
-      ctx.fillText(`הוקדש באהבה ע״י ${ticket.requester || 'אורח ברחבה'} ❤️`, W / 2, requesterY + 7);
-
-      if (ticket.note) {
-        ctx.fillStyle = '#fde047';
-        ctx.font = 'italic 500 30px "Heebo", sans-serif';
-        wrapCanvasText(ctx, `“${ticket.note}”`, W / 2, requesterY + 80, 880, 40);
-      }
-
-      // 6. Footer: Dynamic QR Code & Official Copyright
-      const qrSize = 150;
-      const qrX = (W - qrSize) / 2;
-      const qrY = H - 320;
+      ctx.restore();
 
       try {
         const qrUrl = window.location.href;
-        const qrDataUrl = await generateQrDataUrl(qrUrl, qrSize);
+        const qrDataUrl = await generateQrDataUrl(qrUrl, qrImgSize);
         if (qrDataUrl) {
           const qrImg = await loadImage(qrDataUrl);
-          
-          ctx.save();
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath();
-          ctx.roundRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 16);
-          ctx.fill();
-          ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
-          ctx.restore();
+          ctx.drawImage(qrImg, qrBoxX + (qrBoxW - qrImgSize) / 2, qrBoxY + 12, qrImgSize, qrImgSize);
         }
       } catch(e) {}
 
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '600 22px "Heebo", sans-serif';
-      ctx.fillText('סרקו גם אתם להזמנת שיר באירוע 📲', W / 2, qrY + qrSize + 45);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 13px "Heebo", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.direction = 'rtl';
+      ctx.fillText('סרקו שיר הבא ⚡', qrBoxX + qrBoxW / 2, qrBoxY + qrImgSize + 30);
 
+      ctx.fillStyle = '#d97706';
+      ctx.font = '900 13px "Space Grotesk", monospace';
+      ctx.fillText('#' + cleanRoom, qrBoxX + qrBoxW / 2, qrBoxY + qrImgSize + 48);
+
+      // 4. Top-Right Brand Badge
+      const activeDjName = document.getElementById('active-dj-title')?.innerText || 'DJ SHAZZ & DJ SONIC';
+      ctx.save();
+      const brandX = isStage ? W - 60 : W / 2;
+      const brandY = isStage ? 55 : 290;
+      ctx.textAlign = isStage ? 'right' : 'center';
+
+      // ONYX DJ™ Pill
+      ctx.fillStyle = 'rgba(10, 4, 18, 0.75)';
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(245, 158, 11, 0.3)';
+      ctx.shadowBlur = 15;
+      const pillW = 340;
+      const pillH = 46;
+      const pillX = isStage ? brandX - pillW : brandX - pillW / 2;
+      ctx.beginPath();
+      ctx.roundRect(pillX, brandY, pillW, pillH, 23);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fde68a';
+      ctx.font = '900 18px "Space Grotesk", sans-serif';
+      ctx.direction = 'ltr';
+      ctx.textAlign = 'center';
+      ctx.fillText('ONYX DJ™ • LIVE EXPERIENCE', pillX + pillW / 2, brandY + 29);
+
+      // DJ Name subtitle
+      ctx.fillStyle = '#fb923c';
+      ctx.font = 'bold 16px "Space Grotesk", sans-serif';
+      ctx.fillText(`🎧 ${activeDjName}`, pillX + pillW / 2, brandY + 68);
+      ctx.restore();
+
+      // 5. Authentic Stage Dedication Card (Identical to Big Screen!)
+      const cardW = isStage ? 960 : W - 100;
+      const cardMinH = isStage ? 260 : 330;
+      const cardX = isStage ? (W - cardW) / 2 : 50;
+      const cardY = isStage ? H - cardMinH - 85 : H - cardMinH - 120;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(168, 85, 247, 0.55)';
+      ctx.shadowBlur = 40;
+      ctx.shadowOffsetY = 15;
+
+      ctx.fillStyle = 'rgba(10, 4, 18, 0.88)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.roundRect(cardX, cardY, cardW, cardMinH, 32);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // Inside Dedication Card Elements
+      const cardCenterX = cardX + cardW / 2;
+      let currY = cardY + 45;
+
+      // Card Header Tag: !מתנגן עכשיו לבקשת הקהל ✨
+      ctx.save();
+      const tagText = '✨ !מתנגן עכשיו לבקשת הקהל ✨';
+      ctx.font = 'bold 18px "Heebo", sans-serif';
+      ctx.direction = 'rtl';
+      ctx.textAlign = 'center';
+      const tagMetrics = ctx.measureText(tagText);
+      const tagW = tagMetrics.width + 36;
+      const tagH = 36;
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(cardCenterX - tagW / 2, currY - 24, tagW, tagH, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#fde047';
+      ctx.fillText(tagText, cardCenterX, currY);
+      ctx.restore();
+
+      // Line 1: Requester Name with Heart
+      currY += 52;
+      ctx.save();
+      ctx.direction = 'rtl';
+      ctx.textAlign = 'center';
+      ctx.font = '900 38px "Heebo", sans-serif';
+
+      const reqGrad = ctx.createLinearGradient(cardCenterX - 200, currY, cardCenterX + 200, currY);
+      reqGrad.addColorStop(0, '#ffffff');
+      reqGrad.addColorStop(0.5, '#38bdf8');
+      reqGrad.addColorStop(1, '#e879f9');
+      ctx.fillStyle = reqGrad;
+      ctx.shadowColor = 'rgba(56, 189, 248, 0.5)';
+      ctx.shadowBlur = 20;
+
+      const requesterName = ticket.requester || 'אורח ברחבה';
+      ctx.fillText(`❤️ הוקדש ע״י ${requesterName}`, cardCenterX, currY);
+      ctx.restore();
+
+      // Line 2: Personal Note with Quotes
+      if (ticket.note && ticket.note.trim()) {
+        currY += 54;
+        ctx.save();
+        ctx.direction = 'rtl';
+        ctx.textAlign = 'center';
+        ctx.font = 'italic 900 34px "Heebo", sans-serif';
+
+        const noteGrad = ctx.createLinearGradient(cardCenterX - 250, currY, cardCenterX + 250, currY);
+        noteGrad.addColorStop(0, '#ffffff');
+        noteGrad.addColorStop(0.35, '#fde047');
+        noteGrad.addColorStop(0.7, '#fb7185');
+        noteGrad.addColorStop(1, '#e879f9');
+        ctx.fillStyle = noteGrad;
+        ctx.shadowColor = 'rgba(251, 113, 133, 0.5)';
+        ctx.shadowBlur = 22;
+
+        ctx.fillText(`“${ticket.note.trim()}”`, cardCenterX, currY);
+        ctx.restore();
+      }
+
+      // Line 3: Song Title Pill
+      currY += 50;
+      ctx.save();
+      ctx.direction = 'rtl';
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 22px "Heebo", sans-serif';
+
+      const rawSongTitle = ticket.title || 'שיר לבקשת הקהל';
+      const maxTitleChars = isStage ? 60 : 38;
+      const songTitle = rawSongTitle.length > maxTitleChars ? rawSongTitle.substring(0, maxTitleChars) + '...' : rawSongTitle;
+      const songMetrics = ctx.measureText(`🎵 ${songTitle}`);
+      const songPillW = Math.min(cardW - 60, songMetrics.width + 44);
+      const songPillH = 42;
+
+      ctx.fillStyle = 'rgba(15, 7, 26, 0.75)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(cardCenterX - songPillW / 2, currY - 28, songPillW, songPillH, 21);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillText(`🎵 ${songTitle}`, cardCenterX, currY);
+      ctx.restore();
+
+      // 6. Footer Legal
+      ctx.save();
+      ctx.direction = 'ltr';
+      ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.font = '500 18px "Space Grotesk", sans-serif';
-      ctx.fillText('© 2026 Onyx DJ™ Systems by Meir.Y • All rights reserved.', W / 2, H - 45);
+      ctx.font = '500 15px "Space Grotesk", sans-serif';
+      ctx.fillText('© 2026 Onyx DJ™ Systems by Meir.Y • All rights reserved.', W / 2, H - 22);
+      ctx.restore();
 
       canvas.toBlob((blob) => {
         currentStoryBlob = blob;

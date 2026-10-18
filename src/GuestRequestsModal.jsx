@@ -2492,7 +2492,12 @@ export default function GuestRequestsModal({
                       <span className="text-xs font-black text-white">מופע אורות וסטרוב קהל (Crowd FX) 📱</span>
                       {activeCrowdFx && (
                         <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
-                          פעיל כעת: {activeCrowdFx === 'strobe' ? '⚡ סטרוב BPM' : activeCrowdFx === 'candle' ? '🕯️ סלואו זהב' : activeCrowdFx === 'glow' ? '🟣 רייב ניאון' : '🤍 פנס לבן'}
+                          פעיל כעת: {
+                            activeCrowdFx === 'strobe' ? `⚡ סטרוב (${crowdBpm} BPM)` :
+                            activeCrowdFx === 'strobe_rainbow' ? `🎨 סטרוב צבעוני (${crowdBpm} BPM)` :
+                            activeCrowdFx === 'candle' ? '🕯️ סלואו זהב' :
+                            activeCrowdFx === 'glow' ? '🟣 רייב ניאון' : '🤍 פנס לבן'
+                          }
                         </span>
                       )}
                     </div>
@@ -2503,38 +2508,51 @@ export default function GuestRequestsModal({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5 w-full xl:w-auto justify-end">
-                  {/* Strobe Drop */}
-                  <div className="flex items-center bg-slate-900/90 rounded-xl p-0.5 border border-slate-700">
+                  {/* Strobe Controls Group with Editable BPM & Multi-Color */}
+                  <div className="flex items-center bg-slate-900/90 rounded-xl p-0.5 border border-slate-700 gap-1">
                     <button
                       onClick={() => broadcastCrowdFx('strobe', { bpm: crowdBpm })}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                      className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
                         activeCrowdFx === 'strobe'
                           ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black border-yellow-300 shadow-[0_0_15px_rgba(245,158,11,0.5)] animate-pulse'
                           : 'bg-transparent text-amber-300 hover:text-white border-transparent'
                       }`}
-                      title="סטרוב דרופ מטורף מסונכרן BPM לכל מסכי האורחים ברחבה"
+                      title="סטרוב לבן קלאסי מסונכרן BPM לכל מסכי האורחים"
                     >
                       <Zap className="w-3.5 h-3.5" />
-                      <span>⚡ סטרוב דרופ</span>
+                      <span>⚡ סטרוב</span>
                     </button>
-                    {/* BPM Selector */}
-                    <select
-                      value={crowdBpm}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        setCrowdBpm(val);
-                        if (activeCrowdFx === 'strobe') broadcastCrowdFx('strobe', { bpm: val });
-                      }}
-                      className="bg-slate-950 text-amber-400 text-[11px] font-mono font-bold px-1.5 py-1 rounded border-0 outline-none cursor-pointer"
-                      title="קצב BPM עבור הסטרוב"
+
+                    <button
+                      onClick={() => broadcastCrowdFx('strobe_rainbow', { bpm: crowdBpm })}
+                      className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
+                        activeCrowdFx === 'strobe_rainbow'
+                          ? 'bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 text-white border-white shadow-[0_0_18px_rgba(236,72,153,0.7)] animate-pulse font-black'
+                          : 'bg-transparent text-cyan-300 hover:text-white border-transparent'
+                      }`}
+                      title="סטרוב צבע רנדומלי: כל טלפון מהבהב בצבע אחר בכל פעימה (פסיכדלי ברחבה)"
                     >
-                      <option value="120">120 BPM</option>
-                      <option value="124">124 BPM</option>
-                      <option value="128">128 BPM</option>
-                      <option value="132">132 BPM</option>
-                      <option value="140">140 BPM</option>
-                      <option value="150">150 BPM</option>
-                    </select>
+                      <span>🎨 צבעוני</span>
+                    </button>
+
+                    {/* Editable BPM Input */}
+                    <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded border border-amber-500/40" title="הקלד כל קצב BPM רצוי">
+                      <input
+                        type="number"
+                        min="50"
+                        max="240"
+                        value={crowdBpm}
+                        onChange={(e) => {
+                          const val = Math.max(40, Math.min(260, parseInt(e.target.value, 10) || 128));
+                          setCrowdBpm(val);
+                          if (activeCrowdFx === 'strobe' || activeCrowdFx === 'strobe_rainbow') {
+                            broadcastCrowdFx(activeCrowdFx, { bpm: val });
+                          }
+                        }}
+                        className="w-11 bg-transparent text-amber-400 text-[11px] font-mono font-black text-center outline-none border-0 p-0"
+                      />
+                      <span className="text-[10px] text-amber-500/90 font-mono font-bold select-none">BPM</span>
+                    </div>
                   </div>
 
                   {/* Candle Slow Dance */}
