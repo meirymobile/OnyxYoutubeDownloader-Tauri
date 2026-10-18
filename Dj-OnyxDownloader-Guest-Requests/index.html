@@ -486,8 +486,11 @@
       display: none;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 16px;
       z-index: 500;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
     .modal-card {
       background: #180d24;
@@ -499,6 +502,9 @@
       text-align: center;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
       position: relative;
+      max-height: 90dvh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
     .modal-close {
       position: absolute;
@@ -565,6 +571,10 @@
       cursor: pointer;
       box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
       margin-top: 8px;
+      transition: all 0.2s;
+    }
+    .submit-request-btn:active {
+      transform: scale(0.98);
     }
 
     /* Photo Upload for Stage Projection */
@@ -595,73 +605,224 @@
       border-color: rgba(245, 158, 11, 0.5);
       color: #facc15;
     }
-    .photo-preview-wrap {
-      margin-top: 10px;
-      position: relative;
-      display: inline-block;
-      width: 100%;
-      max-width: 180px;
-      border-radius: 14px;
-      overflow: hidden;
-      border: 2px solid #facc15;
-      box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+
+    /* Compact Photo Preview in Request Form Modal */
+    .photo-compact-preview {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #0d0615;
+      border: 1.5px solid rgba(245, 158, 11, 0.45);
+      border-radius: 16px;
+      padding: 10px 12px;
+      margin-top: 8px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+      animation: fadeInCompact 0.3s ease-out;
     }
-    .photo-preview-img {
+    @keyframes fadeInCompact {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .photo-compact-thumb-wrap {
+      position: relative;
+      width: 76px;
+      height: 48px;
+      border-radius: 10px;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      background: #000;
+    }
+    .photo-compact-img {
       width: 100%;
-      height: 110px;
+      height: 100%;
       object-fit: cover;
       display: block;
     }
-    .photo-remove-btn {
+    .photo-compact-badge {
       position: absolute;
-      top: 5px;
-      right: 5px;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.8);
-      color: #f43f5e;
-      border: 1px solid rgba(244, 63, 94, 0.6);
-      font-size: 13px;
+      bottom: 0;
+      inset-inline: 0;
+      background: rgba(16, 185, 129, 0.92);
+      color: #fff;
+      font-size: 8.5px;
       font-weight: 900;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 30;
+      text-align: center;
+      padding: 1.5px 0;
+      letter-spacing: 0.2px;
     }
-
-    /* 16:9 Interactive Stage Simulator */
-    .stage-simulator-wrap {
-      margin-top: 12px;
-      background: #0d0615;
-      border: 1.5px solid rgba(245, 158, 11, 0.4);
-      border-radius: 16px;
-      padding: 10px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-    }
-    .stage-sim-header {
+    .photo-compact-info {
+      flex: 1;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
+      flex-direction: column;
+      gap: 6px;
+      text-align: right;
+      min-width: 0;
+    }
+    .photo-compact-title {
+      font-size: 12px;
       font-weight: 800;
       color: #facc15;
-      margin-bottom: 8px;
-      padding: 0 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .photo-compact-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .photo-edit-btn, .photo-del-btn {
+      padding: 5px 11px;
+      border-radius: 9px;
+      font-size: 11px;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+    .photo-edit-btn {
+      background: rgba(245, 158, 11, 0.18);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      color: #fbbf24;
+    }
+    .photo-del-btn {
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fb7185;
+    }
+    .photo-edit-btn:active, .photo-del-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Full-Screen Interactive Stage Editor */
+    .stage-editor-fullscreen {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100dvh;
+      background: radial-gradient(circle at 50% 15%, #1d0933 0%, #06020c 80%);
+      z-index: 600;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px) 16px;
+      box-sizing: border-box;
+      touch-action: none;
+      overflow: hidden;
+      user-select: none;
+      animation: modalFadeIn 0.25s ease-out;
+    }
+    .stage-editor-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 2px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      flex-shrink: 0;
+    }
+    .stage-editor-title-wrap {
+      text-align: center;
+      flex: 1;
+    }
+    .stage-editor-title {
+      font-size: 15px;
+      font-weight: 900;
+      color: #facc15;
+      letter-spacing: 0.2px;
+    }
+    .stage-editor-subtitle {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .stage-editor-close-btn, .stage-editor-reset-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+    .stage-editor-reset-btn {
+      color: #fb7185;
+      border-color: rgba(244, 63, 94, 0.35);
+    }
+    .stage-editor-close-btn:active, .stage-editor-reset-btn:active {
+      transform: scale(0.96);
+    }
+    .stage-editor-canvas-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 0;
+      min-height: 0;
+      overflow: hidden;
     }
     .stage-sim-screen {
       position: relative;
       width: 100%;
+      max-width: 620px;
       aspect-ratio: 16 / 9;
       background: #05020a;
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
-      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      border: 2px solid rgba(245, 158, 11, 0.55);
       touch-action: none;
       user-select: none;
-      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9), 0 0 25px rgba(245, 158, 11, 0.25);
       container-type: inline-size;
+      flex-shrink: 0;
+    }
+    .stage-editor-controls {
+      width: 100%;
+      max-width: 620px;
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .stage-editor-footer {
+      padding: 8px 0 4px;
+      flex-shrink: 0;
+    }
+    .stage-editor-done-btn {
+      width: 100%;
+      max-width: 620px;
+      margin: 0 auto;
+      padding: 15px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border: none;
+      border-radius: 14px;
+      color: #000;
+      font-size: 16px;
+      font-weight: 900;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 8px 25px rgba(245, 158, 11, 0.45);
+      transition: all 0.2s;
+    }
+    .stage-editor-done-btn:active {
+      transform: scale(0.98);
+      filter: brightness(0.95);
     }
     .stage-sim-bg {
       position: absolute;
@@ -1299,77 +1460,116 @@
           </button>
         </div>
 
-        <!-- Interactive 16:9 Stage Screen Simulator & Text Positioning -->
-        <div id="stage-simulator-wrap" class="stage-simulator-wrap" style="display: none;">
-          <div class="stage-sim-header">
-            <span>📺 סימולטור מסך במה (גרור את הטקסט למקום הרצוי)</span>
-            <button type="button" class="photo-remove-btn" onclick="removeSelectedPhoto()" title="הסר תמונה">✕</button>
+        <!-- Compact Preview Card when photo is selected -->
+        <div id="photo-compact-preview" class="photo-compact-preview" style="display: none;">
+          <div class="photo-compact-thumb-wrap">
+            <img id="photo-compact-img" class="photo-compact-img" src="" alt="תמונה שנבחרה" />
+            <div class="photo-compact-badge">✓ מותאם לבמה</div>
           </div>
-          
-          <div id="stage-sim-screen" class="stage-sim-screen">
-            <!-- Simulated Background Image -->
-            <img id="stage-sim-bg" class="stage-sim-bg" src="" alt="רקע הבמה" />
-            <div class="stage-sim-overlay"></div>
-            
-            <!-- Mini QR in top-left corner just like real stage -->
-            <div class="stage-sim-qr-badge">
-              <span>🏁 QR</span>
+          <div class="photo-compact-info">
+            <div class="photo-compact-title">📸 תמונת במה מוכנה!</div>
+            <div class="photo-compact-actions">
+              <button type="button" class="photo-edit-btn" onclick="openStageEditor()">
+                <span>✏️ ערוך מיקום שוב</span>
+              </button>
+              <button type="button" class="photo-del-btn" onclick="removeSelectedPhoto()">
+                <span>🗑️ הסר</span>
+              </button>
             </div>
-
-            <!-- Draggable Dedication Card (1:1 Stage Spotlight Replica) -->
-            <div id="stage-sim-draggable" class="stage-sim-draggable">
-              <div class="sim-stage-badge">
-                <span>✨</span>
-                <span>מתנגן עכשיו לבקשת הקהל!</span>
-                <span>✨</span>
-              </div>
-
-              <!-- LINE 1: Requester Name - Large & Colorful -->
-              <div class="sim-requester-hero">
-                <span class="sim-heart-icon">❤️</span>
-                <span>הוקדש ע״י </span>
-                <span id="sim-requester-text" class="sim-requester-name">אורח ברחבה</span>
-              </div>
-
-              <!-- LINE 2: Dedication Note - Large & Colorful -->
-              <div id="sim-note-wrap" class="sim-note-hero" style="display: none;">
-                <span class="sim-quote-mark">“</span>
-                <span id="sim-note-text" class="sim-note-text"></span>
-                <span class="sim-quote-mark">”</span>
-              </div>
-
-              <!-- LINE 3: Song Title & Artist - Smallest at the bottom -->
-              <div class="sim-song-bar">
-                <span class="sim-song-icon">🎵</span>
-                <span id="sim-song-text">שם השיר יופיע כאן</span>
-              </div>
-
-              <div class="drag-hint-badge">❖ גרור למקום הרצוי במסך</div>
-            </div>
-          </div>
-
-          <!-- Quick Alignment Presets -->
-          <div class="sim-preset-buttons">
-            <span style="font-size: 11px; color: #94a3b8; margin-left: 4px;">מיקום מהיר:</span>
-            <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 22)">למעלה ⬆️</button>
-            <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 50)">מרכז 🎯</button>
-            <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 80)">למטה ⬇️</button>
-            <button type="button" class="sim-preset-btn" onclick="setSimPosition(20, 80)">פינה שמאלית ↙️</button>
-            <button type="button" class="sim-preset-btn" onclick="setSimPosition(80, 80)">פינה ימנית ↘️</button>
-          </div>
-
-          <!-- Card Scale Presets & Controls -->
-          <div class="sim-preset-buttons" style="margin-top: 6px;">
-            <span style="font-size: 11px; color: #94a3b8; margin-left: 4px;">גודל כרטיס:</span>
-            <button type="button" class="sim-preset-btn" onclick="adjustSimScale(-0.1)" title="הקטן כרטיס">🔍- קטן</button>
-            <button type="button" class="sim-preset-btn" onclick="setSimScale(1.0)" title="גודל רגיל">100%</button>
-            <button type="button" class="sim-preset-btn" onclick="adjustSimScale(0.1)" title="הגדל כרטיס">🔍+ גדול</button>
-            <span id="sim-scale-badge" style="font-size: 10px; color: #facc15; font-weight: 800; min-width: 32px;">100%</span>
           </div>
         </div>
       </div>
 
       <button id="modal-submit-btn" class="submit-request-btn" onclick="submitRequest()">שלח בקשה עכשיו 🚀</button>
+    </div>
+  </div>
+
+  <!-- Full-Screen Interactive Stage Editor (Mobile-Optimized Canvas) -->
+  <div id="stage-editor-modal" class="stage-editor-fullscreen" style="display: none;">
+    <!-- Top Bar -->
+    <div class="stage-editor-topbar">
+      <button type="button" class="stage-editor-close-btn" onclick="closeStageEditor()" title="חזור לטופס">
+        <span>✕ ביטול</span>
+      </button>
+      <div class="stage-editor-title-wrap">
+        <div class="stage-editor-title">📺 עיצוב מסך הבמה</div>
+        <div class="stage-editor-subtitle">גרור את הטקסט או שנה גודל כדי שלא יסתיר פנים</div>
+      </div>
+      <button type="button" class="stage-editor-reset-btn" onclick="removeSelectedPhoto(); closeStageEditor();" title="מחק תמונה">
+        <span>🗑️ הסר</span>
+      </button>
+    </div>
+
+    <!-- Center Stage Screen Canvas -->
+    <div class="stage-editor-canvas-container">
+      <div id="stage-sim-screen" class="stage-sim-screen">
+        <!-- Simulated Background Image -->
+        <img id="stage-sim-bg" class="stage-sim-bg" src="" alt="רקע הבמה" />
+        <div class="stage-sim-overlay"></div>
+        
+        <!-- Mini QR in top-left corner just like real stage -->
+        <div class="stage-sim-qr-badge">
+          <span>🏁 QR</span>
+        </div>
+
+        <!-- Draggable Dedication Card (1:1 Stage Spotlight Replica) -->
+        <div id="stage-sim-draggable" class="stage-sim-draggable">
+          <div class="sim-stage-badge">
+            <span>✨</span>
+            <span>מתנגן עכשיו לבקשת הקהל!</span>
+            <span>✨</span>
+          </div>
+
+          <!-- LINE 1: Requester Name - Large & Colorful -->
+          <div class="sim-requester-hero">
+            <span class="sim-heart-icon">❤️</span>
+            <span>הוקדש ע״י </span>
+            <span id="sim-requester-text" class="sim-requester-name">אורח ברחבה</span>
+          </div>
+
+          <!-- LINE 2: Dedication Note - Large & Colorful -->
+          <div id="sim-note-wrap" class="sim-note-hero" style="display: none;">
+            <span class="sim-quote-mark">“</span>
+            <span id="sim-note-text" class="sim-note-text"></span>
+            <span class="sim-quote-mark">”</span>
+          </div>
+
+          <!-- LINE 3: Song Title & Artist - Smallest at the bottom -->
+          <div class="sim-song-bar">
+            <span class="sim-song-icon">🎵</span>
+            <span id="sim-song-text">שם השיר יופיע כאן</span>
+          </div>
+
+          <div class="drag-hint-badge">❖ גרור לכל מקום במסך</div>
+        </div>
+      </div>
+
+      <!-- Controls toolbar directly under screen -->
+      <div class="stage-editor-controls">
+        <div class="sim-preset-buttons">
+          <span style="font-size: 11px; color: #94a3b8; margin-left: 4px;">מיקום:</span>
+          <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 22)">למעלה ⬆️</button>
+          <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 50)">מרכז 🎯</button>
+          <button type="button" class="sim-preset-btn" onclick="setSimPosition(50, 80)">למטה ⬇️</button>
+          <button type="button" class="sim-preset-btn" onclick="setSimPosition(20, 80)">פינה ↙️</button>
+          <button type="button" class="sim-preset-btn" onclick="setSimPosition(80, 80)">פינה ↘️</button>
+        </div>
+
+        <div class="sim-preset-buttons" style="margin-top: 8px;">
+          <span style="font-size: 11px; color: #94a3b8; margin-left: 4px;">גודל:</span>
+          <button type="button" class="sim-preset-btn" onclick="adjustSimScale(-0.1)" title="הקטן כרטיס">🔍- קטן</button>
+          <button type="button" class="sim-preset-btn" onclick="setSimScale(1.0)" title="גודל רגיל">100%</button>
+          <button type="button" class="sim-preset-btn" onclick="adjustSimScale(0.1)" title="הגדל כרטיס">🔍+ גדול</button>
+          <span id="sim-scale-badge" style="font-size: 11px; color: #facc15; font-weight: 800; min-width: 36px;">100%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Done Button -->
+    <div class="stage-editor-footer">
+      <button type="button" class="stage-editor-done-btn" onclick="closeStageEditor()">
+        <span>✓ סיום ואישור תצוגה</span>
+      </button>
     </div>
   </div>
 
@@ -2274,6 +2474,10 @@
       document.getElementById('modal-title').innerText = track.title;
       document.getElementById('modal-channel').innerText = track.channel;
       document.getElementById('request-modal').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+
+      // Reset photo state for fresh request
+      removeSelectedPhoto();
 
       setSimPosition(50, 75);
       setSimScale(1.0);
@@ -2284,6 +2488,44 @@
       const noteInput = document.getElementById('requester-note');
       if (nameInput) nameInput.oninput = updateSimContent;
       if (noteInput) noteInput.oninput = updateSimContent;
+    }
+
+    function openStageEditor() {
+      const editor = document.getElementById('stage-editor-modal');
+      if (editor) {
+        editor.style.display = 'flex';
+      }
+      document.body.style.overflow = 'hidden';
+      updateSimContent();
+      initSimDrag();
+      applySimTransform(false);
+    }
+
+    function closeStageEditor() {
+      const editor = document.getElementById('stage-editor-modal');
+      if (editor) {
+        editor.style.display = 'none';
+      }
+      // If photo is active, show the compact preview in the request modal
+      const compactPreview = document.getElementById('photo-compact-preview');
+      const actionsBtns = document.getElementById('photo-actions-btns');
+      if (selectedPhotoDataUrl) {
+        if (compactPreview) compactPreview.style.display = 'flex';
+        if (actionsBtns) actionsBtns.style.display = 'none';
+        const compactImg = document.getElementById('photo-compact-img');
+        if (compactImg) compactImg.src = selectedPhotoDataUrl;
+      } else {
+        if (compactPreview) compactPreview.style.display = 'none';
+        if (actionsBtns) actionsBtns.style.display = 'flex';
+      }
+
+      // Check if request-modal is open to maintain scroll lock
+      const reqModal = document.getElementById('request-modal');
+      if (reqModal && reqModal.style.display === 'flex') {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
     }
 
     function handlePhotoSelected(input) {
@@ -2315,15 +2557,13 @@
 
           selectedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.82);
           const simBg = document.getElementById('stage-sim-bg');
-          const simWrap = document.getElementById('stage-simulator-wrap');
-          const actionsBtns = document.getElementById('photo-actions-btns');
+          const compactImg = document.getElementById('photo-compact-img');
           
           if (simBg) simBg.src = selectedPhotoDataUrl;
-          if (simWrap) simWrap.style.display = 'block';
-          if (actionsBtns) actionsBtns.style.display = 'none';
+          if (compactImg) compactImg.src = selectedPhotoDataUrl;
 
-          updateSimContent();
-          initSimDrag();
+          // Open full-screen editor immediately so user can preview and position text
+          openStageEditor();
         };
         img.src = e.target.result;
       };
@@ -2339,16 +2579,27 @@
       const gal = document.getElementById('photo-gallery-input');
       if (cam) cam.value = '';
       if (gal) gal.value = '';
-      const simWrap = document.getElementById('stage-simulator-wrap');
-      if (simWrap) simWrap.style.display = 'none';
+
+      const compactPreview = document.getElementById('photo-compact-preview');
+      if (compactPreview) compactPreview.style.display = 'none';
+      const compactImg = document.getElementById('photo-compact-img');
+      if (compactImg) compactImg.src = '';
       const simBg = document.getElementById('stage-sim-bg');
       if (simBg) simBg.src = '';
       const actionsBtns = document.getElementById('photo-actions-btns');
       if (actionsBtns) actionsBtns.style.display = 'flex';
+
+      const editor = document.getElementById('stage-editor-modal');
+      if (editor && editor.style.display === 'flex') {
+        editor.style.display = 'none';
+      }
     }
 
     function closeModal() {
       document.getElementById('request-modal').style.display = 'none';
+      const editor = document.getElementById('stage-editor-modal');
+      if (editor) editor.style.display = 'none';
+      document.body.style.overflow = '';
       selectedTrack = null;
       removeSelectedPhoto();
       const nameInput = document.getElementById('requester-name');
