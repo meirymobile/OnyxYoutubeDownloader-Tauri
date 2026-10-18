@@ -1,3 +1,4 @@
+// © 2026 Onyx DJ Systems by Meir.Y All rights reserved.
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { Maximize, Minimize, Music, Sparkles, X, Radio, Disc, MapPin } from 'lucide-react';

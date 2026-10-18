@@ -1,3 +1,4 @@
+// © 2026 Onyx DJ Systems by Meir.Y All rights reserved.
 import { useState, useEffect, useRef } from 'react'
 import { 
   Search, Download, Music, Video, Sparkles, MonitorPlay, CheckCircle, Clock, Settings, 

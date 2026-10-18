@@ -1,3 +1,4 @@
+// © 2026 Onyx DJ Systems by Meir.Y All rights reserved.
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import Paho from 'paho-mqtt';
@@ -2973,6 +2974,12 @@ export default function GuestRequestsModal({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Modal Footer with System Copyright Notice */}
+        <div className="py-2.5 px-5 border-t border-slate-900 bg-slate-950/90 flex flex-wrap items-center justify-between text-[11px] text-slate-500 shrink-0 select-none">
+          <span>&copy; 2026 Onyx DJ Systems by Meir.Y All rights reserved.</span>
+          <span className="font-mono text-slate-600">Onyx Live Stage &bull; Guest Requests Suite</span>
         </div>
       </div>
     </div>
