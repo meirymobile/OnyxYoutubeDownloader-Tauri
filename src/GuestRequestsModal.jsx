@@ -2496,6 +2496,7 @@ export default function GuestRequestsModal({
                             activeCrowdFx === 'strobe' ? `⚡ סטרוב חופשי (${crowdBpm} BPM)` :
                             activeCrowdFx === 'strobe_synced' ? `🌐 מסונכרן 1:1 (${crowdBpm} BPM)` :
                             activeCrowdFx === 'strobe_rainbow' ? `🎨 סטרוב צבעוני (${crowdBpm} BPM)` :
+                            activeCrowdFx === 'strobe_rainbow_synced' ? `🌈 צבע מסונכרן (${crowdBpm} BPM)` :
                             activeCrowdFx === 'candle' ? '🕯️ סלואו זהב' :
                             activeCrowdFx === 'glow' ? '🟣 רייב ניאון' : '🤍 פנס לבן'
                           }
@@ -2544,9 +2545,22 @@ export default function GuestRequestsModal({
                           ? 'bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 text-white border-white shadow-[0_0_18px_rgba(236,72,153,0.7)] animate-pulse font-black'
                           : 'bg-transparent text-cyan-300 hover:text-white border-transparent'
                       }`}
-                      title="סטרוב צבע רנדומלי: כל טלפון מהבהב בצבע אחר בכל פעימה (פסיכדלי ברחבה)"
+                      title="סטרוב צבע חופשי: כל טלפון מהבהב בצבע אחר בתזמון עצמאי (פסיכדלי ברחבה)"
                     >
                       <span>🎨 צבעוני</span>
+                    </button>
+
+                    <button
+                      onClick={() => broadcastCrowdFx('strobe_rainbow_synced', { bpm: crowdBpm })}
+                      className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
+                        activeCrowdFx === 'strobe_rainbow_synced'
+                          ? 'bg-gradient-to-r from-violet-600 via-fuchsia-500 to-amber-300 text-white border-white shadow-[0_0_18px_rgba(217,70,239,0.85)] animate-pulse font-black'
+                          : 'bg-transparent text-fuchsia-300 hover:text-white border-transparent'
+                      }`}
+                      title="צבעוני מסונכרן 100%: כל הטלפונים באולם מבזיקים ומחליפים צבע יחד באותה מאית שניה בדיוק!"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>🌈 צבע מסונכרן</span>
                     </button>
 
                     {/* Editable BPM Input */}
@@ -2559,7 +2573,7 @@ export default function GuestRequestsModal({
                         onChange={(e) => {
                           const val = Math.max(40, Math.min(260, parseInt(e.target.value, 10) || 128));
                           setCrowdBpm(val);
-                          if (activeCrowdFx === 'strobe' || activeCrowdFx === 'strobe_rainbow' || activeCrowdFx === 'strobe_synced') {
+                          if (activeCrowdFx === 'strobe' || activeCrowdFx === 'strobe_rainbow' || activeCrowdFx === 'strobe_synced' || activeCrowdFx === 'strobe_rainbow_synced') {
                             broadcastCrowdFx(activeCrowdFx, { bpm: val });
                           }
                         }}
