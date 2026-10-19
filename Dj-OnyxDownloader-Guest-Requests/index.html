@@ -1927,11 +1927,11 @@
       <h1 class="active-dj-title" id="active-dj-title">DJ SHAZZ &amp; DJ SONIC</h1>
       <p class="active-subtitle">חפשו שיר והדיג'יי ינגן אותו ברחבה!</p>
 
-      <!-- Party Mode Anti-Sleep Indicator & Switch -->
-      <div id="anti-sleep-chip" class="anti-sleep-chip" onclick="manualToggleAntiSleep()" title="השאר את מסך הטלפון דולק במהלך המסיבה">
+      <!-- Party Mode Anti-Sleep Indicator & Switch (Enabled by default) -->
+      <div id="anti-sleep-chip" class="anti-sleep-chip active" onclick="manualToggleAntiSleep()" title="השאר את מסך הטלפון דולק במהלך המסיבה">
         <span class="anti-sleep-icon">💡</span>
         <span id="anti-sleep-label">מסך דולק ברחבה:</span>
-        <span id="anti-sleep-status" class="anti-sleep-status-pill">הפעל</span>
+        <span id="anti-sleep-status" class="anti-sleep-status-pill">פעיל 🟢</span>
       </div>
     </div>
 
@@ -3007,7 +3007,7 @@
     // ========================================================
     let crowdWakeLock = null;
     let isAntiSleepUnlocked = false;
-    let isAntiSleepActive = false;
+    let isAntiSleepActive = true; // Default ON for party atmosphere
 
     // Get or initialize the video element
     function getNoSleepVideo() {
@@ -4632,6 +4632,7 @@
     checkStatus();
     initNotifySseListener();
     renderMyTickets();
+    acquireAntiSleepLocks();
   </script>
 
   <!-- Hidden Silent Anti-Sleep Video Element (Guarantees iOS Safari & Android mobile screens stay awake) -->
