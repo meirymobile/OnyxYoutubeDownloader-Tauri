@@ -3,7 +3,11 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#07020d">
   <title>DJ Shazz & DJ Sonic | Guest Requests</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1571,7 +1575,8 @@
       color: #000000 !important;
     }
     .fx-mode-white .fx-live-indicator,
-    .fx-mode-white .fx-close-btn {
+    .fx-mode-white .fx-close-btn,
+    .fx-mode-white .fx-fullscreen-btn {
       background: rgba(0, 0, 0, 0.15) !important;
       color: #000 !important;
       border-color: rgba(0, 0, 0, 0.25) !important;
@@ -1600,11 +1605,18 @@
     }
 
     /* Anti-Sleep Party Mode UI Chip & FX Lock Badges */
+    .header-chips-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 8px auto 4px;
+    }
     .anti-sleep-chip {
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      margin: 10px auto 4px;
       padding: 6px 14px;
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.15);
@@ -1639,6 +1651,53 @@
     .anti-sleep-chip.active .anti-sleep-status-pill {
       background: #10b981;
       color: #022c22;
+    }
+    .fullscreen-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 13px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #cbd5e1;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.25s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .fullscreen-chip:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    .fullscreen-chip.active {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: rgba(6, 182, 212, 0.5);
+      color: #67e8f9;
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+    }
+    .fx-fullscreen-btn {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      font-size: 17px;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+      transition: all 0.2s;
+    }
+    .fx-fullscreen-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.5);
     }
     .fx-lock-badge {
       display: inline-flex;
@@ -1927,11 +1986,18 @@
       <h1 class="active-dj-title" id="active-dj-title">DJ SHAZZ &amp; DJ SONIC</h1>
       <p class="active-subtitle">חפשו שיר והדיג'יי ינגן אותו ברחבה!</p>
 
-      <!-- Party Mode Anti-Sleep Indicator & Switch (Enabled by default) -->
-      <div id="anti-sleep-chip" class="anti-sleep-chip active" onclick="manualToggleAntiSleep()" title="השאר את מסך הטלפון דולק במהלך המסיבה">
-        <span class="anti-sleep-icon">💡</span>
-        <span id="anti-sleep-label">מסך דולק ברחבה:</span>
-        <span id="anti-sleep-status" class="anti-sleep-status-pill">פעיל 🟢</span>
+      <!-- Party Mode Controls: Anti-Sleep & Fullscreen Toggle -->
+      <div class="header-chips-row">
+        <div id="anti-sleep-chip" class="anti-sleep-chip active" onclick="manualToggleAntiSleep()" title="השאר את מסך הטלפון דולק במהלך המסיבה">
+          <span class="anti-sleep-icon">💡</span>
+          <span id="anti-sleep-label">מסך דולק:</span>
+          <span id="anti-sleep-status" class="anti-sleep-status-pill">פעיל 🟢</span>
+        </div>
+
+        <div id="fullscreen-chip" class="fullscreen-chip" onclick="toggleFullScreen()" title="העבר למסך מלא נקי ללא סרגלים">
+          <span id="fullscreen-icon">⛶</span>
+          <span id="fullscreen-label">מסך מלא</span>
+        </div>
       </div>
     </div>
 
@@ -2221,7 +2287,10 @@
       <div id="fx-lock-badge" class="fx-lock-badge" style="display: none;">
         <span>🔒 מסך נעול דולק</span>
       </div>
-      <button class="fx-close-btn" onclick="stopCrowdFx(true); event.stopPropagation();" title="מזער מופע אורות">&times;</button>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button class="fx-fullscreen-btn" onclick="toggleFullScreen(); event.stopPropagation();" title="מסך מלא">⛶</button>
+        <button class="fx-close-btn" onclick="stopCrowdFx(true); event.stopPropagation();" title="מזער מופע אורות">&times;</button>
+      </div>
     </div>
 
     <div class="fx-center-content">
@@ -3148,9 +3217,65 @@
       }
     }
 
+    function toggleFullScreen() {
+      const doc = window.document;
+      const docEl = doc.documentElement;
+
+      const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+      const cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+
+      const isFs = !!(doc.fullscreenElement || doc.mozFullScreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement);
+
+      if (!isFs) {
+        if (requestFullScreen) {
+          requestFullScreen.call(docEl).catch(() => {});
+        } else {
+          // iOS Safari fallback: scroll address bar out of view
+          window.scrollTo(0, 1);
+        }
+        showToast('⛶ מצב מסך מלא הופעל!');
+      } else {
+        if (cancelFullScreen) {
+          cancelFullScreen.call(doc).catch(() => {});
+        }
+        showToast('יציאה ממסך מלא');
+      }
+      setTimeout(updateFullscreenUI, 120);
+    }
+
+    function updateFullscreenUI() {
+      const doc = window.document;
+      const isFs = !!(doc.fullscreenElement || doc.mozFullScreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement);
+      const chip = document.getElementById('fullscreen-chip');
+      const label = document.getElementById('fullscreen-label');
+      const icon = document.getElementById('fullscreen-icon');
+      
+      if (chip) {
+        if (isFs) {
+          chip.classList.add('active');
+          if (label) label.innerText = 'צא ממסך מלא';
+          if (icon) icon.innerText = '✕';
+        } else {
+          chip.classList.remove('active');
+          if (label) label.innerText = 'מסך מלא';
+          if (icon) icon.innerText = '⛶';
+        }
+      }
+    }
+
+    ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
+      document.addEventListener(evt, updateFullscreenUI);
+    });
+
     function handleOverlayTouchWake(e) {
       if (e) e.stopPropagation();
       acquireAntiSleepLocks();
+      if (!document.fullscreenElement && (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullScreen)) {
+        try {
+          const req = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullScreen;
+          req.call(document.documentElement).catch(() => {});
+        } catch(err) {}
+      }
     }
 
     // Universal Gesture Unlock: Every touch ensures locks are actively held
@@ -3176,6 +3301,12 @@
     function startCrowdFx(mode, bpm = 128, color = '#f59e0b', title = '') {
       currentFxMode = mode;
       acquireAntiSleepLocks();
+      if (!document.fullscreenElement && (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullScreen)) {
+        try {
+          const req = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullScreen;
+          req.call(document.documentElement).catch(() => {});
+        } catch(err) {}
+      }
       const overlay = document.getElementById('crowd-fx-overlay');
       const candleAura = document.getElementById('candle-aura');
       const mainTitle = document.getElementById('fx-main-title');
