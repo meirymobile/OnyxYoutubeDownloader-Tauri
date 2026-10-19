@@ -3006,7 +3006,6 @@
     // Completely solves iOS Safari & Android mobile sleep timeouts
     // ========================================================
     let crowdWakeLock = null;
-    let isAntiSleepUnlocked = false;
     let isAntiSleepActive = true; // Default ON for party atmosphere
 
     // Get or initialize the video element
@@ -3047,28 +3046,9 @@
     }
 
     async function acquireAntiSleepLocks() {
-      isAntiSleepActive = true;
+      if (!isAntiSleepActive) return;
 
-      // 1. Hardware Screen Wake Lock API (Official W3C standard)
-      try {
-        if ('wakeLock' in navigator && (!crowdWakeLock || crowdWakeLock.released)) {
-          crowdWakeLock = await navigator.wakeLock.request('screen');
-          crowdWakeLock.addEventListener('release', () => {
-            console.log('[AntiSleep] Native WakeLock released by OS');
-            crowdWakeLock = null;
-            const v = document.getElementById('no-sleep-video');
-            if (!v || v.paused) {
-              updateAntiSleepUiState(false);
-            }
-          });
-          isAntiSleepUnlocked = true;
-          console.log('[AntiSleep] Native WakeLock active');
-        }
-      } catch (err) {
-        console.warn('[AntiSleep] Native lock request failed:', err);
-      }
-
-      // 2. Play Verified Looping HTML5 Video (Hardware AVFoundation keep-awake for iOS Safari)
+      // 1. Play Verified Looping HTML5 Video (Hardware AVFoundation keep-awake for iOS Safari)
       try {
         const v = getNoSleepVideo();
         if (v) {
@@ -3077,16 +3057,30 @@
           const playPromise = v.play();
           if (playPromise !== undefined) {
             playPromise.then(() => {
-              isAntiSleepUnlocked = true;
-              updateAntiSleepUiState(true);
               console.log('[AntiSleep] Looping video playback active');
             }).catch(err => {
-              console.warn('[AntiSleep] Video play prevented:', err);
+              console.warn('[AntiSleep] Video play waiting for touch gesture:', err);
             });
           }
         }
       } catch (e) {
         console.warn('[AntiSleep] Video error:', e);
+      }
+
+      // 2. Hardware Screen Wake Lock API (Official W3C standard)
+      try {
+        if ('wakeLock' in navigator && (!crowdWakeLock || crowdWakeLock.released)) {
+          crowdWakeLock = await navigator.wakeLock.request('screen');
+          crowdWakeLock.addEventListener('release', () => {
+            console.log('[AntiSleep] Native WakeLock released by OS');
+            crowdWakeLock = null;
+            // DO NOT turn off the UI chip! The user setting remains active.
+            // On next user touch or visibilitychange, it will re-acquire automatically.
+          });
+          console.log('[AntiSleep] Native WakeLock active');
+        }
+      } catch (err) {
+        console.warn('[AntiSleep] Native lock request failed:', err);
       }
 
       updateAntiSleepUiState(true);
@@ -3147,6 +3141,7 @@
         releaseAntiSleepLocks();
         showToast('💡 שמירת מסך דולק בוטלה');
       } else {
+        isAntiSleepActive = true;
         acquireAntiSleepLocks();
         showToast('🟢 מצב מסיבה: המסך יישאר דולק ברחבה!');
       }
@@ -3157,17 +3152,20 @@
       acquireAntiSleepLocks();
     }
 
-    // Universal Gesture Unlock: Tapping anywhere on the page unlocks video playback & wake lock
-    function onFirstUserGesture() {
-      if (!isAntiSleepUnlocked) {
-        acquireAntiSleepLocks();
+    // Universal Gesture Unlock: Every touch ensures locks are actively held
+    function ensureLocksOnUserInteraction() {
+      if (isAntiSleepActive) {
+        const v = document.getElementById('no-sleep-video');
+        if (!crowdWakeLock || (v && v.paused)) {
+          acquireAntiSleepLocks();
+        }
       }
     }
     ['touchstart', 'touchend', 'click', 'pointerdown'].forEach(evt => {
-      window.addEventListener(evt, onFirstUserGesture, { passive: true });
+      window.addEventListener(evt, ensureLocksOnUserInteraction, { passive: true });
     });
 
-    // Automatically re-acquire wake lock if user switches back to the tab while FX is active
+    // Automatically re-acquire wake lock if user switches back to the tab
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'visible' && (isAntiSleepActive || currentFxMode)) {
         await acquireAntiSleepLocks();
@@ -3248,7 +3246,9 @@
     }
 
     function stopCrowdFx(userDismissed = false) {
-      releaseAntiSleepLocks();
+      if (!isAntiSleepActive) {
+        releaseAntiSleepLocks();
+      }
       const overlay = document.getElementById('crowd-fx-overlay');
       if (crowdFxInterval) {
         clearInterval(crowdFxInterval);
