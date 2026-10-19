@@ -2493,7 +2493,8 @@ export default function GuestRequestsModal({
                       {activeCrowdFx && (
                         <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
                           פעיל כעת: {
-                            activeCrowdFx === 'strobe' ? `⚡ סטרוב (${crowdBpm} BPM)` :
+                            activeCrowdFx === 'strobe' ? `⚡ סטרוב חופשי (${crowdBpm} BPM)` :
+                            activeCrowdFx === 'strobe_synced' ? `🌐 מסונכרן 1:1 (${crowdBpm} BPM)` :
                             activeCrowdFx === 'strobe_rainbow' ? `🎨 סטרוב צבעוני (${crowdBpm} BPM)` :
                             activeCrowdFx === 'candle' ? '🕯️ סלואו זהב' :
                             activeCrowdFx === 'glow' ? '🟣 רייב ניאון' : '🤍 פנס לבן'
@@ -2517,10 +2518,23 @@ export default function GuestRequestsModal({
                           ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black border-yellow-300 shadow-[0_0_15px_rgba(245,158,11,0.5)] animate-pulse'
                           : 'bg-transparent text-amber-300 hover:text-white border-transparent'
                       }`}
-                      title="סטרוב לבן קלאסי מסונכרן BPM לכל מסכי האורחים"
+                      title="סטרוב חופשי: כל טלפון בתזמון עצמאי (אפקט שמיים מנצנצים וגחליליות ברחבה)"
                     >
                       <Zap className="w-3.5 h-3.5" />
-                      <span>⚡ סטרוב</span>
+                      <span>⚡ חופשי</span>
+                    </button>
+
+                    <button
+                      onClick={() => broadcastCrowdFx('strobe_synced', { bpm: crowdBpm })}
+                      className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
+                        activeCrowdFx === 'strobe_synced'
+                          ? 'bg-gradient-to-r from-emerald-500 to-cyan-400 text-black border-cyan-200 shadow-[0_0_18px_rgba(6,182,212,0.7)] animate-pulse font-black'
+                          : 'bg-transparent text-emerald-400 hover:text-white border-transparent'
+                      }`}
+                      title="סנכרון עולמי 100%: כל הטלפונים באולם מבזיקים בו-זמנית באותה מאית שניה בדיוק (פליקר ענק)"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>🌐 מסונכרן</span>
                     </button>
 
                     <button
@@ -2545,7 +2559,7 @@ export default function GuestRequestsModal({
                         onChange={(e) => {
                           const val = Math.max(40, Math.min(260, parseInt(e.target.value, 10) || 128));
                           setCrowdBpm(val);
-                          if (activeCrowdFx === 'strobe' || activeCrowdFx === 'strobe_rainbow') {
+                          if (activeCrowdFx === 'strobe' || activeCrowdFx === 'strobe_rainbow' || activeCrowdFx === 'strobe_synced') {
                             broadcastCrowdFx(activeCrowdFx, { bpm: val });
                           }
                         }}

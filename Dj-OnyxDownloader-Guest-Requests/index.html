@@ -2986,6 +2986,7 @@
     // FEATURE 4: SYNCHRONIZED CROWD FX (STROBE & GLOW WAVE)
     // ========================================================
     let crowdFxInterval = null;
+    let crowdFxAnimId = null;
     let isStrobePhase = false;
     let currentFxMode = null;
 
@@ -3182,47 +3183,96 @@
       const badgeText = document.getElementById('fx-badge-text');
       if (!overlay) return;
 
-      if (crowdFxInterval) clearInterval(crowdFxInterval);
+      if (crowdFxInterval) {
+        clearInterval(crowdFxInterval);
+        crowdFxInterval = null;
+      }
+      if (crowdFxAnimId) {
+        cancelAnimationFrame(crowdFxAnimId);
+        crowdFxAnimId = null;
+      }
       overlay.className = '';
       overlay.style.backgroundColor = '';
       if (candleAura) candleAura.style.display = 'none';
 
       overlay.classList.add('active');
 
-      if (mode === 'strobe' || mode === 'strobe_rainbow') {
+      if (mode === 'strobe' || mode === 'strobe_rainbow' || mode === 'strobe_synced') {
         const isRainbow = (mode === 'strobe_rainbow');
-        badgeText.innerText = isRainbow ? `🎨 MULTI-COLOR STROBE • ${bpm} BPM` : `⚡ STROBE DROP • ${bpm} BPM`;
-        mainTitle.innerText = title || (isRainbow ? '🎨 מופע צבעים ברחבה! 🌈' : '⚡ DROP! עפים באוויר! ⚡');
-        subTitle.innerText = 'הרימו את הטלפון גבוה לרחבה!';
+        const isSynced = (mode === 'strobe_synced');
+
+        badgeText.innerText = isRainbow 
+          ? `🎨 MULTI-COLOR STROBE • ${bpm} BPM` 
+          : (isSynced ? `🌐 100% MASTER SYNC • ${bpm} BPM` : `⚡ STROBE DROP • ${bpm} BPM`);
+        mainTitle.innerText = title || (isRainbow 
+          ? '🎨 מופע צבעים ברחבה! 🌈' 
+          : (isSynced ? '🌐 פליקר קהל מסונכרן! ⚡' : '⚡ DROP! עפים באוויר! ⚡'));
+        subTitle.innerText = isSynced 
+          ? 'כל הרחבה מבזיקה באותה מאית שניה בדיוק!' 
+          : 'הרימו את הטלפון גבוה לרחבה!';
         
-        const flashRateMs = Math.max(50, Math.round((60000 / (bpm || 128)) / 2));
+        const beatMs = Math.max(50, Math.round(60000 / (bpm || 128)));
         isStrobePhase = false;
 
-        const RAINBOW_PALETTE = [
-          '#ff0055', '#00ffcc', '#ffcc00', '#ff00ff', '#00e5ff', 
-          '#ff3300', '#a855f7', '#10b981', '#f43f5e', '#3b82f6',
-          '#facc15', '#ec4899', '#06b6d4', '#84cc16', '#fb923c'
-        ];
+        if (isSynced) {
+          // ========================================================
+          // GLOBAL EPOCH MASTER SYNC (Zero-latency phase lock)
+          // Uses Date.now() modulo to lock every phone to the exact millisecond!
+          // ========================================================
+          const flashOnMs = Math.max(30, Math.round(beatMs * 0.35)); // 35% on, 65% off for crisp punchy flash
+          
+          function tickEpochSync() {
+            if (currentFxMode !== 'strobe_synced') return;
+            const now = Date.now();
+            const phase = now % beatMs;
+            const shouldBeOn = (phase < flashOnMs);
 
-        crowdFxInterval = setInterval(() => {
-          isStrobePhase = !isStrobePhase;
-          if (isStrobePhase) {
-            overlay.classList.remove('fx-mode-strobe-off');
-            if (isRainbow) {
-              const randColor = RAINBOW_PALETTE[Math.floor(Math.random() * RAINBOW_PALETTE.length)];
-              overlay.style.backgroundColor = randColor;
-              overlay.classList.add('fx-mode-strobe-rainbow-on');
-            } else {
-              overlay.style.backgroundColor = '';
-              overlay.classList.add('fx-mode-strobe-on');
+            if (shouldBeOn !== isStrobePhase) {
+              isStrobePhase = shouldBeOn;
+              if (isStrobePhase) {
+                overlay.classList.remove('fx-mode-strobe-off');
+                overlay.style.backgroundColor = '';
+                overlay.classList.add('fx-mode-strobe-on');
+                if (navigator.vibrate) try { navigator.vibrate(20); } catch(e) {}
+              } else {
+                overlay.classList.remove('fx-mode-strobe-on');
+                overlay.style.backgroundColor = '';
+                overlay.classList.add('fx-mode-strobe-off');
+              }
             }
-            if (navigator.vibrate) try { navigator.vibrate(25); } catch(e) {}
-          } else {
-            overlay.classList.remove('fx-mode-strobe-on', 'fx-mode-strobe-rainbow-on');
-            overlay.style.backgroundColor = '';
-            overlay.classList.add('fx-mode-strobe-off');
+            crowdFxAnimId = requestAnimationFrame(tickEpochSync);
           }
-        }, flashRateMs);
+          crowdFxAnimId = requestAnimationFrame(tickEpochSync);
+
+        } else {
+          // Organic Free-Running Strobe (Different timing per phone for sparkling galaxy effect)
+          const flashRateMs = Math.max(50, Math.round(beatMs / 2));
+          const RAINBOW_PALETTE = [
+            '#ff0055', '#00ffcc', '#ffcc00', '#ff00ff', '#00e5ff', 
+            '#ff3300', '#a855f7', '#10b981', '#f43f5e', '#3b82f6',
+            '#facc15', '#ec4899', '#06b6d4', '#84cc16', '#fb923c'
+          ];
+
+          crowdFxInterval = setInterval(() => {
+            isStrobePhase = !isStrobePhase;
+            if (isStrobePhase) {
+              overlay.classList.remove('fx-mode-strobe-off');
+              if (isRainbow) {
+                const randColor = RAINBOW_PALETTE[Math.floor(Math.random() * RAINBOW_PALETTE.length)];
+                overlay.style.backgroundColor = randColor;
+                overlay.classList.add('fx-mode-strobe-rainbow-on');
+              } else {
+                overlay.style.backgroundColor = '';
+                overlay.classList.add('fx-mode-strobe-on');
+              }
+              if (navigator.vibrate) try { navigator.vibrate(25); } catch(e) {}
+            } else {
+              overlay.classList.remove('fx-mode-strobe-on', 'fx-mode-strobe-rainbow-on');
+              overlay.style.backgroundColor = '';
+              overlay.classList.add('fx-mode-strobe-off');
+            }
+          }, flashRateMs);
+        }
 
       } else if (mode === 'candle') {
         overlay.classList.add('fx-mode-candle');
@@ -3253,6 +3303,10 @@
       if (crowdFxInterval) {
         clearInterval(crowdFxInterval);
         crowdFxInterval = null;
+      }
+      if (crowdFxAnimId) {
+        cancelAnimationFrame(crowdFxAnimId);
+        crowdFxAnimId = null;
       }
       if (overlay) {
         overlay.style.backgroundColor = '';
