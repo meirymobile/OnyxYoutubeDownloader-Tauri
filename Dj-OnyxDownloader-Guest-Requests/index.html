@@ -1599,6 +1599,83 @@
       color: #ffffff !important;
     }
 
+    /* Anti-Sleep Party Mode UI Chip & FX Lock Badges */
+    .anti-sleep-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin: 10px auto 4px;
+      padding: 6px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #cbd5e1;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.25s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .anti-sleep-chip:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    .anti-sleep-chip.active {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.45);
+      color: #6ee7b7;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+    }
+    .anti-sleep-status-pill {
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      font-size: 10.5px;
+      font-weight: 800;
+      transition: all 0.25s;
+    }
+    .anti-sleep-chip.active .anti-sleep-status-pill {
+      background: #10b981;
+      color: #022c22;
+    }
+    .fx-lock-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.25);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #a7f3d0;
+      font-size: 11px;
+      font-weight: 800;
+      backdrop-filter: blur(10px);
+    }
+    .fx-tap-prompt {
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.75);
+      border: 1.5px solid #facc15;
+      color: #fef08a;
+      font-size: 13px;
+      font-weight: 800;
+      box-shadow: 0 0 25px rgba(250, 204, 21, 0.45);
+      animation: promptPulse 1.8s infinite ease-in-out;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      user-select: none;
+    }
+    @keyframes promptPulse {
+      0%, 100% { transform: scale(0.96); box-shadow: 0 0 15px rgba(250, 204, 21, 0.3); }
+      50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(250, 204, 21, 0.7); }
+    }
+
     /* ======================================================== */
     /* FEATURE 5: SOUVENIR STAGE & STORY CARD MODAL             */
     /* ======================================================== */
@@ -1849,6 +1926,13 @@
       </div>
       <h1 class="active-dj-title" id="active-dj-title">DJ SHAZZ &amp; DJ SONIC</h1>
       <p class="active-subtitle">חפשו שיר והדיג'יי ינגן אותו ברחבה!</p>
+
+      <!-- Party Mode Anti-Sleep Indicator & Switch -->
+      <div id="anti-sleep-chip" class="anti-sleep-chip" onclick="manualToggleAntiSleep()" title="השאר את מסך הטלפון דולק במהלך המסיבה">
+        <span class="anti-sleep-icon">💡</span>
+        <span id="anti-sleep-label">מסך דולק ברחבה:</span>
+        <span id="anti-sleep-status" class="anti-sleep-status-pill">הפעל</span>
+      </div>
     </div>
 
     <!-- My Active Tickets & Live Song Tracking (Feature 3) -->
@@ -2126,7 +2210,7 @@
   </div>
 
   <!-- Synchronized Crowd Light Show & BPM Strobe Wave (Feature 4) -->
-  <div id="crowd-fx-overlay">
+  <div id="crowd-fx-overlay" onclick="handleOverlayTouchWake(event)">
     <div class="candle-aura" id="candle-aura" style="display: none;"></div>
     
     <div class="fx-top-bar">
@@ -2134,12 +2218,21 @@
         <span class="status-dot"></span>
         <span id="fx-badge-text">ONYX CROWD LIVE ✨</span>
       </div>
-      <button class="fx-close-btn" onclick="stopCrowdFx(true)" title="מזער מופע אורות">&times;</button>
+      <div id="fx-lock-badge" class="fx-lock-badge" style="display: none;">
+        <span>🔒 מסך נעול דולק</span>
+      </div>
+      <button class="fx-close-btn" onclick="stopCrowdFx(true); event.stopPropagation();" title="מזער מופע אורות">&times;</button>
     </div>
 
     <div class="fx-center-content">
       <h1 class="fx-title" id="fx-main-title">סלואו קסום ✨</h1>
       <p class="fx-subtitle" id="fx-sub-title">הרימו את הטלפון אל על והאירו את הרחבה!</p>
+    </div>
+
+    <!-- Pulsating Tap-to-Lock Screen Wake prompt -->
+    <div id="fx-tap-prompt" class="fx-tap-prompt" onclick="handleOverlayTouchWake(event)">
+      <span class="fx-tap-pulse">👆</span>
+      <span id="fx-tap-prompt-text">הקישו בכל מקום במסך למניעת כיבוי!</span>
     </div>
 
     <div style="font-size: 11px; opacity: 0.8; z-index: 10; letter-spacing: 1px; font-weight: 700;">
@@ -2908,74 +3001,182 @@
     }
 
     // ========================================================
-    // SCREEN WAKE LOCK & ANTI-SLEEP CONTROLLER
-    // Keeps mobile screens alive during live Crowd FX shows
+    // SCREEN WAKE LOCK & ANTI-SLEEP ENGINE (HYBRID ARCHITECTURE)
+    // Combines Hardware WakeLock API + Muted HTML5 Video Loop
+    // Completely solves iOS Safari & Android mobile sleep timeouts
     // ========================================================
     let crowdWakeLock = null;
-    let noSleepVideo = null;
+    let isAntiSleepUnlocked = false;
+    let isAntiSleepActive = false;
 
-    async function acquireWakeLock() {
-      // 1. Official Native Screen Wake Lock API (Android Chrome & iOS 16.4+ Safari)
-      try {
-        if ('wakeLock' in navigator && !crowdWakeLock) {
-          crowdWakeLock = await navigator.wakeLock.request('screen');
-          crowdWakeLock.addEventListener('release', () => {
-            console.log('[WakeLock] Screen wake lock released');
-            crowdWakeLock = null;
-          });
-          console.log('[WakeLock] Native Screen Wake Lock active');
-        }
-      } catch (err) {
-        console.warn('[WakeLock] Native lock request failed:', err);
+    // Get or initialize the video element
+    function getNoSleepVideo() {
+      let v = document.getElementById('no-sleep-video');
+      if (!v) {
+        v = document.createElement('video');
+        v.id = 'no-sleep-video';
+        v.setAttribute('playsinline', '');
+        v.setAttribute('webkit-playsinline', '');
+        v.setAttribute('muted', '');
+        v.muted = true;
+        v.loop = true;
+        v.preload = 'auto';
+        v.style.position = 'fixed';
+        v.style.top = '0';
+        v.style.left = '0';
+        v.style.width = '1px';
+        v.style.height = '1px';
+        v.style.opacity = '0.001';
+        v.style.pointerEvents = 'none';
+        v.style.zIndex = '-999';
+        v.src = './nosleep.mp4';
+        document.body.appendChild(v);
       }
-
-      // 2. Continuous Video Playback Fallback (Guaranteed to keep all iOS Safari versions awake)
-      try {
-        if (!noSleepVideo) {
-          noSleepVideo = document.createElement('video');
-          noSleepVideo.setAttribute('playsinline', '');
-          noSleepVideo.setAttribute('webkit-playsinline', '');
-          noSleepVideo.setAttribute('muted', '');
-          noSleepVideo.muted = true;
-          noSleepVideo.loop = true;
-          noSleepVideo.style.position = 'fixed';
-          noSleepVideo.style.top = '-9999px';
-          noSleepVideo.style.left = '-9999px';
-          noSleepVideo.style.width = '1px';
-          noSleepVideo.style.height = '1px';
-          noSleepVideo.style.opacity = '0';
-          noSleepVideo.style.pointerEvents = 'none';
-          noSleepVideo.src = 'data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAW1wNDJpc29tYXZjMQAAADpmcmVlAAAALW1kYXQAAAGZAAEAEx//v9/f39/f39/f39/f39/f39/f39/f39/f39/f398AAAAmbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAACWAAAAlgAAQAAAQAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAACXRyYWsAAABcdGtoZAAAAAEAAAAAAAAAAAAAAAEAAAAAAAACWAAAAAAAAAAAAAAAEA';
-          document.body.appendChild(noSleepVideo);
-        }
-        noSleepVideo.play().catch(() => {});
-      } catch (e) {}
+      return v;
     }
 
-    function releaseWakeLock() {
+    // Attach loop protection on video timeupdate to avoid any freeze
+    function attachVideoLoopGuard(v) {
+      if (!v || v.__loopGuardAttached) return;
+      v.__loopGuardAttached = true;
+      v.addEventListener('timeupdate', () => {
+        if (v.currentTime > 0.5) {
+          v.currentTime = Math.random() * 0.2;
+        }
+      });
+    }
+
+    async function acquireAntiSleepLocks() {
+      isAntiSleepActive = true;
+
+      // 1. Hardware Screen Wake Lock API (Official W3C standard)
+      try {
+        if ('wakeLock' in navigator && (!crowdWakeLock || crowdWakeLock.released)) {
+          crowdWakeLock = await navigator.wakeLock.request('screen');
+          crowdWakeLock.addEventListener('release', () => {
+            console.log('[AntiSleep] Native WakeLock released by OS');
+            crowdWakeLock = null;
+            const v = document.getElementById('no-sleep-video');
+            if (!v || v.paused) {
+              updateAntiSleepUiState(false);
+            }
+          });
+          isAntiSleepUnlocked = true;
+          console.log('[AntiSleep] Native WakeLock active');
+        }
+      } catch (err) {
+        console.warn('[AntiSleep] Native lock request failed:', err);
+      }
+
+      // 2. Play Verified Looping HTML5 Video (Hardware AVFoundation keep-awake for iOS Safari)
+      try {
+        const v = getNoSleepVideo();
+        if (v) {
+          attachVideoLoopGuard(v);
+          v.muted = true;
+          const playPromise = v.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              isAntiSleepUnlocked = true;
+              updateAntiSleepUiState(true);
+              console.log('[AntiSleep] Looping video playback active');
+            }).catch(err => {
+              console.warn('[AntiSleep] Video play prevented:', err);
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[AntiSleep] Video error:', e);
+      }
+
+      updateAntiSleepUiState(true);
+    }
+
+    function releaseAntiSleepLocks() {
+      isAntiSleepActive = false;
       if (crowdWakeLock) {
         try {
           crowdWakeLock.release();
         } catch(e) {}
         crowdWakeLock = null;
       }
-      if (noSleepVideo) {
-        try {
-          noSleepVideo.pause();
-        } catch(e) {}
+      try {
+        const v = document.getElementById('no-sleep-video');
+        if (v && !v.paused) {
+          v.pause();
+        }
+      } catch(e) {}
+      updateAntiSleepUiState(false);
+    }
+
+    function updateAntiSleepUiState(active) {
+      const chip = document.getElementById('anti-sleep-chip');
+      const statusPill = document.getElementById('anti-sleep-status');
+      const lockBadge = document.getElementById('fx-lock-badge');
+      const tapPrompt = document.getElementById('fx-tap-prompt');
+      const tapPromptText = document.getElementById('fx-tap-prompt-text');
+
+      if (chip && statusPill) {
+        if (active) {
+          chip.classList.add('active');
+          statusPill.innerText = 'פעיל 🟢';
+        } else {
+          chip.classList.remove('active');
+          statusPill.innerText = 'הפעל';
+        }
+      }
+
+      if (lockBadge) {
+        lockBadge.style.display = active ? 'inline-flex' : 'none';
+      }
+      if (tapPrompt) {
+        if (active) {
+          if (tapPromptText) tapPromptText.innerText = '✨ המסך נעול דולק – לא ייכבה!';
+          setTimeout(() => {
+            if (tapPrompt && isAntiSleepActive) tapPrompt.style.display = 'none';
+          }, 2000);
+        } else {
+          tapPrompt.style.display = 'inline-flex';
+          if (tapPromptText) tapPromptText.innerText = 'הקישו בכל מקום במסך למניעת כיבוי!';
+        }
       }
     }
 
+    function manualToggleAntiSleep() {
+      if (isAntiSleepActive) {
+        releaseAntiSleepLocks();
+        showToast('💡 שמירת מסך דולק בוטלה');
+      } else {
+        acquireAntiSleepLocks();
+        showToast('🟢 מצב מסיבה: המסך יישאר דולק ברחבה!');
+      }
+    }
+
+    function handleOverlayTouchWake(e) {
+      if (e) e.stopPropagation();
+      acquireAntiSleepLocks();
+    }
+
+    // Universal Gesture Unlock: Tapping anywhere on the page unlocks video playback & wake lock
+    function onFirstUserGesture() {
+      if (!isAntiSleepUnlocked) {
+        acquireAntiSleepLocks();
+      }
+    }
+    ['touchstart', 'touchend', 'click', 'pointerdown'].forEach(evt => {
+      window.addEventListener(evt, onFirstUserGesture, { passive: true });
+    });
+
     // Automatically re-acquire wake lock if user switches back to the tab while FX is active
     document.addEventListener('visibilitychange', async () => {
-      if (currentFxMode && document.visibilityState === 'visible') {
-        await acquireWakeLock();
+      if (document.visibilityState === 'visible' && (isAntiSleepActive || currentFxMode)) {
+        await acquireAntiSleepLocks();
       }
     });
 
     function startCrowdFx(mode, bpm = 128, color = '#f59e0b', title = '') {
       currentFxMode = mode;
-      acquireWakeLock();
+      acquireAntiSleepLocks();
       const overlay = document.getElementById('crowd-fx-overlay');
       const candleAura = document.getElementById('candle-aura');
       const mainTitle = document.getElementById('fx-main-title');
@@ -3047,7 +3248,7 @@
     }
 
     function stopCrowdFx(userDismissed = false) {
-      releaseWakeLock();
+      releaseAntiSleepLocks();
       const overlay = document.getElementById('crowd-fx-overlay');
       if (crowdFxInterval) {
         clearInterval(crowdFxInterval);
@@ -4432,5 +4633,12 @@
     initNotifySseListener();
     renderMyTickets();
   </script>
+
+  <!-- Hidden Silent Anti-Sleep Video Element (Guarantees iOS Safari & Android mobile screens stay awake) -->
+  <video id="no-sleep-video" playsinline webkit-playsinline muted loop preload="auto"
+    style="position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.001; pointer-events: none; z-index: -999;">
+    <source src="./nosleep.mp4" type="video/mp4">
+    <source src="data:video/mp4;base64,AAAAHGZ0eXBNNFYgAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAAGF21kYXTeBAAAbGliZmFhYyAxLjI4AABCAJMgBDIARwAAArEGBf//rdxF6b3m2Ui3lizYINkj7u94MjY0IC0gY29yZSAxNDIgcjIgOTU2YzhkOCAtIEguMjY0L01QRUctNCBBVkMgY29kZWMgLSBDb3B5bGVmdCAyMDAzLTIwMTQgLSBodHRwOi8vd3d3LnZpZGVvbGFuLm9yZy94MjY0Lmh0bWwgLSBvcHRpb25zOiBjYWJhYz0wIHJlZj0zIGRlYmxvY2s9MTowOjAgYW5hbHlzZT0weDE6MHgxMTEgbWU9aGV4IHN1Ym1lPTcgcHN5PTEgcHN5X3JkPTEuMDA6MC4wMCBtaXhlZF9yZWY9MSBtZV9yYW5nZT0xNiBjaHJvbWFfbWU9MSB0cmVsbGlzPTEgOHg4ZGN0PTAgY3FtPTAgZGVhZHpvbmU9MjEsMTEgZmFzdF9wc2tpcD0xIGNocm9tYV9xcF9vZmZzZXQ9LTIgdGhyZWFkcz02IGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRlPTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MCB3ZWlnaHRwPTAga2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCB2YnZfbWF4cmF0ZT03NjggdmJ2X2J1ZnNpemU9MzAwMCBjcmZfbWF4PTAuMCBuYWxfaHJkPW5vbmUgZmlsbGVyPTAgaXBfcmF0aW89MS40MCBhcT0xOjEuMDAAgAAAAFZliIQL8mKAAKvMnJycnJycnJycnXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXiEASZACGQAjgCEASZACGQAjgAAAAAdBmjgX4GSAIQBJkAIZACOAAAAAB0GaVAX4GSAhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZpgL8DJIQBJkAIZACOAIQBJkAIZACOAAAAABkGagC/AySEASZACGQAjgAAAAAZBmqAvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZrAL8DJIQBJkAIZACOAAAAABkGa4C/AySEASZACGQAjgCEASZACGQAjgAAAAAZBmwAvwMkhAEmQAhkAI4AAAAAGQZsgL8DJIQBJkAIZACOAIQBJkAIZACOAAAAABkGbQC/AySEASZACGQAjgCEASZACGQAjgAAAAAZBm2AvwMkhAEmQAhkAI4AAAAAGQZuAL8DJIQBJkAIZACOAIQBJkAIZACOAAAAABkGboC/AySEASZACGQAjgAAAAAZBm8AvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZvgL8DJIQBJkAIZACOAAAAABkGaAC/AySEASZACGQAjgCEASZACGQAjgAAAAAZBmiAvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZpAL8DJIQBJkAIZACOAAAAABkGaYC/AySEASZACGQAjgCEASZACGQAjgAAAAAZBmoAvwMkhAEmQAhkAI4AAAAAGQZqgL8DJIQBJkAIZACOAIQBJkAIZACOAAAAABkGawC/AySEASZACGQAjgAAAAAZBmuAvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZsAL8DJIQBJkAIZACOAAAAABkGbIC/AySEASZACGQAjgCEASZACGQAjgAAAAAZBm0AvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZtgL8DJIQBJkAIZACOAAAAABkGbgCvAySEASZACGQAjgCEASZACGQAjgAAAAAZBm6AnwMkhAEmQAhkAI4AhAEmQAhkAI4AhAEmQAhkAI4AhAEmQAhkAI4AAAAhubW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAABDcAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAzB0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAA+kAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAALAAAACQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAPpAAAAAAABAAAAAAKobWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAB1MAAAdU5VxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAACU21pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAhNzdGJsAAAAr3N0c2QAAAAAAAAAAQAAAJ9hdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAALAAkABIAAAASAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAALWF2Y0MBQsAN/+EAFWdCwA3ZAsTsBEAAAPpAADqYA8UKkgEABWjLg8sgAAAAHHV1aWRraEDyXyRPxbo5pRvPAyPzAAAAAAAAABhzdHRzAAAAAAAAAAEAAAAeAAAD6QAAABRzdHNzAAAAAAAAAAEAAAABAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAABAAAAAQAAAIxzdHN6AAAAAAAAAAAAAAAeAAADDwAAAAsAAAALAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAAiHN0Y28AAAAAAAAAHgAAAEYAAANnAAADewAAA5gAAAO0AAADxwAAA+MAAAP2AAAEEgAABCUAAARBAAAEXQAABHAAAASMAAAEnwAABLsAAATOAAAE6gAABQYAAAUZAAAFNQAABUgAAAVkAAAFdwAABZMAAAWmAAAFwgAABd4AAAXxAAAGDQAABGh0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAACAAAAAAAABDcAAAAAAAAAAAAAAAEBAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAQkAAADcAABAAAAAAPgbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAC7gAAAykBVxAAAAAAALWhkbHIAAAAAAAAAAHNvdW4AAAAAAAAAAAAAAABTb3VuZEhhbmRsZXIAAAADi21pbmYAAAAQc21oZAAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAADT3N0YmwAAABnc3RzZAAAAAAAAAABAAAAV21wNGEAAAAAAAAAAQAAAAAAAAAAAAIAEAAAAAC7gAAAAAAAM2VzZHMAAAAAA4CAgCIAAgAEgICAFEAVBbjYAAu4AAAADcoFgICAAhGQBoCAgAECAAAAIHN0dHMAAAAAAAAAAgAAADIAAAQAAAAAAQAAAkAAAAFUc3RzYwAAAAAAAAAbAAAAAQAAAAEAAAABAAAAAgAAAAIAAAABAAAAAwAAAAEAAAABAAAABAAAAAIAAAABAAAABgAAAAEAAAABAAAABwAAAAIAAAABAAAACAAAAAEAAAABAAAACQAAAAIAAAABAAAACgAAAAEAAAABAAAACwAAAAIAAAABAAAADQAAAAEAAAABAAAADgAAAAIAAAABAAAADwAAAAEAAAABAAAAEAAAAAIAAAABAAAAEQAAAAEAAAABAAAAEgAAAAIAAAABAAAAFAAAAAEAAAABAAAAFQAAAAIAAAABAAAAFgAAAAEAAAABAAAAFwAAAAIAAAABAAAAGAAAAAEAAAABAAAAGQAAAAIAAAABAAAAGgAAAAEAAAABAAAAGwAAAAIAAAABAAAAHQAAAAEAAAABAAAAHgAAAAIAAAABAAAAHwAAAAQAAAABAAAA4HN0c3oAAAAAAAAAAAAAADMAAAAaAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAACMc3RjbwAAAAAAAAAfAAAALAAAA1UAAANyAAADhgAAA6IAAAO+AAAD0QAAA+0AAAQAAAAEHAAABC8AAARLAAAEZwAABHoAAASWAAAEqQAABMUAAATYAAAE9AAABRAAAAUjAAAFPwAABVIAAAVuAAAFgQAABZ0AAAWwAAAFzAAABegAAAX7AAAGFwAAAGJ1ZHRhAAAAWm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAALWlsc3QAAAAlqXRvbwAAAB1kYXRhAAAAAQAAAABMYXZmNTUuMzMuMTAw" type="video/mp4">
+  </video>
 </body>
 </html>
