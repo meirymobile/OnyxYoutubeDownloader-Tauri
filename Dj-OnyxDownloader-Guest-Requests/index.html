@@ -333,6 +333,98 @@
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.3; transform: scale(0.8); }
     }
+
+    /* Header Spinning Mini Vinyl Turntable Icon */
+    .mini-turntable-icon {
+      position: relative;
+      width: 68px;
+      height: 68px;
+      margin: 0 auto 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mini-vinyl-disc {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: 
+        repeating-radial-gradient(circle, #111 0px, #111 1.2px, #1f1f1f 2px, #111 2.8px),
+        radial-gradient(circle at 50% 50%, #151515, #000);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.8),
+                  inset 0 0 8px rgba(255, 255, 255, 0.12),
+                  0 0 25px rgba(244, 63, 94, 0.35);
+      position: relative;
+      animation: spinVinyl 6s linear infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mini-vinyl-disc::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 35%, rgba(255,255,255,0.1) 50%, transparent 70%, rgba(255,255,255,0.18) 100%);
+      pointer-events: none;
+    }
+    .mini-vinyl-label {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #f97316 0%, #db2777 100%);
+      border: 1.5px solid #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 6px rgba(0,0,0,0.6);
+      text-align: center;
+      position: relative;
+    }
+    .mini-vinyl-hole {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #030008;
+      border: 1px solid #555;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .mini-label-text-top {
+      font-size: 3.2px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 0.2px;
+      line-height: 1;
+      margin-bottom: 4.5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .mini-label-text-bot {
+      font-size: 2.8px;
+      font-weight: 800;
+      color: #ffedd5;
+      letter-spacing: 0.2px;
+      line-height: 1;
+      margin-top: 4.5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .mini-tonearm {
+      position: absolute;
+      top: -5px;
+      right: -4px;
+      width: 25px;
+      height: 38px;
+      pointer-events: none;
+      transform: rotate(26deg);
+      transform-origin: top right;
+      filter: drop-shadow(1px 4px 4px rgba(0,0,0,0.8));
+    }
+
     .active-dj-title {
       font-family: 'Space Grotesk', sans-serif;
       font-size: 26px;
@@ -1974,7 +2066,22 @@
   <!-- ======================================================== -->
   <div id="state-active">
     <div class="active-header">
-      <img src="favicon.png" alt="Onyx DJ™" style="width: 58px; height: 58px; border-radius: 18px; margin: 0 auto 10px; display: block; box-shadow: 0 0 25px rgba(6, 182, 212, 0.45); border: 1px solid rgba(255, 255, 255, 0.1);" />
+      <!-- Spinning Mini Vinyl Turntable Logo -->
+      <div class="mini-turntable-icon" title="Onyx DJ™ Live Platter">
+        <div class="mini-vinyl-disc">
+          <div class="mini-vinyl-label">
+            <div class="mini-label-text-top">SHAZZ &amp; SONIC</div>
+            <div class="mini-vinyl-hole"></div>
+            <div class="mini-label-text-bot">LIVE ON AIR</div>
+          </div>
+        </div>
+        <!-- SVG Mini Tonearm -->
+        <svg class="mini-tonearm" viewBox="0 0 70 110" fill="none">
+          <circle cx="55" cy="15" r="12" fill="#333" stroke="#888" stroke-width="2"/>
+          <path d="M55 27 L45 80 L35 95" stroke="#aaa" stroke-width="3.5" stroke-linecap="round"/>
+          <rect x="26" y="90" width="16" height="14" rx="2" fill="#f97316" stroke="#fff" stroke-width="1.5" transform="rotate(-25 34 97)"/>
+        </svg>
+      </div>
       <div class="live-badge">
         <span class="live-pulse"></span>
         עמדת בקשות שירים פעילה
