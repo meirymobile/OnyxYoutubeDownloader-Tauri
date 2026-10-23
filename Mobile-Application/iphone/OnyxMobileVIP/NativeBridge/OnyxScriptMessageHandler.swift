@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Photos
 import UIKit
@@ -35,21 +36,32 @@ public final class OnyxScriptMessageHandler: NSObject, WKScriptMessageHandler {
                 UIApplication.shared.isIdleTimerDisabled = disabled
             }
 
-        case "updateLiveActivity":
-            if let data = dict["data"] as? [String: Any] {
-                let track = data["currentTrackTitle"] as? String ?? "Onyx Live Dance Floor"
-                let bpm = (data["bpm"] as? NSNumber)?.intValue ?? 128
-                let isStrobe = data["isStrobeActive"] as? Bool ?? false
-                let stageMsg = data["stageMessage"] as? String ?? ""
-                let isNext = data["isUserSongNext"] as? Bool ?? false
+        case "requestCameraPermission":
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                print("[OnyxScriptHandler] Native camera permission granted: \(granted)")
+            }
 
-                OnyxLiveActivityManager.shared.updateActivity(
-                    trackTitle: track,
-                    bpm: bpm,
-                    isStrobeActive: isStrobe,
-                    stageMessage: stageMsg,
-                    isUserSongNext: isNext
-                )
+        case "checkCameraPermission":
+            let status = AVCaptureDevice.authorizationStatus(for: .video)
+            print("[OnyxScriptHandler] Camera authorization status: \(status.rawValue)")
+
+        case "updateLiveActivity":
+            if #available(iOS 16.2, *) {
+                if let data = dict["data"] as? [String: Any] {
+                    let track = data["currentTrackTitle"] as? String ?? "Onyx Live Dance Floor"
+                    let bpm = (data["bpm"] as? NSNumber)?.intValue ?? 128
+                    let isStrobe = data["isStrobeActive"] as? Bool ?? false
+                    let stageMsg = data["stageMessage"] as? String ?? ""
+                    let isNext = data["isUserSongNext"] as? Bool ?? false
+
+                    OnyxLiveActivityManager.shared.updateActivity(
+                        trackTitle: track,
+                        bpm: bpm,
+                        isStrobeActive: isStrobe,
+                        stageMessage: stageMsg,
+                        isUserSongNext: isNext
+                    )
+                }
             }
 
         case "shareImage":
@@ -68,11 +80,27 @@ public final class OnyxScriptMessageHandler: NSObject, WKScriptMessageHandler {
         }
     }
 
+    private var topViewController: UIViewController? {
+        if let vc = self.viewController { return vc }
+        for scene in UIApplication.shared.connectedScenes {
+            if let windowScene = scene as? UIWindowScene {
+                for window in windowScene.windows where window.isKeyWindow {
+                    var top = window.rootViewController
+                    while let presented = top?.presentedViewController {
+                        top = presented
+                    }
+                    return top
+                }
+            }
+        }
+        return nil
+    }
+
     private func handleShareImage(base64: String, target: String) {
         guard let image = decodeBase64Image(base64) else { return }
 
         DispatchQueue.main.async { [weak self] in
-            guard let vc = self?.viewController else { return }
+            guard let vc = self?.topViewController else { return }
 
             if target == "whatsapp", let whatsappURL = URL(string: "whatsapp://app"), UIApplication.shared.canOpenURL(whatsappURL) {
                 let activityVC = UIActivityViewController(activityItems: [image, "השיר וההקדשה שלי על הבמה של Onyx DJ! 🎵"], applicationActivities: nil)

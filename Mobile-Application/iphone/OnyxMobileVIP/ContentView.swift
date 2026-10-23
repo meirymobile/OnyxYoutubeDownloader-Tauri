@@ -46,7 +46,9 @@ struct OnyxWebViewRepresentable: UIViewRepresentable {
         webView.backgroundColor = UIColor(red: 0.03, green: 0.01, blue: 0.05, alpha: 1.0)
         webView.scrollView.bounces = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.uiDelegate = context.coordinator
 
+        context.coordinator.webView = webView
         handler.viewController = context.coordinator.parentViewController
 
         loadBundledApp(into: webView)
@@ -72,12 +74,25 @@ struct OnyxWebViewRepresentable: UIViewRepresentable {
         }
     }
 
-    class Coordinator: NSObject {
+    class Coordinator: NSObject, WKUIDelegate {
         var parent: OnyxWebViewRepresentable
         weak var parentViewController: UIViewController?
+        weak var webView: WKWebView?
 
         init(_ parent: OnyxWebViewRepresentable) {
             self.parent = parent
+        }
+
+        // Grant camera and media permissions inside WKWebView on iOS 15+
+        @available(iOS 15.0, *)
+        func webView(
+            _ webView: WKWebView,
+            requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+            initiatedByFrame frame: WKFrameInfo,
+            type: WKMediaCaptureType,
+            decisionHandler: @escaping (WKPermissionDecision) -> Void
+        ) {
+            decisionHandler(.grant)
         }
     }
 }

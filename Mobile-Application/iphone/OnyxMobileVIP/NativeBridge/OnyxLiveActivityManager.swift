@@ -5,6 +5,7 @@ import Foundation
  * Onyx DJ™ ActivityKit Manager
  * Manages Dynamic Island & Lock Screen Live Activities during party.
  */
+@available(iOS 16.2, *)
 public final class OnyxLiveActivityManager {
     public static let shared = OnyxLiveActivityManager()
 

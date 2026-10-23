@@ -23,7 +23,7 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSCameraUsageDescription</key>
-    <string>האפליקציה זקוקה לגישה לפלאש המצלמה כדי להפעיל את מופע הסטרוב המסונכרן ברחבה.</string>
+    <string>האפליקציה זקוקה לגישה למצלמה לצורך סריקת קוד QR בעמדת ה-DJ ולהפעלת מופע האורות והסטרוב המסונכרן ברחבה.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>האפליקציה מאפשרת לך לבחור תמונה מהגלריה להקרנה על מסך הבמה יחד עם בקשת השיר שלך.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>

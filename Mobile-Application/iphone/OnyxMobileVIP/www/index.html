@@ -1989,6 +1989,9 @@
       if (window.OnyxNativeBridge && typeof window.OnyxNativeBridge.requestCameraPermission === 'function') {
         window.OnyxNativeBridge.requestCameraPermission();
       }
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.onyxNative) {
+        window.webkit.messageHandlers.onyxNative.postMessage({ action: 'requestCameraPermission' });
+      }
 
       try {
         let stream = null;
