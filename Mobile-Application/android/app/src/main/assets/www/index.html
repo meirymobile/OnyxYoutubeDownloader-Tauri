@@ -8,12 +8,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#07020d">
-  <title>Onyx DJ™ VIP Companion</title>
+  <title>DJ Shazz & DJ Sonic | Onyx VIP Companion</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <!-- Paho MQTT WebSocket Client -->
+  <!-- Paho MQTT WebSocket Client & jsQR Scanner -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="mobile-bridge.js"></script>
   <style>
     * {
@@ -46,38 +47,278 @@
       flex-direction: column;
       align-items: center;
       overflow-x: hidden;
-      padding-bottom: 50px;
+      position: relative;
     }
 
     /* Ambient Warm Stage Glow */
-    .bg-glow {
-      position: fixed;
-      top: -120px;
+    .warm-glow {
+      position: absolute;
+      width: 440px;
+      height: 440px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.16) 0%, rgba(244, 63, 94, 0.1) 40%, transparent 70%);
+      top: 25%;
       left: 50%;
-      transform: translateX(-50%);
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(245, 158, 11, 0.14) 0%, rgba(236, 72, 153, 0.08) 50%, transparent 70%);
+      transform: translate(-50%, -50%);
       pointer-events: none;
-      filter: blur(60px);
+      filter: blur(55px);
       z-index: 0;
     }
 
-    .app-container {
-      position: relative;
-      z-index: 1;
+    /* ======================================================== */
+    /* STATE 1: CLOSED (EXACT 1-TO-1 MATCH WITH WEBSITE)        */
+    /* ======================================================== */
+    #state-closed {
+      display: flex;
       width: 100%;
-      max-width: 460px;
-      padding: 16px 16px 32px;
+      min-height: 100vh;
+      background: radial-gradient(circle at 50% 20%, #2a1138 0%, #11071a 55%, #07020d 100%);
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 16px 36px;
+      position: relative;
+      z-index: 10;
+    }
+    .closed-container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 440px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      align-items: center;
+      text-align: center;
+      margin: auto 0;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #fcd34d;
+      margin-bottom: 20px;
+      backdrop-filter: blur(10px);
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #f59e0b;
+      box-shadow: 0 0 10px #f59e0b;
+    }
+    .dj-names {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(30px, 8vw, 40px);
+      font-weight: 700;
+      letter-spacing: 1px;
+      line-height: 1.15;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff 20%, #fed7aa 60%, #fb7185 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 20px rgba(245, 158, 11, 0.35));
+    }
+    .dj-subtitle {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #fb923c;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .vinyl-wrapper {
+      position: relative;
+      width: 210px;
+      height: 210px;
+      margin: 0 auto 24px;
+    }
+    .vinyl-disc {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: 
+        repeating-radial-gradient(circle, #111 0px, #111 2px, #1f1f1f 3px, #111 4px),
+        radial-gradient(circle at 50% 50%, #151515, #000);
+      box-shadow: 0 12px 35px rgba(0,0,0,0.8),
+                  inset 0 0 15px rgba(255,255,255,0.1),
+                  0 0 30px rgba(244, 63, 94, 0.25);
+      position: relative;
+      animation: spinVinyl 16s linear infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .vinyl-disc::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 35%, rgba(255,255,255,0.08) 50%, transparent 70%, rgba(255,255,255,0.15) 100%);
+      pointer-events: none;
+    }
+    @keyframes spinVinyl {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .vinyl-label {
+      width: 78px;
+      height: 78px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #f97316 0%, #db2777 100%);
+      border: 3px solid #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px rgba(0,0,0,0.6);
+      text-align: center;
+      padding: 6px;
+      position: relative;
+    }
+    .vinyl-hole {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #030008;
+      border: 2px solid #555;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .label-text-top {
+      font-size: 7px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+    .label-text-bot {
+      font-size: 6px;
+      font-weight: 700;
+      color: #ffedd5;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      margin-top: 12px;
+      text-transform: uppercase;
+    }
+    .tonearm {
+      position: absolute;
+      top: -15px;
+      right: -10px;
+      width: 70px;
+      height: 110px;
+      pointer-events: none;
+      transform: rotate(18deg);
+      transform-origin: top right;
+      filter: drop-shadow(2px 8px 6px rgba(0,0,0,0.7));
+    }
+    .party-card {
+      background: rgba(22, 11, 33, 0.75);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 28px;
+      padding: 30px 24px;
+      width: 100%;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(245, 158, 11, 0.12);
+    }
+    .main-message {
+      font-size: 25px;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .sub-message {
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.55;
+      font-weight: 300;
+      margin-bottom: 22px;
+    }
+    .scan-connect-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 15px 20px;
+      background: linear-gradient(135deg, #f59e0b 0%, #ec4899 100%);
+      border: none;
+      border-radius: 16px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 800;
+      box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+    .social-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 13px 20px;
+      background: linear-gradient(135deg, #f97316, #db2777);
+      border-radius: 16px;
+      color: #fff;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      box-shadow: 0 8px 25px rgba(249, 115, 22, 0.35);
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .secondary-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: 16px;
+      color: #fed7aa;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .closed-footer {
+      font-size: 11px;
+      color: #64748b;
+      letter-spacing: 0.5px;
+      text-align: center;
+      margin-top: 20px;
     }
 
-    /* Header & 60FPS Spinning Vinyl Turntable */
+    /* ======================================================== */
+    /* STATE 2: ACTIVE DANCEFLOOR VIP SYSTEM                    */
+    /* ======================================================== */
+    #state-active {
+      display: none;
+      width: 100%;
+      max-width: 480px;
+      min-height: 100vh;
+      flex-direction: column;
+      padding: 16px 14px 40px;
+      position: relative;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    /* Header & 60FPS Spinning Mini Vinyl */
     .app-header {
       text-align: center;
-      padding: 10px 0 6px;
+      padding: 10px 0 4px;
     }
     .mini-turntable-icon {
       position: relative;
@@ -103,10 +344,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-    }
-    @keyframes spinVinyl {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
     }
     .mini-vinyl-disc::before {
       content: '';
@@ -172,41 +409,27 @@
       transform-origin: top right;
       filter: drop-shadow(1px 4px 5px rgba(0,0,0,0.85));
     }
-
-    .dj-title {
+    .active-dj-title {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 26px;
+      font-size: 24px;
       font-weight: 700;
-      background: linear-gradient(135deg, #fff 0%, #fed7aa 60%, #fb7185 100%);
+      background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
-    .dj-subtitle {
-      font-size: 12px;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
-    }
-
-    /* Live Room Status Badge */
-    .room-badge-row {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      margin-top: 10px;
-    }
-    .room-badge {
+    .active-room-chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       background: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.35);
       border-radius: 999px;
-      padding: 5px 12px;
+      padding: 4px 12px;
       font-size: 11px;
       font-weight: 700;
       color: #34d399;
+      margin-top: 4px;
     }
     .pulse-dot {
       width: 7px;
@@ -227,7 +450,7 @@
       display: flex;
       gap: 8px;
       overflow-x: auto;
-      padding: 4px 0 10px;
+      padding: 4px 0 6px;
       scrollbar-width: none;
     }
     .chips-carousel::-webkit-scrollbar { display: none; }
@@ -347,7 +570,7 @@
       cursor: pointer;
     }
 
-    /* Search Results */
+    /* Results */
     .results-container {
       margin-top: 12px;
       display: flex;
@@ -409,7 +632,7 @@
       white-space: nowrap;
     }
 
-    /* My Requests Carousel */
+    /* My Requests Section */
     .my-requests-section {
       display: flex;
       flex-direction: column;
@@ -459,7 +682,7 @@
       color: var(--text-muted);
     }
 
-    /* Modal Overlay (Song Request & Stage Customizer) */
+    /* Modal Sheet (Song Request & Stage Customizer) */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -586,7 +809,6 @@
     .form-input:focus {
       border-color: var(--accent-amber);
     }
-
     .scale-row {
       display: flex;
       align-items: center;
@@ -597,7 +819,6 @@
       flex: 1;
       accent-color: var(--accent-amber);
     }
-
     .submit-request-btn {
       background: linear-gradient(135deg, #f59e0b 0%, #ec4899 100%);
       border: none;
@@ -760,53 +981,145 @@
     .share-save {
       background: #334155;
     }
+
+    /* In-App Camera QR Code Scanner Modal */
+    #qr-scanner-modal {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 900;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 20px 40px;
+    }
+    #qr-scanner-modal.active {
+      display: flex;
+    }
+    .scanner-viewfinder {
+      position: relative;
+      width: 260px;
+      height: 260px;
+      border: 3px solid #f59e0b;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(245, 158, 11, 0.5);
+    }
+    .scan-laser {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: #ec4899;
+      box-shadow: 0 0 12px #ec4899;
+      animation: scanLaser 2s linear infinite;
+    }
+    @keyframes scanLaser {
+      0% { top: 0%; }
+      50% { top: 100%; }
+      100% { top: 0%; }
+    }
   </style>
 </head>
 <body>
-  <div class="bg-glow"></div>
+  <div class="warm-glow"></div>
 
-  <div class="app-container">
-    <!-- Header with 60FPS Spinning Turntable Platter -->
+  <!-- ======================================================== -->
+  <!-- STATE 1: CLOSED / RETRO VINYL LOUNGE                     -->
+  <!-- ======================================================== -->
+  <div id="state-closed">
+    <div class="closed-container">
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        The Set Has Finished
+      </div>
+
+      <h1 class="dj-names" id="closed-dj-title">DJ SHAZZ &amp; DJ SONIC</h1>
+      <div class="dj-subtitle">Vinyl &amp; Live Mashups</div>
+
+      <!-- Realistic Turntable Vinyl with Lifted Tonearm -->
+      <div class="vinyl-wrapper">
+        <div class="vinyl-disc">
+          <div class="vinyl-label">
+            <div class="label-text-top">SHAZZ &amp; SONIC</div>
+            <div class="vinyl-hole"></div>
+            <div class="label-text-bot">TRACK ENDED</div>
+          </div>
+        </div>
+        <!-- SVG Lifted Tonearm -->
+        <svg class="tonearm" viewBox="0 0 70 110" fill="none">
+          <circle cx="55" cy="15" r="12" fill="#333" stroke="#888" stroke-width="2"/>
+          <path d="M55 27 L45 80 L35 95" stroke="#aaa" stroke-width="3.5" stroke-linecap="round"/>
+          <rect x="26" y="90" width="16" height="14" rx="2" fill="#f97316" stroke="#fff" stroke-width="1.5" transform="rotate(-25 34 97)"/>
+        </svg>
+      </div>
+
+      <div class="party-card">
+        <h2 class="main-message" id="closed-main-msg">המוזיקה נחה, אבל הקצב לא מפסיק... 💿</h2>
+        <p class="sub-message" id="closed-sub-msg">
+          תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!
+        </p>
+
+        <!-- Direct Event QR Scanner Button -->
+        <button class="scan-connect-btn" onclick="openQrScanner()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          סרוק קוד QR באירוע להתחברות
+        </button>
+
+        <a class="social-btn" href="https://instagram.com" target="_blank">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path></svg>
+          עקבו אחרינו באינסטגרם
+        </a>
+
+        <a class="secondary-btn" href="https://soundcloud.com" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+          שמעו את הסטים שלנו ברשת
+        </a>
+      </div>
+    </div>
+
+    <footer class="closed-footer">
+      <span>GUEST REQUESTS • DJ SHAZZ &amp; DJ SONIC • ONYX</span><br/>
+      <span style="color: #a855f7; text-decoration: underline; margin-top: 6px; display: inline-block;">
+        🛡️ אישור הקרנה ושמירה על פרטיות
+      </span>
+      <div style="margin-top: 8px; font-size: 10px; opacity: 0.85;">&copy; 2026 Onyx DJ™ Systems by Meir.Y All rights reserved.</div>
+    </footer>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- STATE 2: ACTIVE DANCEFLOOR VIP EXPERIENCE                -->
+  <!-- ======================================================== -->
+  <div id="state-active">
     <header class="app-header">
       <div class="mini-turntable-icon" title="Onyx DJ™ Live Platter">
         <div class="mini-vinyl-disc" id="vinyl-disc">
           <div class="mini-vinyl-label">
-            <span class="mini-label-text-top">SHAZZ & SONIC</span>
+            <span class="mini-label-text-top">SHAZZ &amp; SONIC</span>
             <div class="mini-vinyl-hole"></div>
             <span class="mini-label-text-bot">LIVE • ONYX</span>
           </div>
         </div>
         <!-- High-Precision SVG Chrome Tonearm -->
-        <svg class="mini-tonearm" viewBox="0 0 45 75" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="34" cy="11" r="9" fill="url(#metalBase)" stroke="#475569" stroke-width="1.5" />
-          <circle cx="34" cy="11" r="5" fill="#1e293b" />
-          <circle cx="34" cy="11" r="2.5" fill="#f59e0b" />
-          <path d="M34 11 L31 38 L14 58 L11 63" stroke="url(#chromeArm)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-          <rect x="5" y="60" width="10" height="6" rx="1.5" transform="rotate(-32 5 60)" fill="#0f172a" stroke="#cbd5e1" stroke-width="1" />
+        <svg class="mini-tonearm" viewBox="0 0 45 75" fill="none">
+          <circle cx="34" cy="11" r="9" fill="#475569" stroke="#94a3b8" stroke-width="1.5" />
+          <path d="M34 11 L31 38 L14 58 L11 63" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
           <polygon points="5,66 2,69 7,68" fill="#f59e0b" />
-          <defs>
-            <linearGradient id="metalBase" x1="25" y1="2" x2="43" y2="20" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#94a3b8"/>
-              <stop offset="0.5" stop-color="#334155"/>
-              <stop offset="1" stop-color="#0f172a"/>
-            </linearGradient>
-            <linearGradient id="chromeArm" x1="34" y1="11" x2="11" y2="63" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#f8fafc"/>
-              <stop offset="0.5" stop-color="#94a3b8"/>
-              <stop offset="1" stop-color="#e2e8f0"/>
-            </linearGradient>
-          </defs>
         </svg>
       </div>
 
-      <h1 class="dj-title">DJ Shazz & DJ Sonic</h1>
-      <p class="dj-subtitle">Onyx DJ™ Mobile VIP Companion</p>
-
-      <div class="room-badge-row">
-        <div class="room-badge" id="room-badge" onclick="promptChangeRoom()" style="cursor:pointer;" title="לחץ לשינוי חדר">
+      <h1 class="active-dj-title">DJ Shazz &amp; DJ Sonic</h1>
+      <div>
+        <div class="active-room-chip" id="active-room-badge">
           <span class="pulse-dot"></span>
-          <span id="room-name-display">רחבה: ממתין לחיבור...</span>
-          <span style="font-size:10px; opacity:0.8;">✏️</span>
+          <span id="active-room-name">רחבה פעילה: WEDDING</span>
         </div>
       </div>
     </header>
@@ -840,8 +1153,8 @@
       <div class="stage-live-icon">🎧</div>
       <div class="stage-live-info">
         <div class="stage-live-header">מתנגן כעת ברחבה:</div>
-        <div class="stage-track-title" id="current-track-name">עמדת ה-DJ בהמתנה</div>
-        <div class="stage-track-bpm" id="current-bpm-display">ממתין לשידור חי מהרחבה... ⏳</div>
+        <div class="stage-track-title" id="current-track-name">עמדת ה-DJ פעילה</div>
+        <div class="stage-track-bpm" id="current-bpm-display">ממתין למידע על השיר... ⏳</div>
       </div>
     </div>
 
@@ -873,7 +1186,7 @@
     </div>
   </div>
 
-  <!-- Song Request Modal (with 16:9 Stage Screen Preview & Draggable Text) -->
+  <!-- Song Request Modal (16:9 Stage Screen Preview & Draggable Text) -->
   <div class="modal-overlay" id="request-modal">
     <div class="modal-sheet">
       <div class="modal-header">
@@ -966,9 +1279,30 @@
     </div>
   </div>
 
+  <!-- QR Code Scanner Modal (For Connecting at Event) -->
+  <div id="qr-scanner-modal">
+    <div class="fx-top-bar">
+      <div class="fx-title-group">
+        <span class="fx-title">סריקת קוד בעמדת ה-DJ 📷</span>
+        <span class="fx-bpm" style="color:#cbd5e1;">כוון את המצלמה אל ה-QR של העמדה</span>
+      </div>
+      <button class="fx-close-btn" onclick="closeQrScanner()">✕</button>
+    </div>
+
+    <div class="scanner-viewfinder">
+      <video id="qr-video" playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+      <div class="scan-laser"></div>
+    </div>
+
+    <div style="font-size:13px; color:#cbd5e1; text-align:center;">
+      ההתחברות מתבצעת אוטומטית מיד עם זיהוי הקוד.
+    </div>
+  </div>
+
   <script>
     // State
-    var currentRoom = 'WEDDING-2026';
+    var currentRoom = null;
+    var isBoothOpen = false;
     var selectedSong = null;
     var userPhotoUrl = null;
     var screenWakeActive = false;
@@ -989,37 +1323,126 @@
     var dragStartX = 0, dragStartY = 0;
     var elemStartX = 0, elemStartY = 0;
 
+    // QR Video Stream
+    var qrVideoStream = null;
+    var qrScanAnimId = null;
+
     window.addEventListener('DOMContentLoaded', function () {
-      initRoomFromUrl();
+      initAppFlow();
       initDraggable();
-      initMqtt();
     });
 
-    function initRoomFromUrl() {
+    /**
+     * Initializes App: If QR was scanned (URL parameter ?room= or deep link),
+     * connects to that room. Otherwise shows Closed State waiting for event QR.
+     */
+    function initAppFlow() {
       const params = new URLSearchParams(window.location.search);
-      const room = params.get('room') || localStorage.getItem('onyx_active_room') || 'WEDDING-2026';
-      setRoom(room);
-    }
+      const roomParam = params.get('room') || localStorage.getItem('onyx_active_room');
 
-    function setRoom(room) {
-      currentRoom = (room || 'WEDDING-2026').trim().toUpperCase();
-      localStorage.setItem('onyx_active_room', currentRoom);
-      document.getElementById('room-name-display').innerText = 'רחבה פעילה: ' + currentRoom;
-      loadSavedTickets();
-      renderTickets();
-      if (mqttClient && mqttClient.isConnected()) {
-        try {
-          mqttClient.subscribe(`onyx/stage/${currentRoom}`);
-          mqttClient.subscribe(`onyx/stage/${currentRoom}/crowd_fx`);
-          mqttClient.subscribe(`onyx/stage/${currentRoom}/device/${deviceId}`);
-        } catch(e) {}
+      if (roomParam) {
+        connectToRoom(roomParam);
+      } else {
+        showClosedState({
+          reason: 'closed',
+          main: 'המוזיקה נחה, אבל הקצב לא מפסיק... 💿',
+          sub: 'תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!'
+        });
       }
     }
 
-    function promptChangeRoom() {
-      const newRoom = prompt('הזן את קוד החדר של ה-DJ (למשל: WEDDING-2026 או PARTY):', currentRoom);
-      if (newRoom && newRoom.trim()) {
-        setRoom(newRoom.trim());
+    function showClosedState(info) {
+      document.getElementById('state-closed').style.display = 'flex';
+      document.getElementById('state-active').style.display = 'none';
+      if (info && info.main) document.getElementById('closed-main-msg').innerText = info.main;
+      if (info && info.sub) document.getElementById('closed-sub-msg').innerText = info.sub;
+    }
+
+    function showActiveState() {
+      document.getElementById('state-closed').style.display = 'none';
+      document.getElementById('state-active').style.display = 'flex';
+      document.getElementById('active-room-name').innerText = 'רחבה פעילה: ' + currentRoom;
+      loadSavedTickets();
+      renderTickets();
+    }
+
+    function connectToRoom(room) {
+      currentRoom = (room || '').trim().toUpperCase();
+      if (!currentRoom) return;
+
+      localStorage.setItem('onyx_active_room', currentRoom);
+      initMqtt();
+    }
+
+    // In-App QR Scanner
+    async function openQrScanner() {
+      const modal = document.getElementById('qr-scanner-modal');
+      const video = document.getElementById('qr-video');
+      modal.classList.add('active');
+
+      try {
+        qrVideoStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        video.srcObject = qrVideoStream;
+        video.setAttribute('playsinline', 'true');
+        await video.play();
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function scanFrame() {
+          if (!qrVideoStream) return;
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            if (window.jsQR) {
+              const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert'
+              });
+              if (code && code.data) {
+                handleScannedQr(code.data);
+                return;
+              }
+            }
+          }
+          qrScanAnimId = requestAnimationFrame(scanFrame);
+        }
+        qrScanAnimId = requestAnimationFrame(scanFrame);
+      } catch (e) {
+        console.warn('[QR] Camera access error:', e);
+        const manual = prompt('לא ניתן היה לפתוח מצלמה. הזן את קוד החדר:');
+        if (manual) handleScannedQr(manual);
+        closeQrScanner();
+      }
+    }
+
+    function closeQrScanner() {
+      document.getElementById('qr-scanner-modal').classList.remove('active');
+      if (qrScanAnimId) cancelAnimationFrame(qrScanAnimId);
+      if (qrVideoStream) {
+        qrVideoStream.getTracks().forEach(t => t.stop());
+        qrVideoStream = null;
+      }
+    }
+
+    function handleScannedQr(scannedText) {
+      closeQrScanner();
+      let room = scannedText.trim();
+      try {
+        if (room.includes('?')) {
+          const url = new URL(room);
+          room = url.searchParams.get('room') || room;
+        }
+      } catch (_) {}
+
+      room = room.replace(/.*room=/, '').replace(/[^a-zA-Z0-9_\-]/g, '').toUpperCase();
+      if (room) {
+        MobileBridge.triggerBassHaptic();
+        connectToRoom(room);
       }
     }
 
@@ -1219,11 +1642,9 @@
       const canvas = document.getElementById('story-canvas');
       const ctx = canvas.getContext('2d');
 
-      // 9:16 Vertical Story (720 x 1280)
       ctx.fillStyle = '#07020d';
       ctx.fillRect(0, 0, 720, 1280);
 
-      // Gradient overlay
       const grad = ctx.createLinearGradient(0, 0, 720, 1280);
       grad.addColorStop(0, '#2a1138');
       grad.addColorStop(0.5, '#0e0417');
@@ -1231,12 +1652,10 @@
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 720, 1280);
 
-      // Neon frame
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = 6;
       ctx.strokeRect(30, 30, 660, 1220);
 
-      // Header
       ctx.fillStyle = '#fcd34d';
       ctx.font = 'bold 36px Heebo, sans-serif';
       ctx.textAlign = 'center';
@@ -1246,7 +1665,6 @@
       ctx.font = '22px Heebo, sans-serif';
       ctx.fillText('ONYX DJ™ STAGE SPOTLIGHT', 360, 160);
 
-      // Song Box
       ctx.fillStyle = '#1c0c2e';
       ctx.fillRect(60, 300, 600, 220);
       ctx.strokeStyle = '#ec4899';
@@ -1265,7 +1683,6 @@
       ctx.font = '24px Heebo, sans-serif';
       ctx.fillText('מאת: ' + ticket.guest, 360, 470);
 
-      // Footer
       ctx.fillStyle = '#cbd5e1';
       ctx.font = '20px Heebo, sans-serif';
       ctx.fillText('מסיבה חיה • רחבת הריקודים 🔥', 360, 1150);
@@ -1382,6 +1799,8 @@
     // MQTT Setup
     var mqttClient = null;
     function initMqtt() {
+      if (!currentRoom) return;
+
       try {
         const clientId = 'onyx_mob_' + deviceId;
         mqttClient = new Paho.MQTT.Client('broker.hivemq.com', 8884, clientId);
@@ -1404,10 +1823,13 @@
           useSSL: true,
           timeout: 5,
           onSuccess: function () {
-            console.log('[MQTT] Connected to HiveMQ Broker!');
+            console.log('[MQTT] Connected to HiveMQ Broker for room:', currentRoom);
             mqttClient.subscribe(`onyx/stage/${currentRoom}`);
             mqttClient.subscribe(`onyx/stage/${currentRoom}/crowd_fx`);
             mqttClient.subscribe(`onyx/stage/${currentRoom}/device/${deviceId}`);
+
+            // Transition to active state now that room is connected
+            showActiveState();
           },
           onFailure: function (e) {
             console.warn('[MQTT] Connection failed, retrying...', e);
@@ -1420,6 +1842,17 @@
     }
 
     function handleMqttMessage(data) {
+      // Station closed / open state toggle from DJ
+      if (data.action === 'room_closed' || data.isOpen === false) {
+        showClosedState({
+          main: 'המוזיקה נחה, אבל הקצב לא מפסיק... 💿',
+          sub: 'תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!'
+        });
+        return;
+      } else if (data.isOpen === true && document.getElementById('state-closed').style.display !== 'none') {
+        showActiveState();
+      }
+
       // 1. Live Track & BPM broadcast from DJ
       if (data.trackTitle) {
         document.getElementById('current-track-name').innerText = data.trackTitle;
