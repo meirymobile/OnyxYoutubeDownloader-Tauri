@@ -1986,12 +1986,25 @@
       const video = document.getElementById('qr-video');
       modal.classList.add('active');
 
+      if (window.OnyxNativeBridge && typeof window.OnyxNativeBridge.requestCameraPermission === 'function') {
+        window.OnyxNativeBridge.requestCameraPermission();
+      }
+
       try {
-        qrVideoStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
-        });
+        let stream = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } }
+          });
+        } catch (_) {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+
+        qrVideoStream = stream;
         video.srcObject = qrVideoStream;
         video.setAttribute('playsinline', 'true');
+        video.setAttribute('autoplay', 'true');
+        video.setAttribute('muted', 'true');
         await video.play();
 
         const canvas = document.createElement('canvas');
@@ -1999,7 +2012,7 @@
 
         function scanFrame() {
           if (!qrVideoStream) return;
-          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          if (video.readyState >= video.HAVE_CURRENT_DATA) {
             canvas.height = video.videoHeight;
             canvas.width = video.videoWidth;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -2020,7 +2033,7 @@
         qrScanAnimId = requestAnimationFrame(scanFrame);
       } catch (e) {
         console.warn('[QR] Camera access error:', e);
-        const manual = prompt('לא ניתן היה לפתוח מצלמה. הזן את קוד החדר:');
+        const manual = prompt('לא ניתן היה לפתוח מצלמה (' + (e.message || e.name || 'שגיאת הרשאה') + '). הזן את קוד החדר:');
         if (manual) handleScannedQr(manual);
         closeQrScanner();
       }

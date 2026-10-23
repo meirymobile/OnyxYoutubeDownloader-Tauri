@@ -55,6 +55,23 @@ class OnyxNativeBridge(
     }
 
     @JavascriptInterface
+    fun checkCameraPermission(): Boolean {
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+            activity,
+            android.Manifest.permission.CAMERA
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
+    @JavascriptInterface
+    fun requestCameraPermission() {
+        activity.runOnUiThread {
+            if (activity is MainActivity) {
+                activity.requestCameraPermissionDirect()
+            }
+        }
+    }
+
+    @JavascriptInterface
     fun shareImage(base64Data: String, target: String) {
         try {
             val bitmap = decodeBase64(base64Data) ?: return

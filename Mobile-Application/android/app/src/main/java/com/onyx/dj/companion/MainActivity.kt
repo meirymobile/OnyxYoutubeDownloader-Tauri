@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.webkit.ConsoleMessage
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -46,10 +47,22 @@ class MainActivity : AppCompatActivity() {
         filePathCallback = null
     }
 
+    private var pendingPermissionRequest: PermissionRequest? = null
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ ->
-        // Permissions granted/denied handled gracefully
+    ) { grants ->
+        if (grants[Manifest.permission.CAMERA] == true) {
+            runOnUiThread {
+                pendingPermissionRequest?.let {
+                    it.grant(it.resources)
+                    pendingPermissionRequest = null
+                }
+            }
+        } else {
+            pendingPermissionRequest?.deny()
+            pendingPermissionRequest = null
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -113,6 +126,17 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
+            override fun onPermissionRequest(request: PermissionRequest?) {
+                runOnUiThread {
+                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                        pendingPermissionRequest = request
+                        requestPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                    } else {
+                        request?.grant(request.resources)
+                    }
+                }
+            }
+
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?,
                 callback: android.webkit.GeolocationPermissions.Callback?
@@ -162,6 +186,12 @@ class MainActivity : AppCompatActivity() {
         }
         if (perms.isNotEmpty()) {
             requestPermissionLauncher.launch(perms.toTypedArray())
+        }
+    }
+
+    fun requestCameraPermissionDirect() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
         }
     }
 
