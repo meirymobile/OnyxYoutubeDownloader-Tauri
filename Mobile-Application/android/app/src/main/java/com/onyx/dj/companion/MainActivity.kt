@@ -93,6 +93,8 @@ class MainActivity : AppCompatActivity() {
         settings.mediaPlaybackRequiresUserGesture = false
         settings.cacheMode = WebSettings.LOAD_DEFAULT
 
+        settings.setGeolocationEnabled(true)
+
         webView.setBackgroundColor(0xFF07020D.toInt())
 
         // Register Native JavaScript Bridge
@@ -109,6 +111,13 @@ class MainActivity : AppCompatActivity() {
                     android.util.Log.d("OnyxWebView", "${it.message()} -- From line ${it.lineNumber()} of ${it.sourceId()}")
                 }
                 return true
+            }
+
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String?,
+                callback: android.webkit.GeolocationPermissions.Callback?
+            ) {
+                callback?.invoke(origin, true, false)
             }
 
             override fun onShowFileChooser(
@@ -130,9 +139,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun parseDeepLinkOrLocalAsset(intent: Intent?): String {
         val data: Uri? = intent?.data
-        val roomParam = data?.getQueryParameter("room")
-        return if (!roomParam.isNullOrEmpty()) {
-            "file:///android_asset/www/index.html?room=$roomParam"
+        val query = data?.query
+        return if (!query.isNullOrEmpty()) {
+            "file:///android_asset/www/index.html?$query"
         } else {
             "file:///android_asset/www/index.html"
         }
@@ -142,6 +151,9 @@ class MainActivity : AppCompatActivity() {
         val perms = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             perms.add(Manifest.permission.CAMERA)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

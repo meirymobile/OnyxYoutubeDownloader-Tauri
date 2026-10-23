@@ -28,6 +28,8 @@
     <string>האפליקציה מאפשרת לך לבחור תמונה מהגלריה להקרנה על מסך הבמה יחד עם בקשת השיר שלך.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>האפליקציה מאפשרת לך לשמור כרטיסי סטורי ומזכרות VIP מהאירוע ישירות לגלריית התמונות.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>האפליקציה מאמתת את הימצאותך ברחבת האירוע כדי לאפשר שליחת בקשות שירים לעמדת ה-DJ.</string>
     <key>NSSupportsLiveActivities</key>
     <true/>
     <key>UIBackgroundModes</key>
