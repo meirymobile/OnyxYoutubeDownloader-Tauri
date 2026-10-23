@@ -803,9 +803,10 @@
       <p class="dj-subtitle">Onyx DJ™ Mobile VIP Companion</p>
 
       <div class="room-badge-row">
-        <div class="room-badge" id="room-badge">
+        <div class="room-badge" id="room-badge" onclick="promptChangeRoom()" style="cursor:pointer;" title="לחץ לשינוי חדר">
           <span class="pulse-dot"></span>
-          <span id="room-name-display">רחבה פעילה: WEDDING-2026</span>
+          <span id="room-name-display">רחבה: ממתין לחיבור...</span>
+          <span style="font-size:10px; opacity:0.8;">✏️</span>
         </div>
       </div>
     </header>
@@ -839,8 +840,8 @@
       <div class="stage-live-icon">🎧</div>
       <div class="stage-live-info">
         <div class="stage-live-header">מתנגן כעת ברחבה:</div>
-        <div class="stage-track-title" id="current-track-name">Calvin Harris - Summer</div>
-        <div class="stage-track-bpm" id="current-bpm-display">⚡ 128 BPM • מעבר הבא בעוד 1:20</div>
+        <div class="stage-track-title" id="current-track-name">עמדת ה-DJ בהמתנה</div>
+        <div class="stage-track-bpm" id="current-bpm-display">ממתין לשידור חי מהרחבה... ⏳</div>
       </div>
     </div>
 
@@ -848,7 +849,7 @@
     <div class="my-requests-section">
       <div class="section-title">
         <span>הבקשות שלי באירוע</span>
-        <span style="font-size: 11px; color: var(--accent-amber);" id="ticket-count">2 בקשות</span>
+        <span style="font-size: 11px; color: var(--accent-amber);" id="ticket-count">0 בקשות</span>
       </div>
       <div class="tickets-container" id="tickets-container">
         <!-- Rendered dynamically -->
@@ -978,11 +979,10 @@
     var beatIntervalId = null;
     var directTorchOn = false;
 
-    // Local Mock / Preset Tickets
-    var myTickets = [
-      { id: 'req_1', song: 'Queen - Don\'t Stop Me Now', guest: 'רועי ומיה', status: 'אושר לעלייה • שיר הבא!' },
-      { id: 'req_2', song: 'Coldplay - A Sky Full of Stars', guest: 'דנה', status: 'מתנגן כעת! 👑' }
-    ];
+    // Real Data State (Zero Mock Data)
+    var myTickets = [];
+    var deviceId = localStorage.getItem('onyx_device_id') || ('dev_' + Math.random().toString(36).substring(2, 10));
+    localStorage.setItem('onyx_device_id', deviceId);
 
     // Draggable stage text logic
     var isDragging = false;
@@ -991,18 +991,52 @@
 
     window.addEventListener('DOMContentLoaded', function () {
       initRoomFromUrl();
-      renderTickets();
       initDraggable();
       initMqtt();
     });
 
     function initRoomFromUrl() {
       const params = new URLSearchParams(window.location.search);
-      const room = params.get('room');
-      if (room) {
-        currentRoom = room;
-        document.getElementById('room-name-display').innerText = 'רחבה פעילה: ' + room;
+      const room = params.get('room') || localStorage.getItem('onyx_active_room') || 'WEDDING-2026';
+      setRoom(room);
+    }
+
+    function setRoom(room) {
+      currentRoom = (room || 'WEDDING-2026').trim().toUpperCase();
+      localStorage.setItem('onyx_active_room', currentRoom);
+      document.getElementById('room-name-display').innerText = 'רחבה פעילה: ' + currentRoom;
+      loadSavedTickets();
+      renderTickets();
+      if (mqttClient && mqttClient.isConnected()) {
+        try {
+          mqttClient.subscribe(`onyx/stage/${currentRoom}`);
+          mqttClient.subscribe(`onyx/stage/${currentRoom}/crowd_fx`);
+          mqttClient.subscribe(`onyx/stage/${currentRoom}/device/${deviceId}`);
+        } catch(e) {}
       }
+    }
+
+    function promptChangeRoom() {
+      const newRoom = prompt('הזן את קוד החדר של ה-DJ (למשל: WEDDING-2026 או PARTY):', currentRoom);
+      if (newRoom && newRoom.trim()) {
+        setRoom(newRoom.trim());
+      }
+    }
+
+    function loadSavedTickets() {
+      try {
+        const saved = localStorage.getItem('onyx_tickets_' + currentRoom);
+        if (saved) myTickets = JSON.parse(saved);
+        else myTickets = [];
+      } catch (e) {
+        myTickets = [];
+      }
+    }
+
+    function saveMyTickets() {
+      try {
+        localStorage.setItem('onyx_tickets_' + currentRoom, JSON.stringify(myTickets));
+      } catch (e) {}
     }
 
     function initDraggable() {
@@ -1063,6 +1097,15 @@
       container.innerHTML = '';
       document.getElementById('ticket-count').innerText = myTickets.length + ' בקשות';
 
+      if (myTickets.length === 0) {
+        container.innerHTML = `
+          <div style="width: 100%; text-align: center; padding: 18px 12px; color: #94a3b8; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.12); border-radius: 12px;">
+            טרם שלחת בקשות לאירוע זה. חפש שיר למטה ושלח ישירות לרחבה! 🎵
+          </div>
+        `;
+        return;
+      }
+
       myTickets.forEach(t => {
         const card = document.createElement('div');
         card.className = 'ticket-card';
@@ -1075,16 +1118,16 @@
       });
     }
 
-    // Song Search (iTunes API with Fallback)
+    // Pure Real-Time Song Search (iTunes API)
     async function searchSongs() {
       const term = document.getElementById('search-input').value.trim();
       if (!term) return;
 
       const container = document.getElementById('results-container');
-      container.innerHTML = '<div style="text-align:center; padding:15px; color:#cbd5e1;">מחפש שירים... ⏳</div>';
+      container.innerHTML = '<div style="text-align:center; padding:15px; color:#cbd5e1;">מחפש שירים בזמן אמת... ⏳</div>';
 
       try {
-        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=6`);
+        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=8`);
         const data = await res.json();
         if (data.results && data.results.length > 0) {
           container.innerHTML = '';
@@ -1103,34 +1146,11 @@
             container.appendChild(item);
           });
         } else {
-          showMockResults(term);
+          container.innerHTML = `<div style="text-align:center; padding:18px; color:#cbd5e1; font-size:13px;">לא נמצאו שירים התואמים ל-"${term}". נסה לדייק בשם השיר או האמן.</div>`;
         }
       } catch (e) {
-        showMockResults(term);
+        container.innerHTML = `<div style="text-align:center; padding:18px; color:#f87171; font-size:13px;">שגיאת חיבור לחיפוש שירים. נסה שוב בעוד מספר שניות.</div>`;
       }
-    }
-
-    function showMockResults(term) {
-      const container = document.getElementById('results-container');
-      container.innerHTML = '';
-      const mocks = [
-        { trackName: term, artistName: 'גרסת רמיקס מועדונים (DJ Exclusive)' },
-        { trackName: term + ' (Club Mix)', artistName: 'Onyx Live Dance Floor' }
-      ];
-      mocks.forEach(song => {
-        const item = document.createElement('div');
-        item.className = 'song-result-item';
-        item.onclick = () => openRequestModal(song);
-        item.innerHTML = `
-          <div class="song-cover" style="display:flex;align-items:center;justify-content:center;font-size:18px;">🎵</div>
-          <div class="song-details">
-            <div class="song-name">${song.trackName}</div>
-            <div class="song-artist">${song.artistName}</div>
-          </div>
-          <div class="request-badge">בקש עכשיו</div>
-        `;
-        container.appendChild(item);
-      });
     }
 
     function openRequestModal(song) {
@@ -1177,10 +1197,12 @@
         id: 'req_' + Date.now(),
         song: selectedSong.trackName + ' - ' + selectedSong.artistName,
         guest: name,
-        status: 'ממתין לאישור ה-DJ ⏳'
+        status: 'ממתין לאישור ה-DJ ⏳',
+        timestamp: Date.now()
       };
 
       myTickets.unshift(newTicket);
+      saveMyTickets();
       renderTickets();
       closeRequestModal();
 
@@ -1361,7 +1383,7 @@
     var mqttClient = null;
     function initMqtt() {
       try {
-        const clientId = 'onyx_mobile_' + Math.random().toString(36).substring(2, 9);
+        const clientId = 'onyx_mob_' + deviceId;
         mqttClient = new Paho.MQTT.Client('broker.hivemq.com', 8884, clientId);
 
         mqttClient.onConnectionLost = function (responseObject) {
@@ -1385,6 +1407,7 @@
             console.log('[MQTT] Connected to HiveMQ Broker!');
             mqttClient.subscribe(`onyx/stage/${currentRoom}`);
             mqttClient.subscribe(`onyx/stage/${currentRoom}/crowd_fx`);
+            mqttClient.subscribe(`onyx/stage/${currentRoom}/device/${deviceId}`);
           },
           onFailure: function (e) {
             console.warn('[MQTT] Connection failed, retrying...', e);
@@ -1397,11 +1420,12 @@
     }
 
     function handleMqttMessage(data) {
+      // 1. Live Track & BPM broadcast from DJ
       if (data.trackTitle) {
         document.getElementById('current-track-name').innerText = data.trackTitle;
         if (data.bpm) {
           currentBpm = data.bpm;
-          document.getElementById('current-bpm-display').innerText = `⚡ ${data.bpm} BPM • מעבר הבא`;
+          document.getElementById('current-bpm-display').innerText = `⚡ ${data.bpm} BPM • שיר פעיל בלייב`;
           document.getElementById('fx-bpm-counter').innerText = `${data.bpm} BPM`;
           if (fxActive) startBeatSync();
         }
@@ -1416,10 +1440,28 @@
         });
       }
 
+      // 2. Crowd FX commands from DJ
       if (data.action === 'crowd_fx_start') {
         openCrowdFx();
       } else if (data.action === 'crowd_fx_stop') {
         closeCrowdFx();
+      }
+
+      // 3. Status updates for user's requested song
+      if (data.ticketId && data.status) {
+        let updated = false;
+        myTickets.forEach(t => {
+          if (t.id === data.ticketId) {
+            t.status = data.status;
+            updated = true;
+          }
+        });
+        if (updated) {
+          saveMyTickets();
+          renderTickets();
+          MobileBridge.triggerBassHaptic();
+          MobileBridge.turnScreenOn();
+        }
       }
     }
 
@@ -1427,6 +1469,7 @@
       if (mqttClient && mqttClient.isConnected()) {
         const payload = JSON.stringify({
           ticketId: ticket.id,
+          deviceId: deviceId,
           song: ticket.song,
           guestName: ticket.guest,
           dedication: dedication || '',
@@ -1435,7 +1478,7 @@
         const message = new Paho.MQTT.Message(payload);
         message.destinationName = `onyx/requests/${currentRoom}`;
         mqttClient.send(message);
-        console.log('[MQTT] Published song request successfully');
+        console.log('[MQTT] Published real song request successfully');
       }
     }
   </script>
