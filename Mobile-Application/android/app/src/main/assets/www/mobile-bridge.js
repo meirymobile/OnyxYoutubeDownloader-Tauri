@@ -309,6 +309,80 @@
       }
     },
 
+    enterFullScreen: function () {
+      if (this.platform === 'android') {
+        try { window.OnyxNativeBridge.enterFullScreen(); } catch (e) {}
+      }
+      if (!document.fullscreenElement && (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullScreen)) {
+        try {
+          const req = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullScreen;
+          req.call(document.documentElement).catch(() => {});
+        } catch (err) {}
+      }
+    },
+
+    exitFullScreen: function () {
+      if (this.platform === 'android') {
+        try { window.OnyxNativeBridge.exitFullScreen(); } catch (e) {}
+      }
+      if (document.fullscreenElement && document.exitFullscreen) {
+        try { document.exitFullscreen().catch(() => {}); } catch (err) {}
+      }
+    },
+
+    showNotification: function (title, message) {
+      if (this.platform === 'android') {
+        try { window.OnyxNativeBridge.showNotification(title, message); } catch (e) {}
+      } else if (this.platform === 'ios') {
+        try {
+          window.webkit.messageHandlers.onyxNative.postMessage({
+            action: 'showNotification',
+            title: title,
+            message: message
+          });
+        } catch (e) {}
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        try { new Notification(title, { body: message, icon: './icon.png' }); } catch (e) {}
+      }
+    },
+
+    checkPermissionsStatus: function () {
+      if (this.platform === 'android' && window.OnyxNativeBridge && typeof window.OnyxNativeBridge.checkPermissionsStatus === 'function') {
+        try {
+          return JSON.parse(window.OnyxNativeBridge.checkPermissionsStatus());
+        } catch (e) {}
+      }
+      return { camera: false, location: false, notifications: false, allGranted: false };
+    },
+
+    requestAllPermissions: function () {
+      if (this.platform === 'android') {
+        try { window.OnyxNativeBridge.requestAllPermissions(); } catch (e) {}
+      } else if (this.platform === 'ios') {
+        try {
+          window.webkit.messageHandlers.onyxNative.postMessage({ action: 'requestAllPermissions' });
+        } catch (e) {}
+      }
+      if ('Notification' in window && Notification.permission === 'default') {
+        try { Notification.requestPermission(); } catch (e) {}
+      }
+      if (navigator.geolocation) {
+        try { navigator.geolocation.getCurrentPosition(() => {}, () => {}); } catch (e) {}
+      }
+    },
+
+    openAppSettings: function () {
+      if (this.platform === 'android' && window.OnyxNativeBridge && typeof window.OnyxNativeBridge.openAppSettings === 'function') {
+        try { window.OnyxNativeBridge.openAppSettings(); } catch (e) {}
+      }
+    },
+
+    requestIgnoreBatteryOptimizations: function () {
+      if (this.platform === 'android' && window.OnyxNativeBridge && typeof window.OnyxNativeBridge.requestIgnoreBatteryOptimizations === 'function') {
+        try { window.OnyxNativeBridge.requestIgnoreBatteryOptimizations(); } catch (e) {}
+      }
+    },
+
     _downloadBase64Image: function (base64Data, filename) {
       const a = document.createElement('a');
       a.href = base64Data;

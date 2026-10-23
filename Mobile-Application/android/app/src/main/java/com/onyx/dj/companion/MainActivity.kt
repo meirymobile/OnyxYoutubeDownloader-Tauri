@@ -2,12 +2,19 @@ package com.onyx.dj.companion
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.KeyguardManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.view.View
+import android.os.PowerManager
+import android.provider.Settings
+import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -17,6 +24,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -24,15 +32,21 @@ import androidx.core.view.WindowInsetsControllerCompat
 
 /**
  * Onyx DJ™ Companion Main Activity
+ * Full lifecycle & hardware management for VIP event experience.
  */
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
-    private lateinit var torchManager: OnyxTorchManager
-    private lateinit var hapticManager: OnyxHapticManager
-    private lateinit var wakeLockManager: OnyxWakeLockManager
+    lateinit var webView: WebView
+        private set
+    lateinit var torchManager: OnyxTorchManager
+        private set
+    lateinit var hapticManager: OnyxHapticManager
+        private set
+    lateinit var wakeLockManager: OnyxWakeLockManager
+        private set
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingWebPermissionRequest: PermissionRequest? = null
 
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -47,21 +61,17 @@ class MainActivity : AppCompatActivity() {
         filePathCallback = null
     }
 
-    private var pendingPermissionRequest: PermissionRequest? = null
-
-    private val requestPermissionLauncher = registerForActivityResult(
+    val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
-        if (grants[Manifest.permission.CAMERA] == true) {
-            runOnUiThread {
-                pendingPermissionRequest?.let {
-                    it.grant(it.resources)
-                    pendingPermissionRequest = null
-                }
+        val cameraGranted = grants[Manifest.permission.CAMERA] == true
+        runOnUiThread {
+            pendingWebPermissionRequest?.let {
+                if (cameraGranted) it.grant(it.resources) else it.deny()
+                pendingWebPermissionRequest = null
             }
-        } else {
-            pendingPermissionRequest?.deny()
-            pendingPermissionRequest = null
+            // Notify JavaScript that permissions have been updated
+            notifyPermissionsUpdatedToWeb()
         }
     }
 
@@ -70,10 +80,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         // Make activity show when locked & turn screen on
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        }
+        configureWindowAwakeProperties()
 
         // Initialize Managers
         torchManager = OnyxTorchManager(this)
@@ -87,7 +94,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(webView)
 
         configureWebView()
-        requestAppPermissions()
+
+        // Proactively request all party permissions on launch
+        checkAndRequestPartyPermissions(forcePrompt = true)
 
         // Start Foreground Service to maintain connectivity
         OnyxForegroundService.start(this)
@@ -95,6 +104,30 @@ class MainActivity : AppCompatActivity() {
         // Load bundled VIP application
         val initialUrl = parseDeepLinkOrLocalAsset(intent)
         webView.loadUrl(initialUrl)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        configureWindowAwakeProperties()
+        // Re-check permissions and notify WebView on every resume
+        notifyPermissionsUpdatedToWeb()
+    }
+
+    private fun configureWindowAwakeProperties() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+            val km = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            km?.requestDismissKeyguard(this, null)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            )
+        }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     private fun configureWebView() {
@@ -105,7 +138,6 @@ class MainActivity : AppCompatActivity() {
         settings.databaseEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
         settings.cacheMode = WebSettings.LOAD_DEFAULT
-
         settings.setGeolocationEnabled(true)
 
         webView.setBackgroundColor(0xFF07020D.toInt())
@@ -116,7 +148,12 @@ class MainActivity : AppCompatActivity() {
             "OnyxNativeBridge"
         )
 
-        webView.webViewClient = object : WebViewClient() {}
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                notifyPermissionsUpdatedToWeb()
+            }
+        }
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
@@ -129,7 +166,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPermissionRequest(request: PermissionRequest?) {
                 runOnUiThread {
                     if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                        pendingPermissionRequest = request
+                        pendingWebPermissionRequest = request
                         requestPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                     } else {
                         request?.grant(request.resources)
@@ -171,27 +208,120 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun requestAppPermissions() {
-        val perms = mutableListOf<String>()
+    /**
+     * List of all required party experience permissions
+     */
+    fun getMissingPermissions(): List<String> {
+        val missing = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            perms.add(Manifest.permission.CAMERA)
+            missing.add(Manifest.permission.CAMERA)
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            missing.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                perms.add(Manifest.permission.POST_NOTIFICATIONS)
+                missing.add(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
-        if (perms.isNotEmpty()) {
-            requestPermissionLauncher.launch(perms.toTypedArray())
+        return missing
+    }
+
+    fun checkAndRequestPartyPermissions(forcePrompt: Boolean = false) {
+        val missing = getMissingPermissions()
+        if (missing.isNotEmpty() && forcePrompt) {
+            requestPermissionLauncher.launch(missing.toTypedArray())
         }
     }
 
-    fun requestCameraPermissionDirect() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+    fun notifyPermissionsUpdatedToWeb() {
+        val camera = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val location = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val notifications = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else true
+        val allGranted = camera && location && notifications
+
+        val js = "javascript:(function(){ if(window.onNativePermissionsUpdate) window.onNativePermissionsUpdate({camera:$camera, location:$location, notifications:$notifications, allGranted:$allGranted}); })()"
+        webView.post { webView.evaluateJavascript(js, null) }
+    }
+
+    fun setFullScreen(enabled: Boolean) {
+        runOnUiThread {
+            WindowCompat.setDecorFitsSystemWindows(window, !enabled)
+            val controller = WindowInsetsControllerCompat(window, window.decorView)
+            if (enabled) {
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
+    fun postSystemNotification(title: String, message: String) {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        val channelId = "onyx_dj_alerts"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "התראות מסיבה - Onyx DJ",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 150, 300)
+                description = "הודעות חשובות מהדיג'יי וסטטוס בקשות שירים"
+            }
+            manager.createNotificationChannel(channel)
+        }
+
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            (System.currentTimeMillis() % 100000).toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notif = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_vinyl_logo)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        manager.notify((System.currentTimeMillis() % 100000).toInt(), notif)
+    }
+
+    fun openAppSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+            }
+            startActivity(intent)
+        } catch (_: Exception) {}
+    }
+
+    fun requestIgnoreBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                }
+            } catch (_: Exception) {}
         }
     }
 

@@ -1353,13 +1353,243 @@
       background: #251e33;
       color: #64748b;
       box-shadow: none;
-      cursor: not-allowed;
-      opacity: 0.6;
+    /* ======================================================== */
+    /* VIP PARTY PERMISSIONS ONBOARDING CARD                     */
+    /* ======================================================== */
+    .permissions-card {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      max-width: 440px;
+      margin: 0 auto;
+      background: linear-gradient(135deg, rgba(28, 12, 46, 0.96), rgba(15, 5, 25, 0.98));
+      border: 1.5px solid #f59e0b;
+      box-shadow: 0 10px 30px rgba(245, 158, 11, 0.35), 0 0 20px rgba(236, 72, 153, 0.2);
+      border-radius: 18px;
+      padding: 16px;
+      z-index: 9999;
+      backdrop-filter: blur(15px);
+      direction: rtl;
+      text-align: right;
+      animation: slideDownPerm 0.4s ease-out;
+    }
+    @keyframes slideDownPerm {
+      from { transform: translateY(-40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .perm-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .perm-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #fcd34d;
+    }
+    .perm-close-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .perm-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .perm-desc {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.45;
+      margin-bottom: 12px;
+    }
+    .perm-badges-list {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .perm-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #e2e8f0;
+      transition: all 0.2s;
+    }
+    .perm-pill.granted {
+      background: rgba(16, 185, 129, 0.18);
+      border-color: #10b981;
+      color: #34d399;
+    }
+    .btn-perm-grant {
+      width: 100%;
+      background: linear-gradient(135deg, #f59e0b 0%, #ec4899 100%);
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+      transition: transform 0.15s;
+    }
+    .btn-perm-grant:active {
+      transform: scale(0.98);
+    }
+
+    /* ======================================================== */
+    /* DJ ANNOUNCEMENTS / MESSAGES MODAL & CARDS                */
+    /* ======================================================== */
+    .announce-card {
+      background: linear-gradient(135deg, #1c0a2a 0%, #0d0417 100%);
+      border: 2px solid #ec4899;
+      box-shadow: 0 15px 45px rgba(236, 72, 153, 0.45);
+      border-radius: 24px;
+      padding: 24px 20px;
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+      direction: rtl;
+    }
+    .announce-icon-wrap {
+      font-size: 42px;
+      margin-bottom: 10px;
+      animation: bounceAnnounce 1.5s infinite;
+    }
+    @keyframes bounceAnnounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .announce-tag {
+      display: inline-block;
+      background: rgba(236, 72, 153, 0.18);
+      border: 1px solid rgba(236, 72, 153, 0.4);
+      color: #f472b6;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+    .announce-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
+    .announce-body {
+      font-size: 14px;
+      color: #e2e8f0;
+      line-height: 1.6;
+      margin-bottom: 16px;
+      white-space: pre-wrap;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .announce-meta {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-bottom: 18px;
+    }
+    .announce-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #ec4899 0%, #f59e0b 100%);
+      border: none;
+      border-radius: 14px;
+      padding: 13px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 18px rgba(236, 72, 153, 0.4);
+    }
+
+    .closed-announcement-card {
+      width: 100%;
+      background: rgba(236, 72, 153, 0.1);
+      border: 1.5px solid rgba(236, 72, 153, 0.35);
+      border-radius: 16px;
+      padding: 14px;
+      margin-top: 14px;
+      direction: rtl;
+      text-align: right;
+      box-sizing: border-box;
+    }
+    .announcement-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .announcement-icon {
+      font-size: 16px;
+    }
+    .announcement-tag {
+      font-size: 11px;
+      font-weight: 800;
+      color: #f472b6;
+    }
+    .announcement-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .announcement-text {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.45;
+      margin-bottom: 4px;
+    }
+    .announcement-time {
+      font-size: 10px;
+      color: #94a3b8;
     }
   </style>
 </head>
 <body>
   <div class="warm-glow"></div>
+
+  <!-- VIP Party Permissions Card (Proactive Request on Launch) -->
+  <div id="party-permissions-card" class="permissions-card" style="display: none;">
+    <div class="perm-header">
+      <div class="perm-badge">⚡ חווית VIP ברחבה</div>
+      <button class="perm-close-btn" onclick="dismissPermCard()">✕</button>
+    </div>
+    <div class="perm-title">הפעלת הרשאות רחבה וסטרוב</div>
+    <div class="perm-desc">
+      כדי שהאפליקציה תפעיל סטרוב פלאש, תמנע כיבוי מסך, ותעדכן אותך כשהשיר שבקשת עולה – נדרש אישור הרשאות.
+    </div>
+    <div class="perm-badges-list">
+      <span id="perm-cam-badge" class="perm-pill">📷 פלאש / מצלמה</span>
+      <span id="perm-loc-badge" class="perm-pill">📍 אימות רחבה</span>
+      <span id="perm-notif-badge" class="perm-pill">🔔 עדכוני שירים</span>
+    </div>
+    <button class="btn-perm-grant" onclick="requestAllPartyPermissions()">
+      ⚡ אשר הרשאות מסיבה עכשיו
+    </button>
+  </div>
 
   <!-- ======================================================== -->
   <!-- STATE 1: CLOSED / RETRO VINYL LOUNGE                     -->
@@ -1412,6 +1642,17 @@
         <button id="retry-location-btn" class="retry-location-btn" onclick="retryLocationCheck()" style="display: none;">
           בדוק מיקום שוב 🔄
         </button>
+
+        <!-- DJ Broadcast Announcement in Closed State -->
+        <div id="closed-dj-announcement" class="closed-announcement-card" style="display: none;">
+          <div class="announcement-header">
+            <span class="announcement-icon">📢</span>
+            <span class="announcement-tag">הודעת הדיג'יי לקהל</span>
+          </div>
+          <div id="closed-announce-title" class="announcement-title"></div>
+          <div id="closed-announce-text" class="announcement-text"></div>
+          <div id="closed-announce-time" class="announcement-time"></div>
+        </div>
 
         <a class="social-btn" href="https://instagram.com" target="_blank">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path></svg>
@@ -1722,6 +1963,18 @@
     </div>
   </div>
 
+  <!-- DJ Announcement Live Modal -->
+  <div id="dj-announcement-modal" class="modal-overlay">
+    <div class="announce-card">
+      <div class="announce-icon-wrap">📢</div>
+      <div class="announce-tag">הודעה מיוחדת מהדיג'יי</div>
+      <h2 id="dj-announce-title" class="announce-title">התכוננו לסט הבא!</h2>
+      <div id="dj-announce-body" class="announce-body"></div>
+      <div id="dj-announce-meta" class="announce-meta">DJ SHAZZ &amp; DJ SONIC</div>
+      <button class="announce-btn" onclick="closeDjAnnouncement()">הבנתי, תודה! 🎧</button>
+    </div>
+  </div>
+
   <script>
     // State
     var currentRoom = null;
@@ -1846,6 +2099,11 @@
       const lon = parseFloat(params.get('lon'));
       const rad = parseFloat(params.get('rad') || '30');
 
+      // Check party permissions & listen for announcements on app launch
+      checkAndPromptPermissions();
+      updateClosedAnnouncement();
+      initDjMessageSse(roomParam ? roomParam.toLowerCase() : 'shazz-sonic');
+
       if (roomParam) {
         connectToRoom(roomParam, isExplicitLive, { lat, lon, rad });
       } else {
@@ -1854,6 +2112,191 @@
           main: 'המוזיקה נחה, אבל הקצב לא מפסיק... 💿',
           sub: 'תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!'
         });
+      }
+    }
+
+    // Permissions Management
+    function checkAndPromptPermissions() {
+      if (typeof MobileBridge !== 'undefined' && MobileBridge.checkPermissionsStatus) {
+        const status = MobileBridge.checkPermissionsStatus();
+        updatePermissionsUI(status);
+        if (!status.allGranted && localStorage.getItem('onyx_perms_dismissed') !== 'true') {
+          // Proactively request on launch as required by user!
+          MobileBridge.requestAllPermissions();
+        }
+      }
+    }
+
+    function updatePermissionsUI(status) {
+      if (!status) return;
+      const card = document.getElementById('party-permissions-card');
+      const camPill = document.getElementById('perm-cam-badge');
+      const locPill = document.getElementById('perm-loc-badge');
+      const notifPill = document.getElementById('perm-notif-badge');
+
+      if (camPill) {
+        if (status.camera) camPill.classList.add('granted');
+        else camPill.classList.remove('granted');
+      }
+      if (locPill) {
+        if (status.location) locPill.classList.add('granted');
+        else locPill.classList.remove('granted');
+      }
+      if (notifPill) {
+        if (status.notifications) notifPill.classList.add('granted');
+        else notifPill.classList.remove('granted');
+      }
+
+      if (card) {
+        if (status.allGranted) {
+          card.style.display = 'none';
+        } else if (localStorage.getItem('onyx_perms_dismissed') !== 'true') {
+          card.style.display = 'block';
+        }
+      }
+    }
+
+    function requestAllPartyPermissions() {
+      localStorage.removeItem('onyx_perms_dismissed');
+      MobileBridge.requestAllPermissions();
+      if (MobileBridge.requestIgnoreBatteryOptimizations) {
+        setTimeout(() => MobileBridge.requestIgnoreBatteryOptimizations(), 1200);
+      }
+    }
+
+    function dismissPermCard() {
+      localStorage.setItem('onyx_perms_dismissed', 'true');
+      const card = document.getElementById('party-permissions-card');
+      if (card) card.style.display = 'none';
+    }
+
+    window.onNativePermissionsUpdate = function(status) {
+      console.log('[Native] Permissions updated:', status);
+      updatePermissionsUI(status);
+    };
+
+    window.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') {
+        checkAndPromptPermissions();
+      }
+    });
+
+    // DJ Announcements & Messages Channel (Active even when booth is closed)
+    var djMsgSseClient = null;
+    var djMsgDefaultSseClient = null;
+    var djBroadcastAllSseClient = null;
+
+    function initDjMessageSse(room) {
+      const clean = (room || 'shazz-sonic').toLowerCase();
+
+      if (djMsgSseClient) try { djMsgSseClient.close(); } catch (_) {}
+      try {
+        djMsgSseClient = new EventSource(`https://ntfy.sh/onyx_msg_${clean}/sse`);
+        djMsgSseClient.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'message') {
+              const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+              handleDjAnnouncement(payload);
+            }
+          } catch (_) {}
+        };
+      } catch (_) {}
+
+      if (clean !== 'shazz-sonic') {
+        if (djMsgDefaultSseClient) try { djMsgDefaultSseClient.close(); } catch (_) {}
+        try {
+          djMsgDefaultSseClient = new EventSource('https://ntfy.sh/onyx_msg_shazz-sonic/sse');
+          djMsgDefaultSseClient.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.event === 'message') {
+                const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+                handleDjAnnouncement(payload);
+              }
+            } catch (_) {}
+          };
+        } catch (_) {}
+      }
+
+      if (!djBroadcastAllSseClient) {
+        try {
+          djBroadcastAllSseClient = new EventSource('https://ntfy.sh/onyx_broadcast_all/sse');
+          djBroadcastAllSseClient.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.event === 'message') {
+                const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+                handleDjAnnouncement(payload);
+              }
+            } catch (_) {}
+          };
+        } catch (_) {}
+      }
+    }
+
+    function handleDjAnnouncement(payload) {
+      if (!payload) return;
+      console.log('[DJ Announcement] Received live broadcast:', payload);
+      try {
+        localStorage.setItem('onyx_last_announcement', JSON.stringify(payload));
+      } catch (_) {}
+
+      // 1. Wake screen from sleep!
+      MobileBridge.turnScreenOn();
+
+      // 2. Tactical sub-bass haptic kick
+      MobileBridge.triggerBassHaptic();
+
+      // 3. Post system notification
+      const title = payload.title || '📢 הודעה מיוחדת מה-DJ!';
+      const msg = payload.message || payload.text || '';
+      MobileBridge.showNotification(title, msg);
+
+      // 4. Update and display Modal
+      const modal = document.getElementById('dj-announcement-modal');
+      const titleElem = document.getElementById('dj-announce-title');
+      const bodyElem = document.getElementById('dj-announce-body');
+      const metaElem = document.getElementById('dj-announce-meta');
+
+      if (titleElem) titleElem.innerText = title;
+      if (bodyElem) bodyElem.innerText = msg;
+      if (metaElem) {
+        metaElem.innerText = `${payload.djName || 'DJ SHAZZ & DJ SONIC'} ${payload.date ? '• ' + payload.date : ''}`;
+      }
+      if (modal) modal.classList.add('active');
+
+      // 5. Update Closed State card
+      updateClosedAnnouncement(payload);
+    }
+
+    function closeDjAnnouncement() {
+      const modal = document.getElementById('dj-announcement-modal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function updateClosedAnnouncement(payload) {
+      const card = document.getElementById('closed-dj-announcement');
+      if (!card) return;
+      if (!payload) {
+        const saved = localStorage.getItem('onyx_last_announcement');
+        if (saved) {
+          try { payload = JSON.parse(saved); } catch (_) {}
+        }
+      }
+      if (payload && (payload.title || payload.message || payload.text)) {
+        const titleElem = document.getElementById('closed-announce-title');
+        const textElem = document.getElementById('closed-announce-text');
+        const timeElem = document.getElementById('closed-announce-time');
+
+        if (titleElem) titleElem.innerText = payload.title || 'הודעה מהדיג\'יי';
+        if (textElem) textElem.innerText = payload.message || payload.text || '';
+        if (timeElem) {
+          timeElem.innerText = payload.date ? `תאריך אירוע: ${payload.date}` : (payload.timestamp ? new Date(payload.timestamp).toLocaleDateString('he-IL') : '');
+        }
+        card.style.display = 'block';
+      } else {
+        card.style.display = 'none';
       }
     }
 
@@ -2076,6 +2519,9 @@
           } catch (_) {}
         };
       } catch (_) {}
+
+      // 4. DJ Announcements & Broadcasts SSE (Port 443)
+      initDjMessageSse(clean);
     }
 
     async function pollRoomStatus() {
@@ -2742,6 +3188,7 @@
     function startCrowdFx(mode, bpm = 128, color = '#f59e0b', title = '') {
       currentFxMode = mode;
       fxActive = true;
+      MobileBridge.enterFullScreen();
       MobileBridge.setKeepScreenOn(true);
       MobileBridge.turnScreenOn();
 
@@ -2895,6 +3342,7 @@
         overlay.className = '';
         overlay.classList.remove('active');
       }
+      MobileBridge.exitFullScreen();
       MobileBridge.setTorch(false);
       MobileBridge.setKeepScreenOn(false);
     }
@@ -2967,6 +3415,8 @@
               handleCrowdFx(payload);
             } else if (topic.includes('/notify')) {
               handleGuestNotification(payload);
+            } else if (topic.includes('/message') || topic.includes('onyx/broadcast')) {
+              handleDjAnnouncement(payload);
             } else if (topic.startsWith('onyx/status/')) {
               applyRoomStatus(payload);
             } else if (topic.startsWith('onyx/dj_location/')) {
@@ -3004,6 +3454,11 @@
             mqttClient.subscribe(`onyx/requests/${cleanRoom}/notify`);
             mqttClient.subscribe(`onyx/requests/SHAZZ-SONIC/notify`);
             mqttClient.subscribe(`onyx/stage/${cleanRoom}/device/${deviceId}`);
+            // DJ Announcements & Broadcasts (active even when booth is closed)
+            mqttClient.subscribe(`onyx/stage/${cleanRoom}/message`);
+            mqttClient.subscribe(`onyx/stage/SHAZZ-SONIC/message`);
+            mqttClient.subscribe(`onyx/broadcast/all`);
+            mqttClient.subscribe(`onyx/broadcast/${cleanRoom}`);
           },
           onFailure: function (e) {
             console.warn('[MQTT] Connection failed, retrying...', e);

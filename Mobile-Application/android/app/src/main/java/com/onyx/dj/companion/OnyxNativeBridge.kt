@@ -1,6 +1,5 @@
 package com.onyx.dj.companion
 
-import android.app.Activity
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -13,6 +12,7 @@ import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
@@ -22,7 +22,7 @@ import java.io.OutputStream
  * Onyx DJ™ JavaScript Interface Native Bridge
  */
 class OnyxNativeBridge(
-    private val activity: Activity,
+    private val activity: MainActivity,
     private val torchManager: OnyxTorchManager,
     private val hapticManager: OnyxHapticManager,
     private val wakeLockManager: OnyxWakeLockManager
@@ -45,6 +45,11 @@ class OnyxNativeBridge(
     }
 
     @JavascriptInterface
+    fun triggerBassHaptic() {
+        hapticManager.triggerBassKick()
+    }
+
+    @JavascriptInterface
     fun turnScreenOn() {
         wakeLockManager.turnScreenOn()
     }
@@ -55,19 +60,64 @@ class OnyxNativeBridge(
     }
 
     @JavascriptInterface
+    fun enterFullScreen() {
+        activity.setFullScreen(true)
+    }
+
+    @JavascriptInterface
+    fun exitFullScreen() {
+        activity.setFullScreen(false)
+    }
+
+    @JavascriptInterface
+    fun showNotification(title: String, message: String) {
+        activity.postSystemNotification(title, message)
+    }
+
+    @JavascriptInterface
+    fun checkPermissionsStatus(): String {
+        val camera = ContextCompat.checkSelfPermission(activity, android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val location = ContextCompat.checkSelfPermission(activity, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val notifications = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(activity, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else true
+        val allGranted = camera && location && notifications
+        return """{"camera":$camera,"location":$location,"notifications":$notifications,"allGranted":$allGranted}"""
+    }
+
+    @JavascriptInterface
     fun checkCameraPermission(): Boolean {
-        return androidx.core.content.ContextCompat.checkSelfPermission(
+        return ContextCompat.checkSelfPermission(
             activity,
             android.Manifest.permission.CAMERA
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     @JavascriptInterface
+    fun requestAllPermissions() {
+        activity.runOnUiThread {
+            activity.checkAndRequestPartyPermissions(forcePrompt = true)
+        }
+    }
+
+    @JavascriptInterface
     fun requestCameraPermission() {
         activity.runOnUiThread {
-            if (activity is MainActivity) {
-                activity.requestCameraPermissionDirect()
-            }
+            activity.checkAndRequestPartyPermissions(forcePrompt = true)
+        }
+    }
+
+    @JavascriptInterface
+    fun openAppSettings() {
+        activity.runOnUiThread {
+            activity.openAppSettings()
+        }
+    }
+
+    @JavascriptInterface
+    fun requestIgnoreBatteryOptimizations() {
+        activity.runOnUiThread {
+            activity.requestIgnoreBatteryOptimizations()
         }
     }
 
