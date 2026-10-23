@@ -832,6 +832,137 @@
       margin-top: 4px;
     }
 
+    /* ======================================================== */
+    /* SYNCHRONIZED CROWD FX OVERLAY (STAGE & BOOTH SYNC)      */
+    /* ======================================================== */
+    #crowd-fx-overlay {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 99999;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 30px 20px 40px;
+      text-align: center;
+      overflow: hidden;
+      box-sizing: border-box;
+      user-select: none;
+      background: #000;
+    }
+    #crowd-fx-overlay.active {
+      display: flex;
+    }
+    .fx-live-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font-size: 11px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 0.5px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      display: inline-block;
+      animation: pulseDot 1.5s infinite;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .fx-center-content {
+      z-index: 10;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .fx-main-title {
+      font-size: clamp(26px, 8vw, 40px);
+      font-weight: 900;
+      line-height: 1.15;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      text-shadow: 0 4px 25px rgba(0, 0, 0, 0.8);
+      color: #fff;
+    }
+    .fx-sub-title {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.5;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+      opacity: 0.95;
+      color: #fff;
+    }
+    .fx-mode-candle {
+      background: radial-gradient(circle at 50% 50%, #f59e0b 0%, #b45309 35%, #451a03 70%, #0c0402 100%) !important;
+    }
+    .candle-aura {
+      position: absolute;
+      width: 450px;
+      height: 450px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(254, 240, 138, 0.45) 0%, rgba(245, 158, 11, 0.25) 45%, transparent 75%);
+      filter: blur(40px);
+      animation: candleBreathe 3.5s infinite ease-in-out;
+      pointer-events: none;
+    }
+    @keyframes candleBreathe {
+      0%, 100% { transform: scale(0.92); opacity: 0.8; }
+      50% { transform: scale(1.18); opacity: 1; }
+    }
+    .fx-mode-glow {
+      background: linear-gradient(135deg, #7928ca 0%, #ff0080 50%, #0070f3 100%) !important;
+      background-size: 400% 400% !important;
+      animation: neonFlow 6s ease infinite !important;
+    }
+    @keyframes neonFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .fx-mode-white {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+    .fx-mode-white .fx-live-indicator,
+    .fx-mode-white .fx-close-btn {
+      background: rgba(0, 0, 0, 0.15) !important;
+      color: #000 !important;
+      border-color: rgba(0, 0, 0, 0.25) !important;
+    }
+    .fx-mode-white .fx-main-title {
+      color: #000 !important;
+      text-shadow: none !important;
+    }
+    .fx-mode-white .fx-sub-title {
+      color: #333 !important;
+      text-shadow: none !important;
+    }
+    .fx-mode-strobe-on {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+    .fx-mode-strobe-rainbow-on {
+      opacity: 1 !important;
+      color: #000000 !important;
+    }
+    .fx-mode-strobe-off {
+      background: #000000 !important;
+      color: #ffffff !important;
+    }
+
     /* Crowd FX Fullscreen Mode */
     #crowd-fx-modal {
       position: fixed;
@@ -1493,6 +1624,30 @@
     </div>
   </div>
 
+  <!-- Synchronized Crowd Light Show & BPM Strobe Wave (Triggered from DJ Booth) -->
+  <div id="crowd-fx-overlay">
+    <div class="candle-aura" id="candle-aura" style="display: none;"></div>
+    
+    <div class="fx-top-bar">
+      <div class="fx-live-indicator">
+        <span class="status-dot"></span>
+        <span id="fx-badge-text">ONYX CROWD LIVE ✨</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button class="fx-close-btn" onclick="stopCrowdFx(true)">&times;</button>
+      </div>
+    </div>
+
+    <div class="fx-center-content">
+      <h1 class="fx-main-title" id="fx-main-title">מופע אורות ✨</h1>
+      <p class="fx-sub-title" id="fx-sub-title">הרימו את הטלפון אל על והאירו את הרחבה!</p>
+    </div>
+
+    <div style="font-size: 11px; opacity: 0.8; z-index: 10; letter-spacing: 1px; font-weight: 700; color: #fff;">
+      ONYX DJ™ SYNCHRONIZED EXPERIENCE
+    </div>
+  </div>
+
   <!-- QR Code Scanner Modal (For Connecting at Event) -->
   <div id="qr-scanner-modal">
     <div class="fx-top-bar">
@@ -1840,19 +1995,83 @@
       checkConsentModal();
     }
 
+    var fxSseClient = null;
+    var fxDefaultSseClient = null;
+    var notifySseClient = null;
+
     function initSseStatus() {
       if (!currentRoom) return;
+      const clean = currentRoom.toLowerCase();
+
+      // 1. Room Status SSE (Port 443)
       if (sseClient) {
         try { sseClient.close(); } catch (_) {}
       }
       try {
-        sseClient = new EventSource(`https://ntfy.sh/onyx_status_${currentRoom.toLowerCase()}/sse`);
+        sseClient = new EventSource(`https://ntfy.sh/onyx_status_${clean}/sse`);
         sseClient.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
             if (data.event === 'message') {
               const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
               applyRoomStatus(payload);
+            }
+          } catch (_) {}
+        };
+      } catch (_) {}
+
+      // 2. Synchronized Crowd FX SSE (Port 443)
+      if (fxSseClient) {
+        try { fxSseClient.close(); } catch (_) {}
+      }
+      try {
+        fxSseClient = new EventSource(`https://ntfy.sh/onyx_fx_${clean}/sse`);
+        fxSseClient.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'message') {
+              const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+              if (payload && payload.mode) {
+                handleCrowdFx(payload);
+              }
+            }
+          } catch (_) {}
+        };
+      } catch (_) {}
+
+      // Also listen on default room fx if not SHAZZ-SONIC
+      if (clean !== 'shazz-sonic') {
+        if (fxDefaultSseClient) {
+          try { fxDefaultSseClient.close(); } catch (_) {}
+        }
+        try {
+          fxDefaultSseClient = new EventSource('https://ntfy.sh/onyx_fx_shazz-sonic/sse');
+          fxDefaultSseClient.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.event === 'message') {
+                const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+                if (payload && payload.mode) {
+                  handleCrowdFx(payload);
+                }
+              }
+            } catch (_) {}
+          };
+        } catch (_) {}
+      }
+
+      // 3. User Song Notifications SSE (Port 443)
+      if (notifySseClient) {
+        try { notifySseClient.close(); } catch (_) {}
+      }
+      try {
+        notifySseClient = new EventSource(`https://ntfy.sh/onyx_notify_${clean}/sse`);
+        notifySseClient.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'message') {
+              const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message;
+              handleGuestNotification(payload);
             }
           } catch (_) {}
         };
@@ -2174,44 +2393,139 @@
       });
     }
 
-    // Pure Real-Time Song Search (iTunes API)
+    // Universal Multi-Engine Song Search (YouTube Innertube + Vercel Serverless + Apple Music IL fallback)
+    const SEARCH_API_BASE = 'https://dj-onyxdownloader-guest-requests.vercel.app';
+    var currentSearchResults = [];
+
     async function searchSongs() {
-      const term = document.getElementById('search-input').value.trim();
-      if (!term) return;
+      const query = document.getElementById('search-input').value.trim();
+      if (!query) return;
 
       const container = document.getElementById('results-container');
-      container.innerHTML = '<div style="text-align:center; padding:15px; color:#cbd5e1;">מחפש שירים בזמן אמת... ⏳</div>';
+      container.innerHTML = '<div style="text-align:center; padding:18px; color:#cbd5e1; font-size:13px;">מחפש שירים ברשת... 🎧</div>';
 
       try {
-        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=8`);
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          container.innerHTML = '';
-          data.results.forEach(song => {
-            const item = document.createElement('div');
-            item.className = 'song-result-item';
-            item.onclick = () => openRequestModal(song);
-            item.innerHTML = `
-              <img src="${song.artworkUrl60 || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100'}" class="song-cover">
-              <div class="song-details">
-                <div class="song-name">${song.trackName}</div>
-                <div class="song-artist">${song.artistName}</div>
-              </div>
-              <div class="request-badge">בקש עכשיו</div>
-            `;
-            container.appendChild(item);
-          });
-        } else {
-          container.innerHTML = `<div style="text-align:center; padding:18px; color:#cbd5e1; font-size:13px;">לא נמצאו שירים התואמים ל-"${term}". נסה לדייק בשם השיר או האמן.</div>`;
+        // 1. Direct YouTube link pasted by guest
+        if (query.includes('youtube.com') || query.includes('youtu.be')) {
+          try {
+            const res = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(query)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.title) {
+                renderSearchResults([{
+                  id: query,
+                  url: query,
+                  title: data.title,
+                  channel: data.author_name || 'YouTube',
+                  thumbnail: data.thumbnail_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150',
+                  duration: ''
+                }]);
+                return;
+              }
+            }
+          } catch(e) {}
         }
-      } catch (e) {
-        container.innerHTML = `<div style="text-align:center; padding:18px; color:#f87171; font-size:13px;">שגיאת חיבור לחיפוש שירים. נסה שוב בעוד מספר שניות.</div>`;
+
+        // 2. High-speed YouTube Search via Onyx Vercel Serverless Function (Primary Engine)
+        try {
+          const apiResp = await fetch(`${SEARCH_API_BASE}/api/search?q=${encodeURIComponent(query)}`);
+          if (apiResp.ok) {
+            const apiData = await apiResp.json();
+            if (apiData && Array.isArray(apiData.results) && apiData.results.length > 0) {
+              renderSearchResults(apiData.results);
+              return;
+            }
+          }
+        } catch(apiErr) {
+          console.warn('/api/search error, falling back:', apiErr);
+        }
+
+        // 3. Fallback: Apple iTunes API with Israel store
+        try {
+          const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15&country=IL`;
+          const resp = await fetch(itunesUrl);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.results && data.results.length > 0) {
+              const cleanTracks = data.results.map(t => ({
+                id: String(t.trackId),
+                url: `ytsearch1:${t.artistName} ${t.trackName}`,
+                title: `${t.artistName} - ${t.trackName}`,
+                channel: t.collectionName || t.artistName,
+                thumbnail: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '300x300bb') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150',
+                duration: ''
+              }));
+              renderSearchResults(cleanTracks);
+              return;
+            }
+          }
+        } catch(itunesErr) {
+          console.warn('iTunes fallback error:', itunesErr);
+        }
+
+        // 4. Fallback direct YouTube search
+        fallbackMockSearch(query);
+      } catch (err) {
+        console.warn('Search error, applying fallback', err);
+        fallbackMockSearch(query);
       }
+    }
+
+    function fallbackMockSearch(query) {
+      renderSearchResults([
+        {
+          id: 'yt_direct',
+          url: `ytsearch1:${query}`,
+          title: query,
+          channel: 'חיפוש ישיר ביוטיוב',
+          thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=150',
+          duration: ''
+        }
+      ]);
+    }
+
+    function renderSearchResults(tracks) {
+      currentSearchResults = Array.isArray(tracks) ? tracks : [];
+      const container = document.getElementById('results-container');
+      if (!currentSearchResults.length) {
+        container.innerHTML = `<div style="text-align:center; padding:18px; color:#cbd5e1; font-size:13px;">לא נמצאו שירים התואמים לחיפוש. נסו חיפוש אחר.</div>`;
+        return;
+      }
+
+      container.innerHTML = currentSearchResults.map((t, idx) => {
+        const safeTitle = (t.title || 'שיר ללא כותרת').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeChannel = (t.channel || 'YouTube').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const thumb = t.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150';
+        const durationTag = t.duration ? `<span style="font-size:10px; background:rgba(0,0,0,0.65); padding:1px 4px; border-radius:4px; position:absolute; bottom:2px; right:2px; color:#fff;">${t.duration}</span>` : '';
+
+        return `
+          <div class="song-result-item" onclick="openRequestModalByIndex(${idx})">
+            <div style="position:relative; width:44px; height:44px; flex-shrink:0;">
+              <img src="${thumb}" class="song-cover" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150';" />
+              ${durationTag}
+            </div>
+            <div class="song-details">
+              <div class="song-name" title="${safeTitle}">${safeTitle}</div>
+              <div class="song-artist">${safeChannel}</div>
+            </div>
+            <div class="request-badge">בקש עכשיו</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openRequestModalByIndex(idx) {
+      const track = currentSearchResults[idx];
+      if (!track) return;
+      selectedSong = track;
+      document.getElementById('preview-song-title').innerText = track.title + ' • ' + track.channel;
+      document.getElementById('request-modal').classList.add('active');
     }
 
     function openRequestModal(song) {
       selectedSong = song;
-      document.getElementById('preview-song-title').innerText = song.trackName + ' - ' + song.artistName;
+      const title = song.title || (song.trackName + ' - ' + song.artistName);
+      document.getElementById('preview-song-title').innerText = title;
       document.getElementById('request-modal').classList.add('active');
     }
 
@@ -2259,13 +2573,18 @@
       const name = document.getElementById('guest-name-input').value.trim() || 'אורח VIP';
       const text = document.getElementById('guest-dedication-input').value.trim();
 
+      const songTitle = selectedSong.title || selectedSong.trackName || 'שיר ללא כותרת';
+      const songChannel = selectedSong.channel || selectedSong.artistName || 'YouTube';
+      const songUrl = selectedSong.url || `ytsearch1:${songTitle} ${songChannel}`;
+      const songThumb = selectedSong.thumbnail || selectedSong.artworkUrl100 || selectedSong.artworkUrl60 || '';
+
       const newTicket = {
         id: 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-        title: selectedSong.trackName,
-        channel: selectedSong.artistName,
-        url: selectedSong.trackViewUrl || ('https://music.apple.com/search?term=' + encodeURIComponent(selectedSong.trackName)),
-        thumbnail: selectedSong.artworkUrl100 || selectedSong.artworkUrl60 || '',
-        song: selectedSong.trackName + ' - ' + selectedSong.artistName,
+        title: songTitle,
+        channel: songChannel,
+        url: songUrl,
+        thumbnail: songThumb,
+        song: songTitle + ' - ' + songChannel,
         guest: name,
         requester: name,
         note: text,
@@ -2402,19 +2721,190 @@
       setTimeout(() => chip.classList.remove('active'), 300);
     }
 
-    // Crowd FX Mode
-    function openCrowdFx() {
+    // ========================================================
+    // FEATURE 4: SYNCHRONIZED CROWD FX (STROBE, RAINBOW, CANDLE, GLOW, TORCH)
+    // ========================================================
+    let crowdFxInterval = null;
+    let crowdFxAnimId = null;
+    let isStrobePhase = false;
+    let currentFxMode = null;
+
+    function handleCrowdFx(payload) {
+      if (!payload) return;
+      console.log('[Crowd FX] Incoming broadcast:', payload);
+      if (payload.mode === 'off' || !payload.mode) {
+        stopCrowdFx();
+      } else {
+        startCrowdFx(payload.mode, payload.bpm, payload.color, payload.title);
+      }
+    }
+
+    function startCrowdFx(mode, bpm = 128, color = '#f59e0b', title = '') {
+      currentFxMode = mode;
       fxActive = true;
-      document.getElementById('crowd-fx-modal').classList.add('active');
+      MobileBridge.setKeepScreenOn(true);
       MobileBridge.turnScreenOn();
-      startBeatSync();
+
+      const overlay = document.getElementById('crowd-fx-overlay');
+      const candleAura = document.getElementById('candle-aura');
+      const mainTitle = document.getElementById('fx-main-title');
+      const subTitle = document.getElementById('fx-sub-title');
+      const badgeText = document.getElementById('fx-badge-text');
+      if (!overlay) return;
+
+      if (crowdFxInterval) {
+        clearInterval(crowdFxInterval);
+        crowdFxInterval = null;
+      }
+      if (crowdFxAnimId) {
+        cancelAnimationFrame(crowdFxAnimId);
+        crowdFxAnimId = null;
+      }
+
+      overlay.className = '';
+      overlay.style.backgroundColor = '';
+      if (candleAura) candleAura.style.display = 'none';
+      overlay.classList.add('active');
+
+      if (mode === 'strobe' || mode === 'strobe_rainbow' || mode === 'strobe_synced' || mode === 'strobe_rainbow_synced') {
+        const isRainbow = (mode === 'strobe_rainbow' || mode === 'strobe_rainbow_synced');
+        const isSynced = (mode === 'strobe_synced' || mode === 'strobe_rainbow_synced');
+        const isRainbowSynced = (mode === 'strobe_rainbow_synced');
+
+        if (badgeText) {
+          badgeText.innerText = isRainbowSynced
+            ? `🌈 100% SYNC COLOR • ${bpm} BPM`
+            : (isRainbow 
+                ? `🎨 MULTI-COLOR STROBE • ${bpm} BPM` 
+                : (isSynced ? `🌐 100% MASTER SYNC • ${bpm} BPM` : `⚡ STROBE DROP • ${bpm} BPM`));
+        }
+        if (mainTitle) {
+          mainTitle.innerText = title || (isRainbowSynced
+            ? '🌈 גל צבעים מסונכרן! ⚡'
+            : (isRainbow 
+                ? '🎨 מופע צבעים ברחבה! 🌈' 
+                : (isSynced ? '🌐 פליקר קהל מסונכרן! ⚡' : '⚡ DROP! עפים באוויר! ⚡')));
+        }
+        if (subTitle) {
+          subTitle.innerText = isRainbowSynced
+            ? 'כל הרחבה מבזיקה ומחליפה צבעים ביחד בכל פעימה!'
+            : (isSynced 
+                ? 'כל הרחבה מבזיקה באותה מאית שניה בדיוק!' 
+                : (isRainbow ? 'כל מכשיר מהבהב בצבע חי משלו!' : 'הרימו את הטלפון גבוה לרחבה!'));
+        }
+
+        const beatMs = Math.max(50, Math.round(60000 / (bpm || 128)));
+        isStrobePhase = false;
+        const RAINBOW_PALETTE = [
+          '#ff0055', '#00ffcc', '#ffcc00', '#ff00ff', '#00e5ff', 
+          '#ff3300', '#a855f7', '#10b981', '#f43f5e', '#3b82f6',
+          '#facc15', '#ec4899', '#06b6d4', '#84cc16', '#fb923c'
+        ];
+
+        if (isSynced) {
+          const flashOnMs = Math.max(30, Math.round(beatMs * 0.35));
+          function tickEpochSync() {
+            if (currentFxMode !== 'strobe_synced' && currentFxMode !== 'strobe_rainbow_synced') return;
+            const now = Date.now();
+            const phase = now % beatMs;
+            const shouldBeOn = (phase < flashOnMs);
+
+            if (shouldBeOn !== isStrobePhase) {
+              isStrobePhase = shouldBeOn;
+              if (isStrobePhase) {
+                overlay.classList.remove('fx-mode-strobe-off');
+                if (isRainbowSynced) {
+                  const beatIndex = Math.floor(now / beatMs);
+                  const color = RAINBOW_PALETTE[beatIndex % RAINBOW_PALETTE.length];
+                  overlay.style.backgroundColor = color;
+                  overlay.classList.add('fx-mode-strobe-rainbow-on');
+                } else {
+                  overlay.style.backgroundColor = '';
+                  overlay.classList.add('fx-mode-strobe-on');
+                }
+                MobileBridge.pulseStrobe(35);
+                MobileBridge.triggerBassHaptic();
+              } else {
+                overlay.classList.remove('fx-mode-strobe-on', 'fx-mode-strobe-rainbow-on');
+                overlay.style.backgroundColor = '';
+                overlay.classList.add('fx-mode-strobe-off');
+              }
+            }
+            crowdFxAnimId = requestAnimationFrame(tickEpochSync);
+          }
+          crowdFxAnimId = requestAnimationFrame(tickEpochSync);
+        } else {
+          const flashRateMs = Math.max(50, Math.round(beatMs / 2));
+          crowdFxInterval = setInterval(() => {
+            isStrobePhase = !isStrobePhase;
+            if (isStrobePhase) {
+              overlay.classList.remove('fx-mode-strobe-off');
+              if (isRainbow) {
+                const randColor = RAINBOW_PALETTE[Math.floor(Math.random() * RAINBOW_PALETTE.length)];
+                overlay.style.backgroundColor = randColor;
+                overlay.classList.add('fx-mode-strobe-rainbow-on');
+              } else {
+                overlay.style.backgroundColor = '';
+                overlay.classList.add('fx-mode-strobe-on');
+              }
+              MobileBridge.pulseStrobe(35);
+              MobileBridge.triggerBassHaptic();
+            } else {
+              overlay.classList.remove('fx-mode-strobe-on', 'fx-mode-strobe-rainbow-on');
+              overlay.style.backgroundColor = '';
+              overlay.classList.add('fx-mode-strobe-off');
+            }
+          }, flashRateMs);
+        }
+      } else if (mode === 'candle') {
+        overlay.classList.add('fx-mode-candle');
+        if (candleAura) candleAura.style.display = 'block';
+        if (badgeText) badgeText.innerText = '✨ סלואו קסום ✨';
+        if (mainTitle) mainTitle.innerText = title || 'סלואו קסום ברחבה ✨';
+        if (subTitle) subTitle.innerText = 'הרימו את הטלפון והאירו את הרגע המרגש...';
+        MobileBridge.setTorch(false);
+      } else if (mode === 'glow') {
+        overlay.classList.add('fx-mode-glow');
+        if (badgeText) badgeText.innerText = '🟣 RAVE NEON WAVE 🟣';
+        if (mainTitle) mainTitle.innerText = title || 'גל ניאון פסיכדלי 🟣';
+        if (subTitle) subTitle.innerText = 'רוקדים יחד באותה אנרגיה ברחבה!';
+        MobileBridge.setTorch(false);
+      } else if (mode === 'white') {
+        overlay.classList.add('fx-mode-white');
+        if (badgeText) badgeText.innerText = '🤍 CROWD TORCH 🤍';
+        if (mainTitle) mainTitle.innerText = title || 'האירו את הרחבה! 🤍';
+        if (subTitle) subTitle.innerText = 'אלומת אור ענקית מהקהל לבמה!';
+        MobileBridge.setTorch(true);
+      }
+    }
+
+    function stopCrowdFx() {
+      fxActive = false;
+      currentFxMode = null;
+      if (crowdFxInterval) {
+        clearInterval(crowdFxInterval);
+        crowdFxInterval = null;
+      }
+      if (crowdFxAnimId) {
+        cancelAnimationFrame(crowdFxAnimId);
+        crowdFxAnimId = null;
+      }
+      const overlay = document.getElementById('crowd-fx-overlay');
+      if (overlay) {
+        overlay.style.backgroundColor = '';
+        overlay.className = '';
+        overlay.classList.remove('active');
+      }
+      MobileBridge.setTorch(false);
+      MobileBridge.setKeepScreenOn(false);
+    }
+
+    function openCrowdFx() {
+      startCrowdFx('strobe', currentBpm || 128);
     }
 
     function closeCrowdFx() {
-      fxActive = false;
-      document.getElementById('crowd-fx-modal').classList.remove('active');
-      if (beatIntervalId) clearInterval(beatIntervalId);
-      MobileBridge.setTorch(false);
+      stopCrowdFx();
     }
 
     function toggleFxTorch() {
@@ -2428,24 +2918,29 @@
       document.getElementById('fx-haptic-btn').classList.toggle('active', fxHapticsEnabled);
     }
 
-    function startBeatSync() {
-      const beatMs = (60 / currentBpm) * 1000;
-      if (beatIntervalId) clearInterval(beatIntervalId);
-
-      beatIntervalId = setInterval(() => {
-        if (!fxActive) return;
-
-        const disc = document.getElementById('fx-beat-disc');
-        disc.style.transform = 'scale(1.25)';
-        setTimeout(() => disc.style.transform = 'scale(1)', 90);
-
-        if (fxTorchEnabled) {
-          MobileBridge.pulseStrobe(40);
-        }
-        if (fxHapticsEnabled) {
-          MobileBridge.triggerBassHaptic();
-        }
-      }, beatMs);
+    // Guest Notification Handler
+    function handleGuestNotification(payload) {
+      if (!payload) return;
+      console.log('[Guest Notify] Received:', payload);
+      let isForMe = false;
+      if (payload.reqId) {
+        isForMe = myTickets.some(t => t.id === payload.reqId);
+      }
+      if (!isForMe && payload.title) {
+        isForMe = myTickets.some(t => t.title && t.title.toLowerCase().trim() === payload.title.toLowerCase().trim());
+      }
+      if (isForMe) {
+        myTickets.forEach(t => {
+          if (t.id === payload.reqId || (t.title && payload.title && t.title.toLowerCase().trim() === payload.title.toLowerCase().trim())) {
+            t.status = payload.type === 'playing' ? 'מתנגן עכשיו 🎧' : 'עולה בקרוב 🔥';
+          }
+        });
+        saveMyTickets();
+        renderTickets();
+        MobileBridge.triggerBassHaptic();
+        MobileBridge.turnScreenOn();
+        showToast(payload.message || (payload.type === 'playing' ? '🎉 השיר שלך מתנגן עכשיו!' : '🔥 השיר שלך עולה בעוד 2 שירים!'));
+      }
     }
 
     // MQTT Setup
@@ -2454,6 +2949,7 @@
       if (!currentRoom) return;
 
       try {
+        const cleanRoom = (currentRoom || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
         const clientId = 'onyx_mob_' + deviceId;
         mqttClient = new Paho.MQTT.Client('broker.hivemq.com', 8884, clientId);
 
@@ -2464,10 +2960,16 @@
 
         mqttClient.onMessageArrived = function (message) {
           try {
+            const topic = message.destinationName || '';
             const payload = JSON.parse(message.payloadString);
-            if (message.destinationName && message.destinationName.startsWith('onyx/status/')) {
+
+            if (topic.includes('/fx')) {
+              handleCrowdFx(payload);
+            } else if (topic.includes('/notify')) {
+              handleGuestNotification(payload);
+            } else if (topic.startsWith('onyx/status/')) {
               applyRoomStatus(payload);
-            } else if (message.destinationName && message.destinationName.startsWith('onyx/dj_location/')) {
+            } else if (topic.startsWith('onyx/dj_location/')) {
               if (payload && !isNaN(payload.lat) && !isNaN(payload.lon)) {
                 targetLat = parseFloat(payload.lat);
                 targetLon = parseFloat(payload.lon);
@@ -2490,14 +2992,18 @@
           useSSL: true,
           timeout: 5,
           onSuccess: function () {
-            console.log('[MQTT] Connected to Broker for room:', currentRoom);
-            mqttClient.subscribe(`onyx/status/${currentRoom}`);
-            mqttClient.subscribe(`onyx/dj_location/${currentRoom}`);
-            mqttClient.subscribe(`onyx/stage/${currentRoom}`);
-            mqttClient.subscribe(`onyx/stage/${currentRoom}/crowd_fx`);
-            mqttClient.subscribe(`onyx/stage/${currentRoom}/device/${deviceId}`);
-            // Note: We DO NOT call showActiveState() here!
-            // Active state is only entered when the DJ station broadcasts active: true.
+            console.log('[MQTT] Connected to Broker for room:', cleanRoom);
+            mqttClient.subscribe(`onyx/status/${cleanRoom}`);
+            mqttClient.subscribe(`onyx/status/SHAZZ-SONIC`);
+            mqttClient.subscribe(`onyx/dj_location/${cleanRoom}`);
+            mqttClient.subscribe(`onyx/dj_location/SHAZZ-SONIC`);
+            mqttClient.subscribe(`onyx/stage/${cleanRoom}`);
+            mqttClient.subscribe(`onyx/stage/SHAZZ-SONIC`);
+            mqttClient.subscribe(`onyx/stage/${cleanRoom}/fx`);
+            mqttClient.subscribe(`onyx/stage/SHAZZ-SONIC/fx`);
+            mqttClient.subscribe(`onyx/requests/${cleanRoom}/notify`);
+            mqttClient.subscribe(`onyx/requests/SHAZZ-SONIC/notify`);
+            mqttClient.subscribe(`onyx/stage/${cleanRoom}/device/${deviceId}`);
           },
           onFailure: function (e) {
             console.warn('[MQTT] Connection failed, retrying...', e);
@@ -2524,14 +3030,13 @@
         showActiveState();
       }
 
-      // 1. Live Track & BPM broadcast from DJ
+      // Live Track & BPM broadcast from DJ
       if (data.trackTitle) {
         document.getElementById('current-track-name').innerText = data.trackTitle;
         if (data.bpm) {
           currentBpm = data.bpm;
           document.getElementById('current-bpm-display').innerText = `⚡ ${data.bpm} BPM • שיר פעיל בלייב`;
           document.getElementById('fx-bpm-counter').innerText = `${data.bpm} BPM`;
-          if (fxActive) startBeatSync();
         }
 
         // Update Dynamic Island on iOS
@@ -2544,14 +3049,7 @@
         });
       }
 
-      // 2. Crowd FX commands from DJ
-      if (data.action === 'crowd_fx_start') {
-        openCrowdFx();
-      } else if (data.action === 'crowd_fx_stop') {
-        closeCrowdFx();
-      }
-
-      // 3. Status updates for user's requested song
+      // Status updates for user's requested song
       if (data.ticketId && data.status) {
         let updated = false;
         myTickets.forEach(t => {
@@ -2571,6 +3069,7 @@
 
     function publishSongRequest(ticket, text) {
       if (!currentRoom) return;
+      const cleanRoom = (currentRoom || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
 
       const payloadObj = {
         id: ticket.id,
@@ -2591,16 +3090,16 @@
       if (mqttClient && mqttClient.isConnected()) {
         try {
           const message = new Paho.MQTT.Message(payloadStr);
-          message.destinationName = `onyx/requests/${currentRoom}`;
+          message.destinationName = `onyx/requests/${cleanRoom}`;
           mqttClient.send(message);
-          console.log('[MQTT] Published song request successfully to:', `onyx/requests/${currentRoom}`);
+          console.log('[MQTT] Published song request successfully to:', `onyx/requests/${cleanRoom}`);
         } catch (e) {
           console.warn('[MQTT] Publish error:', e);
         }
       }
 
       try {
-        fetch(`https://ntfy.sh/onyx_req_${currentRoom.toLowerCase()}`, {
+        fetch(`https://ntfy.sh/onyx_req_${cleanRoom.toLowerCase()}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: payloadStr
