@@ -1,0 +1,15 @@
+# Android build ignores
+.gradle/
+build/
+app/build/
+*.apk
+*.aab
+local.properties
+
+# iOS build ignores
+.DS_Store
+*.xcuserdata/
+xcuserdata/
+DerivedData/
+build/
+*.ipa

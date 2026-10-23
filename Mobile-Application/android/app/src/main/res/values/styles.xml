@@ -1,0 +1,17 @@
+<resources>
+    <!-- Base application theme -->
+    <style name="Theme.OnyxCompanion" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/onyx_bg</item>
+        <item name="android:statusBarColor">@color/onyx_bg</item>
+        <item name="android:navigationBarColor">@color/onyx_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="colorPrimary">@color/onyx_amber</item>
+        <item name="colorSecondary">@color/onyx_magenta</item>
+    </style>
+
+    <!-- Fullscreen Crowd FX theme -->
+    <style name="Theme.OnyxCompanion.Fullscreen" parent="Theme.OnyxCompanion">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+</resources>

@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Onyx DJ VIP</string>
+    <string name="channel_name_party">Onyx Party Live</string>
+    <string name="channel_desc_party">Real-time DJ alerts and stage light show synchronization</string>
+    <string name="service_title">🎧 מחובר לרחבת Onyx DJ</string>
+    <string name="service_desc">מוכן להפעלת תאורה, מופע סטרוב ובקשות שירים</string>
+</resources>
