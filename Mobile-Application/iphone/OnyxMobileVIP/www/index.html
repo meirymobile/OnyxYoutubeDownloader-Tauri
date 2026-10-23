@@ -1033,7 +1033,7 @@
     <div class="closed-container">
       <div class="status-badge">
         <span class="status-dot"></span>
-        The Set Has Finished
+        <span id="closed-badge-text">The Set Has Finished</span>
       </div>
 
       <h1 class="dj-names" id="closed-dj-title">DJ SHAZZ &amp; DJ SONIC</h1>
@@ -1117,9 +1117,10 @@
 
       <h1 class="active-dj-title">DJ Shazz &amp; DJ Sonic</h1>
       <div>
-        <div class="active-room-chip" id="active-room-badge">
+        <div class="active-room-chip" id="active-room-badge" onclick="disconnectRoom()" title="לחץ להתנתקות מהרחבה">
           <span class="pulse-dot"></span>
-          <span id="active-room-name">רחבה פעילה: WEDDING</span>
+          <span id="active-room-name">רחבה פעילה</span>
+          <span style="font-size: 11px; opacity: 0.8; margin-right: 5px;">✕ יציאה</span>
         </div>
       </div>
     </header>
@@ -1336,15 +1337,24 @@
      * Initializes App: If QR was scanned (URL parameter ?room= or deep link),
      * connects to that room. Otherwise shows Closed State waiting for event QR.
      */
+    var isRoomActive = false;
+    var statusPollInterval = null;
+
     function initAppFlow() {
+      // Clear legacy storage to guarantee the app NEVER connects to past rooms without a scan
+      localStorage.removeItem('onyx_active_room');
+      currentRoom = null;
+      isRoomActive = false;
+
       const params = new URLSearchParams(window.location.search);
-      const roomParam = params.get('room') || localStorage.getItem('onyx_active_room');
+      const roomParam = params.get('room');
+      const isExplicitLive = params.get('live') === 'true';
 
       if (roomParam) {
-        connectToRoom(roomParam);
+        connectToRoom(roomParam, isExplicitLive);
       } else {
         showClosedState({
-          reason: 'closed',
+          badge: 'The Set Has Finished',
           main: 'המוזיקה נחה, אבל הקצב לא מפסיק... 💿',
           sub: 'תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!'
         });
@@ -1356,22 +1366,115 @@
       document.getElementById('state-active').style.display = 'none';
       if (info && info.main) document.getElementById('closed-main-msg').innerText = info.main;
       if (info && info.sub) document.getElementById('closed-sub-msg').innerText = info.sub;
+      if (info && info.badge) {
+        const badgeElem = document.getElementById('closed-badge-text');
+        if (badgeElem) badgeElem.innerText = info.badge;
+      }
     }
 
-    function showActiveState() {
+    function showActiveState(statusInfo) {
       document.getElementById('state-closed').style.display = 'none';
       document.getElementById('state-active').style.display = 'flex';
-      document.getElementById('active-room-name').innerText = 'רחבה פעילה: ' + currentRoom;
+      const djTitle = (statusInfo && statusInfo.djNames) ? statusInfo.djNames : 'DJ Shazz & DJ Sonic';
+      const titleElem = document.querySelector('.active-dj-title');
+      if (titleElem) titleElem.innerText = djTitle;
+      document.getElementById('active-room-name').innerText = 'רחבה פעילה: ' + (currentRoom || '');
       loadSavedTickets();
       renderTickets();
     }
 
-    function connectToRoom(room) {
-      currentRoom = (room || '').trim().toUpperCase();
+    function disconnectRoom() {
+      if (statusPollInterval) {
+        clearInterval(statusPollInterval);
+        statusPollInterval = null;
+      }
+      if (mqttClient) {
+        try {
+          mqttClient.disconnect();
+        } catch (_) {}
+        mqttClient = null;
+      }
+      currentRoom = null;
+      isRoomActive = false;
+      localStorage.removeItem('onyx_active_room');
+      showClosedState({
+        badge: 'The Set Has Finished',
+        main: 'התנתקת מהאירוע 💿',
+        sub: 'עמדת בקשות האורחים סגורה. לסריקת קוד QR של אירוע פעיל, לחץ על הכפתור למטה.'
+      });
+    }
+
+    function connectToRoom(room, isExplicitLive) {
+      currentRoom = (room || '').trim().toUpperCase().replace(/[^A-Z0-9_\-]/g, '');
       if (!currentRoom) return;
 
-      localStorage.setItem('onyx_active_room', currentRoom);
+      console.log('[Room] Connecting to room:', currentRoom, 'isExplicitLive:', isExplicitLive);
+
+      // Start by listening via MQTT and polling via HTTPS
       initMqtt();
+      pollRoomStatus();
+
+      if (statusPollInterval) clearInterval(statusPollInterval);
+      statusPollInterval = setInterval(pollRoomStatus, 3000);
+
+      if (isExplicitLive) {
+        isRoomActive = true;
+        showActiveState();
+      } else {
+        // App starts strictly in closed state until DJ station broadcasts active: true
+        showClosedState({
+          badge: 'Checking Station...',
+          main: `בודק חיבור לעמדת DJ (${currentRoom})... ⏳`,
+          sub: 'האפליקציה ממתינה לשידור חי מעמדת ה-DJ. ברגע שה-DJ יפתח את העמדה, תועבר אוטומטית לרחבה!'
+        });
+      }
+    }
+
+    async function pollRoomStatus() {
+      if (!currentRoom) return;
+      try {
+        const res = await fetch(`https://ntfy.sh/onyx_status_${currentRoom.toLowerCase()}/json?poll=1`, {
+          cache: 'no-store',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (res.ok) {
+          const text = await res.text();
+          const lines = text.trim().split('\n');
+          for (let i = lines.length - 1; i >= 0; i--) {
+            try {
+              const item = JSON.parse(lines[i]);
+              if (item.event === 'message') {
+                const payload = typeof item.message === 'string' ? JSON.parse(item.message) : item.message;
+                if (payload && typeof payload.active === 'boolean') {
+                  applyRoomStatus(payload);
+                  return;
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (e) {
+        console.warn('[Status Poll] Error:', e);
+      }
+    }
+
+    function applyRoomStatus(statusInfo) {
+      if (!statusInfo || typeof statusInfo.active !== 'boolean') return;
+      console.log('[Room Status] Received:', statusInfo);
+
+      if (statusInfo.active === true) {
+        if (!isRoomActive) {
+          isRoomActive = true;
+          showActiveState(statusInfo);
+        }
+      } else {
+        isRoomActive = false;
+        showClosedState({
+          badge: 'The Set Has Finished',
+          main: 'עמדת ה-DJ סגורה כרגע ⏸️',
+          sub: (statusInfo.djNames ? statusInfo.djNames + ': ' : '') + 'העמדה סגורה כרגע לקבלת בקשות. נתראה בסט הבא!'
+        });
+      }
     }
 
     // In-App QR Scanner
@@ -1432,9 +1535,11 @@
     function handleScannedQr(scannedText) {
       closeQrScanner();
       let room = scannedText.trim();
+      let isLive = false;
       try {
         if (room.includes('?')) {
           const url = new URL(room);
+          isLive = url.searchParams.get('live') === 'true';
           room = url.searchParams.get('room') || room;
         }
       } catch (_) {}
@@ -1442,7 +1547,9 @@
       room = room.replace(/.*room=/, '').replace(/[^a-zA-Z0-9_\-]/g, '').toUpperCase();
       if (room) {
         MobileBridge.triggerBassHaptic();
-        connectToRoom(room);
+        connectToRoom(room, isLive);
+      } else {
+        alert('לא זוהה קוד אירוע תקין בברקוד.');
       }
     }
 
@@ -1807,13 +1914,17 @@
 
         mqttClient.onConnectionLost = function (responseObject) {
           console.warn('[MQTT] Connection lost:', responseObject.errorMessage);
-          setTimeout(initMqtt, 3000);
+          if (currentRoom) setTimeout(initMqtt, 3000);
         };
 
         mqttClient.onMessageArrived = function (message) {
           try {
             const payload = JSON.parse(message.payloadString);
-            handleMqttMessage(payload);
+            if (message.destinationName && message.destinationName.startsWith('onyx/status/')) {
+              applyRoomStatus(payload);
+            } else {
+              handleMqttMessage(payload);
+            }
           } catch (e) {
             console.log('[MQTT] Raw message:', message.payloadString);
           }
@@ -1823,17 +1934,17 @@
           useSSL: true,
           timeout: 5,
           onSuccess: function () {
-            console.log('[MQTT] Connected to HiveMQ Broker for room:', currentRoom);
+            console.log('[MQTT] Connected to Broker for room:', currentRoom);
+            mqttClient.subscribe(`onyx/status/${currentRoom}`);
             mqttClient.subscribe(`onyx/stage/${currentRoom}`);
             mqttClient.subscribe(`onyx/stage/${currentRoom}/crowd_fx`);
             mqttClient.subscribe(`onyx/stage/${currentRoom}/device/${deviceId}`);
-
-            // Transition to active state now that room is connected
-            showActiveState();
+            // Note: We DO NOT call showActiveState() here!
+            // Active state is only entered when the DJ station broadcasts active: true.
           },
           onFailure: function (e) {
             console.warn('[MQTT] Connection failed, retrying...', e);
-            setTimeout(initMqtt, 5000);
+            if (currentRoom) setTimeout(initMqtt, 5000);
           }
         });
       } catch (e) {
@@ -1843,13 +1954,16 @@
 
     function handleMqttMessage(data) {
       // Station closed / open state toggle from DJ
-      if (data.action === 'room_closed' || data.isOpen === false) {
+      if (data.action === 'room_closed' || data.isOpen === false || data.active === false) {
+        isRoomActive = false;
         showClosedState({
+          badge: 'The Set Has Finished',
           main: 'המוזיקה נחה, אבל הקצב לא מפסיק... 💿',
           sub: 'תודה ענקית על ערב מטורף ומלא אנרגיה! עמדת בקשות האורחים (Guest Requests) סגורה. נתראה בסט הבא!'
         });
         return;
-      } else if (data.isOpen === true && document.getElementById('state-closed').style.display !== 'none') {
+      } else if ((data.isOpen === true || data.active === true) && !isRoomActive) {
+        isRoomActive = true;
         showActiveState();
       }
 
