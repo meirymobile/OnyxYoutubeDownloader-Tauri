@@ -101,6 +101,9 @@ class MainActivity : AppCompatActivity() {
         // Start Foreground Service to maintain connectivity
         OnyxForegroundService.start(this)
 
+        // Auto-subscribe to Firebase Cloud Messaging announcements
+        OnyxFirebaseMessagingService.subscribeToTopics()
+
         // Load bundled VIP application
         val initialUrl = parseDeepLinkOrLocalAsset(intent)
         webView.loadUrl(initialUrl)
@@ -109,6 +112,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         configureWindowAwakeProperties()
+        OnyxFirebaseMessagingService.subscribeToTopics()
         // Re-check permissions and notify WebView on every resume
         notifyPermissionsUpdatedToWeb()
     }

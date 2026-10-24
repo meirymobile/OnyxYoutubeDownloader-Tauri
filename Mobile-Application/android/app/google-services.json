@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "102420261111",
+    "project_id": "onyx-dj-vip",
+    "storage_bucket": "onyx-dj-vip.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:102420261111:android:a1b2c3d4e5f60718293a",
+        "android_client_info": {
+          "package_name": "com.onyx.dj.companion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyOnyxDjVipKeyForFirebaseMessaging2026"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
