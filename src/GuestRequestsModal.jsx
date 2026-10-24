@@ -8,7 +8,7 @@ import {
   QrCode, Maximize2, Minimize2, Settings2, User, MessageSquareHeart, Monitor,
   MapPin, Navigation, Compass, Smartphone, Search, Building2, CheckCircle,
   Tv, Cast, Wifi, Loader2, Sparkles, Camera, Image as ImageIcon,
-  Eye, Trash2, ShieldAlert, Zap, Share2
+  Eye, Trash2, ShieldAlert, Zap, Share2, Calendar, Mail, Send, Upload
 } from 'lucide-react';
 
 // Popular Israeli event venues & wedding halls for 1-click DJ GPS calibration
@@ -188,8 +188,126 @@ export default function GuestRequestsModal({
   const [activeCrowdFx, setActiveCrowdFx] = useState(null); // 'strobe' | 'candle' | 'glow' | 'white' | null
   const [crowdBpm, setCrowdBpm] = useState(128);
 
+  // DJ Broadcast / Marketing Event Announcement State
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState('🔥 מסיבת Onyx DJ VIP הבאה יוצאת לדרך!');
+  const [broadcastMessage, setBroadcastMessage] = useState('חברים יקרים, שמחים להזמין אתכם לערב בלתי נשכח! כל הפרטים, התאריך והמיקום בהזמנה המצורפת.');
+  const [broadcastImage, setBroadcastImage] = useState(null);
+  const [broadcastEventDate, setBroadcastEventDate] = useState('');
+  const [broadcastEventTime, setBroadcastEventTime] = useState('22:00');
+  const [broadcastLocation, setBroadcastLocation] = useState('מועדון האומן 17, תל אביב');
+  const [broadcastEmail, setBroadcastEmail] = useState('dj@onyx.vip');
+  const [broadcastTarget, setBroadcastTarget] = useState('all'); // 'all' | 'room'
+  const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+  const [broadcastStatusMessage, setBroadcastStatusMessage] = useState(null);
+
+  const handleBroadcastImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('גודל הקובץ גדול מ-5MB. אנא בחר תמונה קלה יותר.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setBroadcastImage(event.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const hiveClientRef = useRef(null);
   const emqxClientRef = useRef(null);
+
+  const sendDjBroadcast = async () => {
+    if (!broadcastTitle.trim() && !broadcastMessage.trim()) {
+      alert('נא להזין כותרת או תוכן להודעה');
+      return;
+    }
+    setIsSendingBroadcast(true);
+    setBroadcastStatusMessage(null);
+
+    const cleanRoom = (roomCode || 'SHAZZ-SONIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '') || 'SHAZZ-SONIC';
+    const payload = {
+      type: 'dj_announcement',
+      id: 'ann_' + Date.now(),
+      title: broadcastTitle.trim() || '📢 הודעה מיוחדת מה-DJ!',
+      message: broadcastMessage.trim(),
+      djName: djNames || 'DJ SHAZZ & DJ SONIC',
+      image: broadcastImage,
+      eventDate: broadcastEventDate,
+      eventTime: broadcastEventTime,
+      location: broadcastLocation.trim(),
+      contactEmail: broadcastEmail.trim(),
+      timestamp: Date.now()
+    };
+    const payloadStr = JSON.stringify(payload);
+
+    // 1. MQTT Broadcast
+    const sendToMqtt = (client, name) => {
+      try {
+        if (client && client.isConnected()) {
+          const MqttMessage = Paho?.Message || (Paho?.default && Paho.default.Message) || (window.Paho && window.Paho.Message);
+          if (MqttMessage) {
+            // Room message
+            const msg1 = new MqttMessage(payloadStr);
+            msg1.destinationName = `onyx/stage/${cleanRoom}/message`;
+            msg1.qos = 0;
+            msg1.retained = true;
+            client.send(msg1);
+
+            // Global broadcast for any user opening app anytime
+            if (broadcastTarget === 'all') {
+              const msg2 = new MqttMessage(payloadStr);
+              msg2.destinationName = 'onyx/broadcast/all';
+              msg2.qos = 0;
+              msg2.retained = true;
+              client.send(msg2);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[Onyx DJ Broadcast] MQTT error on ${name}:`, err);
+      }
+    };
+    sendToMqtt(hiveClientRef.current, 'HiveMQ');
+    sendToMqtt(emqxClientRef.current, 'EMQX');
+
+    // 2. Dual-Engine HTTPS Broadcast via ntfy (Port 443 - Push Notification to notification bar)
+    try {
+      const ntfyHeaders = {
+        'Title': payload.title,
+        'Priority': 'urgent',
+        'Tags': 'tada,speaker,party_popper'
+      };
+      
+      const endpoints = [
+        `https://ntfy.sh/onyx_msg_${cleanRoom.toLowerCase()}`,
+        'https://ntfy.sh/onyx_broadcast_all'
+      ];
+
+      await Promise.allSettled(endpoints.map(url => 
+        fetch(url, {
+          method: 'POST',
+          headers: ntfyHeaders,
+          body: payloadStr
+        })
+      ));
+    } catch (e) {
+      console.warn('[Onyx DJ Broadcast] NTFY error:', e);
+    }
+
+    try {
+      localStorage.setItem('onyx_dj_last_broadcast', payloadStr);
+    } catch (_) {}
+
+    playChime();
+    setIsSendingBroadcast(false);
+    setBroadcastStatusMessage('ההודעה שודרה בהצלחה לכל המכשירים! 🚀');
+    setTimeout(() => {
+      setBroadcastStatusMessage(null);
+      setIsBroadcastModalOpen(false);
+    }, 2000);
+  };
 
   // Feature 3: Send Live Notification & Haptic Vibration to Guest Phone ("השיר עולה בעוד 2 שירים / מתנגן עכשיו")
   const sendGuestNotification = (item, type = 'up_next') => {
@@ -2048,6 +2166,206 @@ export default function GuestRequestsModal({
         </div>
       )}
 
+      {/* DJ Broadcast & Event Invitation Modal */}
+      {isBroadcastModalOpen && (
+        <div className="fixed inset-0 z-[260] bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 select-none animate-fadeIn" dir="rtl">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl max-w-xl w-full p-4 sm:p-6 space-y-4 shadow-[0_0_60px_rgba(245,158,11,0.25)] relative text-right max-h-[92vh] overflow-y-auto">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.25)]">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">שידור הודעה והזמנה לאירוע 📱📢</h3>
+                  <p className="text-[11px] text-slate-400">ההודעה תשלח כהתראה למכשירי האורחים, תציג את הפלאייר ותאפשר שמירה ביומן</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBroadcastModalOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-3.5 text-xs">
+              {/* Title */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  כותרת ההודעה / שם האירוע:
+                </label>
+                <input
+                  type="text"
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  placeholder="לדוגמה: פותחים עונה! מסיבת קיץ מטורפת עם DJ SHAZZ"
+                  className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2 text-white font-medium outline-none transition-all"
+                />
+              </div>
+
+              {/* Message */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  תוכן ההודעה / פרטים על האירוע:
+                </label>
+                <textarea
+                  rows={3}
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  placeholder="פרטו על המסיבה, קוד לבוש, שעות פתיחת שערים..."
+                  className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2 text-white font-medium outline-none resize-none transition-all"
+                />
+              </div>
+
+              {/* Flyer Image Upload */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5 flex items-center justify-between">
+                  <span>צירוף פלאייר / הזמנה מעוצבת:</span>
+                  {broadcastImage && (
+                    <button 
+                      type="button"
+                      onClick={() => setBroadcastImage(null)}
+                      className="text-rose-400 hover:text-rose-300 text-[11px] flex items-center gap-1 font-bold"
+                    >
+                      <Trash2 className="w-3 h-3" /> הסר תמונה
+                    </button>
+                  )}
+                </label>
+                {broadcastImage ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-amber-500/40 bg-slate-950 flex items-center justify-center p-2 max-h-48">
+                    <img src={broadcastImage} alt="Flyer Preview" className="max-h-44 object-contain rounded-xl" />
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-slate-700 hover:border-amber-500/50 rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-slate-950/50 hover:bg-slate-950 transition-all text-slate-400 hover:text-amber-300">
+                    <ImageIcon className="w-6 h-6" />
+                    <span className="font-bold">לחץ להעלאת עיצוב ההזמנה (JPG, PNG)</span>
+                    <span className="text-[10px] text-slate-500">התמונה תופיע ישירות בחלון ההודעה של האפליקציה</span>
+                    <input type="file" accept="image/*" onChange={handleBroadcastImageUpload} className="hidden" />
+                  </label>
+                )}
+              </div>
+
+              {/* Date & Time */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">תאריך האירוע:</label>
+                  <input
+                    type="date"
+                    value={broadcastEventDate}
+                    onChange={(e) => setBroadcastEventDate(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-medium outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">שעת התחלה:</label>
+                  <input
+                    type="time"
+                    value={broadcastEventTime}
+                    onChange={(e) => setBroadcastEventTime(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-medium outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Venue / Location & Contact Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">מיקום האירוע (אולם / מועדון):</label>
+                  <input
+                    type="text"
+                    value={broadcastLocation}
+                    onChange={(e) => setBroadcastLocation(e.target.value)}
+                    placeholder="לדוגמה: מועדון האומן 17, תל אביב"
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-medium outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">אימייל לאישור הגעה / יצירת קשר:</label>
+                  <input
+                    type="email"
+                    value={broadcastEmail}
+                    onChange={(e) => setBroadcastEmail(e.target.value)}
+                    placeholder="dj@onyx.vip"
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-medium outline-none text-left"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              {/* Target Selection */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">יעד השידור:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBroadcastTarget('all')}
+                    className={`py-2 px-3 rounded-xl border font-bold text-center transition-all ${
+                      broadcastTarget === 'all'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    🌐 לכל משתמשי האפליקציה (גם בימים רגילים)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBroadcastTarget('room')}
+                    className={`py-2 px-3 rounded-xl border font-bold text-center transition-all ${
+                      broadcastTarget === 'room'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    📍 למשתתפי החדר הנוכחי בלבד
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Status Toast */}
+            {broadcastStatusMessage && (
+              <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-center animate-fadeIn text-xs">
+                {broadcastStatusMessage}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setIsBroadcastModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
+              >
+                ביטול
+              </button>
+
+              <button
+                type="button"
+                onClick={sendDjBroadcast}
+                disabled={isSendingBroadcast}
+                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:from-amber-400 hover:to-purple-500 text-white rounded-xl text-xs font-black transition-all shadow-[0_0_20px_rgba(245,158,11,0.4)] flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSendingBroadcast ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>משדר לכל המכשירים...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>שדר הודעה והזמנה לכולם 🚀</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stage Screen Preview & Moderation Modal */}
       {previewItem && (
         <div className="fixed inset-0 z-[250] bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-fadeIn" dir="rtl">
@@ -2443,6 +2761,16 @@ export default function GuestRequestsModal({
             >
               <Settings2 className="w-3.5 h-3.5" />
               <span>הגדרות</span>
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => setIsBroadcastModalOpen(true)}
+              className="px-3 py-1 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:from-amber-400 hover:to-purple-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.35)] border border-amber-300/40"
+              title="שליחת הודעה, פלאייר והזמנה לאירוע לכל המכשירים"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-200 animate-pulse" />
+              <span>📢 הודעה / הזמנה לאירוע</span>
             </button>
           </div>
 

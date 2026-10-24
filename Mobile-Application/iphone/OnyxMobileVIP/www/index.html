@@ -1353,6 +1353,8 @@
       background: #251e33;
       color: #64748b;
       box-shadow: none;
+      cursor: not-allowed;
+    }
     /* ======================================================== */
     /* VIP PARTY PERMISSIONS ONBOARDING CARD                     */
     /* ======================================================== */
@@ -1523,6 +1525,46 @@
       font-weight: 800;
       cursor: pointer;
       box-shadow: 0 4px 18px rgba(236, 72, 153, 0.4);
+    }
+    .announce-cal-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #000;
+      border: none;
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .announce-cal-btn:active {
+      transform: scale(0.98);
+    }
+    .announce-email-btn {
+      width: 100%;
+      background: rgba(147, 51, 234, 0.15);
+      color: #c084fc;
+      border: 1.5px solid #a855f7;
+      border-radius: 14px;
+      padding: 11px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .announce-email-btn:active {
+      background: rgba(147, 51, 234, 0.3);
+      transform: scale(0.98);
     }
 
     .closed-announcement-card {
@@ -1967,11 +2009,40 @@
   <div id="dj-announcement-modal" class="modal-overlay">
     <div class="announce-card">
       <div class="announce-icon-wrap">📢</div>
-      <div class="announce-tag">הודעה מיוחדת מהדיג'יי</div>
+      <div class="announce-tag" id="dj-announce-tag">הודעה מיוחדת מהדיג'יי</div>
+
+      <!-- Event Flyer / Attached Invitation Banner -->
+      <div id="dj-announce-img-container" style="display: none; margin-bottom: 14px;">
+        <img id="dj-announce-image" src="" alt="Party Flyer" style="width: 100%; max-height: 240px; object-fit: contain; border-radius: 14px; border: 1.5px solid rgba(245, 158, 11, 0.4); box-shadow: 0 4px 20px rgba(0,0,0,0.6);" />
+      </div>
+
       <h2 id="dj-announce-title" class="announce-title">התכוננו לסט הבא!</h2>
       <div id="dj-announce-body" class="announce-body"></div>
+
+      <!-- Event Date, Time & Venue Bar -->
+      <div id="dj-announce-event-box" style="display: none; margin-bottom: 14px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 10px; text-align: right; font-size: 13px;">
+        <div id="dj-announce-datetime-row" style="display: flex; align-items: center; gap: 8px; color: #fbbf24; font-weight: 700; margin-bottom: 4px;">
+          <span>📅</span>
+          <span id="dj-announce-datetime"></span>
+        </div>
+        <div id="dj-announce-location-row" style="display: none; align-items: center; gap: 8px; color: #e2e8f0; font-size: 12px;">
+          <span>📍</span>
+          <span id="dj-announce-location"></span>
+        </div>
+      </div>
+
       <div id="dj-announce-meta" class="announce-meta">DJ SHAZZ &amp; DJ SONIC</div>
-      <button class="announce-btn" onclick="closeDjAnnouncement()">הבנתי, תודה! 🎧</button>
+
+      <!-- Interactive Actions -->
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button id="dj-announce-cal-btn" class="announce-cal-btn" style="display: none;" onclick="addCurrentAnnouncementToCalendar()">
+          <span>📅 הוסף ליומן האירועים</span>
+        </button>
+        <button id="dj-announce-email-btn" class="announce-email-btn" style="display: none;" onclick="emailDjForAnnouncement()">
+          <span>✉️ אישור הגעה / צור קשר</span>
+        </button>
+        <button class="announce-btn" onclick="closeDjAnnouncement()">הבנתי, תודה! 🎧</button>
+      </div>
     </div>
   </div>
 
@@ -2235,15 +2306,19 @@
       }
     }
 
+    var currentAnnouncementPayload = null;
+
     function handleDjAnnouncement(payload) {
       if (!payload) return;
       console.log('[DJ Announcement] Received live broadcast:', payload);
+      currentAnnouncementPayload = payload;
       try {
         localStorage.setItem('onyx_last_announcement', JSON.stringify(payload));
       } catch (_) {}
 
-      // 1. Wake screen from sleep!
+      // 1. Wake screen from sleep & bring app to front!
       MobileBridge.turnScreenOn();
+      MobileBridge.bringToFront();
 
       // 2. Tactical sub-bass haptic kick
       MobileBridge.triggerBassHaptic();
@@ -2258,16 +2333,95 @@
       const titleElem = document.getElementById('dj-announce-title');
       const bodyElem = document.getElementById('dj-announce-body');
       const metaElem = document.getElementById('dj-announce-meta');
+      const imgContainer = document.getElementById('dj-announce-img-container');
+      const imgElem = document.getElementById('dj-announce-image');
+      const eventBox = document.getElementById('dj-announce-event-box');
+      const datetimeRow = document.getElementById('dj-announce-datetime-row');
+      const datetimeElem = document.getElementById('dj-announce-datetime');
+      const locRow = document.getElementById('dj-announce-location-row');
+      const locElem = document.getElementById('dj-announce-location');
+      const calBtn = document.getElementById('dj-announce-cal-btn');
+      const emailBtn = document.getElementById('dj-announce-email-btn');
 
       if (titleElem) titleElem.innerText = title;
       if (bodyElem) bodyElem.innerText = msg;
       if (metaElem) {
-        metaElem.innerText = `${payload.djName || 'DJ SHAZZ & DJ SONIC'} ${payload.date ? '• ' + payload.date : ''}`;
+        metaElem.innerText = `${payload.djName || 'DJ SHAZZ & DJ SONIC'}`;
       }
+
+      // Flyer / Image handling
+      if (payload.image && imgContainer && imgElem) {
+        imgElem.src = payload.image;
+        imgContainer.style.display = 'block';
+      } else if (imgContainer) {
+        imgContainer.style.display = 'none';
+      }
+
+      // Event Date, Time & Venue
+      const dateVal = payload.eventDate || payload.date;
+      const timeVal = payload.eventTime || payload.time || '';
+      const hasDate = !!dateVal;
+      const hasLocation = !!payload.location;
+
+      if ((hasDate || hasLocation) && eventBox) {
+        eventBox.style.display = 'block';
+        if (hasDate && datetimeElem) {
+          datetimeRow.style.display = 'flex';
+          let formattedDate = dateVal;
+          try {
+            const d = new Date(dateVal + (timeVal ? 'T' + timeVal : ''));
+            if (!isNaN(d.getTime())) {
+              formattedDate = d.toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+              if (timeVal) formattedDate += ` • שעה: ${timeVal}`;
+            }
+          } catch (_) {}
+          datetimeElem.innerText = formattedDate;
+        } else if (datetimeRow) {
+          datetimeRow.style.display = 'none';
+        }
+
+        if (hasLocation && locElem) {
+          locRow.style.display = 'flex';
+          locElem.innerText = payload.location;
+        } else if (locRow) {
+          locRow.style.display = 'none';
+        }
+      } else if (eventBox) {
+        eventBox.style.display = 'none';
+      }
+
+      if (calBtn) calBtn.style.display = hasDate ? 'flex' : 'none';
+      if (emailBtn) emailBtn.style.display = payload.contactEmail ? 'flex' : 'none';
+
       if (modal) modal.classList.add('active');
 
       // 5. Update Closed State card
       updateClosedAnnouncement(payload);
+    }
+    window.handleDjAnnouncement = handleDjAnnouncement;
+
+    function addCurrentAnnouncementToCalendar() {
+      if (!currentAnnouncementPayload) return;
+      const p = currentAnnouncementPayload;
+      const title = p.title || 'מסיבת Onyx DJ VIP';
+      const desc = (p.message || p.text || '') + (p.contactEmail ? `\nאימייל לפרטים: ${p.contactEmail}` : '');
+      const location = p.location || 'עמדת DJ';
+      MobileBridge.addToCalendar({
+        title: title,
+        description: desc,
+        location: location,
+        dateStr: p.eventDate || p.date,
+        timeStr: p.eventTime || p.time
+      });
+    }
+
+    function emailDjForAnnouncement() {
+      if (!currentAnnouncementPayload || !currentAnnouncementPayload.contactEmail) return;
+      const p = currentAnnouncementPayload;
+      const email = p.contactEmail;
+      const subject = `אישור הגעה / שאלה: ${p.title || 'אירוע DJ'}`;
+      const body = `שלום, ראיתי את ההזמנה באפליקציית Onyx DJ VIP.\nאשמח לקבל פרטים / לאשר הגעה!\nשם: \nטלפון: `;
+      MobileBridge.openEmailClient(email, subject, body);
     }
 
     function closeDjAnnouncement() {
@@ -2285,6 +2439,7 @@
         }
       }
       if (payload && (payload.title || payload.message || payload.text)) {
+        currentAnnouncementPayload = payload;
         const titleElem = document.getElementById('closed-announce-title');
         const textElem = document.getElementById('closed-announce-text');
         const timeElem = document.getElementById('closed-announce-time');
@@ -2292,9 +2447,12 @@
         if (titleElem) titleElem.innerText = payload.title || 'הודעה מהדיג\'יי';
         if (textElem) textElem.innerText = payload.message || payload.text || '';
         if (timeElem) {
-          timeElem.innerText = payload.date ? `תאריך אירוע: ${payload.date}` : (payload.timestamp ? new Date(payload.timestamp).toLocaleDateString('he-IL') : '');
+          const dateVal = payload.eventDate || payload.date;
+          timeElem.innerText = dateVal ? `תאריך אירוע: ${dateVal}` : (payload.timestamp ? new Date(payload.timestamp).toLocaleDateString('he-IL') : '');
         }
         card.style.display = 'block';
+        card.onclick = () => handleDjAnnouncement(payload);
+        card.style.cursor = 'pointer';
       } else {
         card.style.display = 'none';
       }
@@ -3181,6 +3339,9 @@
       if (payload.mode === 'off' || !payload.mode) {
         stopCrowdFx();
       } else {
+        MobileBridge.turnScreenOn();
+        MobileBridge.bringToFront();
+        MobileBridge.setKeepScreenOn(true);
         startCrowdFx(payload.mode, payload.bpm, payload.color, payload.title);
       }
     }
@@ -3188,9 +3349,11 @@
     function startCrowdFx(mode, bpm = 128, color = '#f59e0b', title = '') {
       currentFxMode = mode;
       fxActive = true;
+      currentBpm = bpm || 128;
       MobileBridge.enterFullScreen();
       MobileBridge.setKeepScreenOn(true);
       MobileBridge.turnScreenOn();
+      MobileBridge.bringToFront();
 
       const overlay = document.getElementById('crowd-fx-overlay');
       const candleAura = document.getElementById('candle-aura');
@@ -3240,6 +3403,10 @@
                 : (isRainbow ? 'כל מכשיר מהבהב בצבע חי משלו!' : 'הרימו את הטלפון גבוה לרחבה!'));
         }
 
+        if (fxTorchEnabled) {
+          MobileBridge.startNativeStrobe(bpm || 128);
+        }
+
         const beatMs = Math.max(50, Math.round(60000 / (bpm || 128)));
         isStrobePhase = false;
         const RAINBOW_PALETTE = [
@@ -3269,7 +3436,6 @@
                   overlay.style.backgroundColor = '';
                   overlay.classList.add('fx-mode-strobe-on');
                 }
-                MobileBridge.pulseStrobe(35);
                 MobileBridge.triggerBassHaptic();
               } else {
                 overlay.classList.remove('fx-mode-strobe-on', 'fx-mode-strobe-rainbow-on');
@@ -3294,7 +3460,6 @@
                 overlay.style.backgroundColor = '';
                 overlay.classList.add('fx-mode-strobe-on');
               }
-              MobileBridge.pulseStrobe(35);
               MobileBridge.triggerBassHaptic();
             } else {
               overlay.classList.remove('fx-mode-strobe-on', 'fx-mode-strobe-rainbow-on');
@@ -3304,6 +3469,7 @@
           }, flashRateMs);
         }
       } else if (mode === 'candle') {
+        MobileBridge.stopNativeStrobe();
         overlay.classList.add('fx-mode-candle');
         if (candleAura) candleAura.style.display = 'block';
         if (badgeText) badgeText.innerText = '✨ סלואו קסום ✨';
@@ -3311,12 +3477,14 @@
         if (subTitle) subTitle.innerText = 'הרימו את הטלפון והאירו את הרגע המרגש...';
         MobileBridge.setTorch(false);
       } else if (mode === 'glow') {
+        MobileBridge.stopNativeStrobe();
         overlay.classList.add('fx-mode-glow');
         if (badgeText) badgeText.innerText = '🟣 RAVE NEON WAVE 🟣';
         if (mainTitle) mainTitle.innerText = title || 'גל ניאון פסיכדלי 🟣';
         if (subTitle) subTitle.innerText = 'רוקדים יחד באותה אנרגיה ברחבה!';
         MobileBridge.setTorch(false);
       } else if (mode === 'white') {
+        MobileBridge.stopNativeStrobe();
         overlay.classList.add('fx-mode-white');
         if (badgeText) badgeText.innerText = '🤍 CROWD TORCH 🤍';
         if (mainTitle) mainTitle.innerText = title || 'האירו את הרחבה! 🤍';
@@ -3342,6 +3510,7 @@
         overlay.className = '';
         overlay.classList.remove('active');
       }
+      MobileBridge.stopNativeStrobe();
       MobileBridge.exitFullScreen();
       MobileBridge.setTorch(false);
       MobileBridge.setKeepScreenOn(false);
@@ -3358,7 +3527,12 @@
     function toggleFxTorch() {
       fxTorchEnabled = !fxTorchEnabled;
       document.getElementById('fx-torch-btn').classList.toggle('active', fxTorchEnabled);
-      if (!fxTorchEnabled) MobileBridge.setTorch(false);
+      if (!fxTorchEnabled) {
+        MobileBridge.stopNativeStrobe();
+        MobileBridge.setTorch(false);
+      } else if (currentFxMode && currentFxMode.startsWith('strobe')) {
+        MobileBridge.startNativeStrobe(currentBpm || 128);
+      }
     }
 
     function toggleFxHaptics() {

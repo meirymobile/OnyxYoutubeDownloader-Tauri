@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.CalendarContract
 import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
@@ -37,6 +38,21 @@ class OnyxNativeBridge(
     @JavascriptInterface
     fun pulseStrobe(durationMs: Long) {
         torchManager.pulseStrobe(durationMs)
+    }
+
+    @JavascriptInterface
+    fun startNativeStrobe(bpm: Int) {
+        torchManager.startNativeStrobe(bpm)
+    }
+
+    @JavascriptInterface
+    fun stopNativeStrobe() {
+        torchManager.stopNativeStrobe()
+    }
+
+    @JavascriptInterface
+    fun bringToFront() {
+        activity.bringToFront()
     }
 
     @JavascriptInterface
@@ -72,6 +88,41 @@ class OnyxNativeBridge(
     @JavascriptInterface
     fun showNotification(title: String, message: String) {
         activity.postSystemNotification(title, message)
+    }
+
+    @JavascriptInterface
+    fun addToCalendar(title: String, description: String, location: String, startTimestamp: Long, endTimestamp: Long) {
+        activity.runOnUiThread {
+            try {
+                val intent = Intent(Intent.ACTION_INSERT).apply {
+                    data = CalendarContract.Events.CONTENT_URI
+                    putExtra(CalendarContract.Events.TITLE, title)
+                    putExtra(CalendarContract.Events.DESCRIPTION, description)
+                    putExtra(CalendarContract.Events.EVENT_LOCATION, location)
+                    if (startTimestamp > 0) putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, startTimestamp)
+                    if (endTimestamp > 0) putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endTimestamp)
+                }
+                activity.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to launch calendar intent: ${e.message}")
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun openEmailClient(email: String, subject: String, body: String) {
+        activity.runOnUiThread {
+            try {
+                val intent = Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("mailto:" + Uri.encode(email))
+                    putExtra(Intent.EXTRA_SUBJECT, subject)
+                    putExtra(Intent.EXTRA_TEXT, body)
+                }
+                activity.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to launch email client: ${e.message}")
+            }
+        }
     }
 
     @JavascriptInterface

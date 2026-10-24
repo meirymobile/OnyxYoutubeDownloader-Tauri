@@ -113,6 +113,18 @@ class MainActivity : AppCompatActivity() {
         notifyPermissionsUpdatedToWeb()
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        configureWindowAwakeProperties()
+        intent?.getStringExtra("announcement_payload")?.let { payloadJson ->
+            runOnUiThread {
+                val js = "if (window.handleDjAnnouncement) { window.handleDjAnnouncement($payloadJson); }"
+                webView.evaluateJavascript(js, null)
+            }
+        }
+    }
+
     private fun configureWindowAwakeProperties() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -302,6 +314,17 @@ class MainActivity : AppCompatActivity() {
         manager.notify((System.currentTimeMillis() % 100000).toInt(), notif)
     }
 
+    fun bringToFront() {
+        runOnUiThread {
+            configureWindowAwakeProperties()
+            wakeLockManager.turnScreenOn()
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            startActivity(intent)
+        }
+    }
+
     fun openAppSettings() {
         try {
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -335,6 +358,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        torchManager.stopNativeStrobe()
         torchManager.setTorch(false)
     }
 }

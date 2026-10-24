@@ -138,6 +138,48 @@
     },
 
     /**
+     * Brings application activity to the front immediately
+     */
+    bringToFront: function () {
+      if (this.platform === 'android' && window.OnyxNativeBridge && typeof window.OnyxNativeBridge.bringToFront === 'function') {
+        try {
+          window.OnyxNativeBridge.bringToFront();
+        } catch (e) {
+          console.warn('[MobileBridge] Android bringToFront error:', e);
+        }
+      }
+    },
+
+    /**
+     * Starts native hardware strobe loop immune to background throttling
+     * @param {number} bpm
+     */
+    startNativeStrobe: function (bpm) {
+      bpm = bpm || 128;
+      if (this.platform === 'android' && window.OnyxNativeBridge && typeof window.OnyxNativeBridge.startNativeStrobe === 'function') {
+        try {
+          window.OnyxNativeBridge.startNativeStrobe(bpm);
+        } catch (e) {
+          console.warn('[MobileBridge] Android startNativeStrobe error:', e);
+        }
+      }
+    },
+
+    /**
+     * Stops native hardware strobe loop and turns off LED
+     */
+    stopNativeStrobe: function () {
+      if (this.platform === 'android' && window.OnyxNativeBridge && typeof window.OnyxNativeBridge.stopNativeStrobe === 'function') {
+        try {
+          window.OnyxNativeBridge.stopNativeStrobe();
+        } catch (e) {
+          console.warn('[MobileBridge] Android stopNativeStrobe error:', e);
+        }
+      }
+      this.setTorch(false);
+    },
+
+    /**
      * Keeps screen permanently on during the event
      * @param {boolean} enabled 
      */
@@ -381,6 +423,104 @@
       if (this.platform === 'android' && window.OnyxNativeBridge && typeof window.OnyxNativeBridge.requestIgnoreBatteryOptimizations === 'function') {
         try { window.OnyxNativeBridge.requestIgnoreBatteryOptimizations(); } catch (e) {}
       }
+    },
+
+    /**
+     * Adds an event to the native calendar (Android Intent or iOS/Web .ics download)
+     * @param {Object} opts { title, description, location, startTimestamp, endTimestamp, dateStr, timeStr }
+     */
+    addToCalendar: function (opts) {
+      opts = opts || {};
+      var title = opts.title || 'מסיבת Onyx DJ VIP';
+      var description = opts.description || opts.message || 'אירוע מיוחד של Onyx DJ';
+      var location = opts.location || 'עמדת ה-DJ';
+      var startTime = opts.startTimestamp;
+      
+      if (!startTime && opts.dateStr) {
+        try {
+          var datePart = opts.dateStr;
+          var timePart = opts.timeStr || '22:00';
+          startTime = new Date(datePart + 'T' + timePart + ':00').getTime();
+        } catch (_) {}
+      }
+      if (!startTime || isNaN(startTime)) {
+        startTime = Date.now() + 86400000; // Tomorrow
+      }
+      var endTime = opts.endTimestamp || (startTime + (4 * 3600000)); // Default 4 hours duration
+
+      if (this.platform === 'android' && window.OnyxNativeBridge && typeof window.OnyxNativeBridge.addToCalendar === 'function') {
+        try {
+          window.OnyxNativeBridge.addToCalendar(title, description, location, startTime, endTime);
+          return;
+        } catch (e) {
+          console.warn('[MobileBridge] Android addToCalendar failed:', e);
+        }
+      }
+
+      // Universal .ics generator (Apple Calendar, Google Calendar Web, Outlook)
+      try {
+        var startIso = new Date(startTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        var endIso = new Date(endTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        var nowIso = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        var uid = 'onyx_evt_' + startTime + '@onyxdj.vip';
+
+        var icsContent = [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//Onyx DJ Systems//VIP Mobile Events//HE',
+          'CALSCALE:GREGORIAN',
+          'METHOD:PUBLISH',
+          'BEGIN:VEVENT',
+          'UID:' + uid,
+          'DTSTAMP:' + nowIso,
+          'DTSTART:' + startIso,
+          'DTEND:' + endIso,
+          'SUMMARY:' + title.replace(/\n/g, ' '),
+          'DESCRIPTION:' + description.replace(/\n/g, '\\n'),
+          'LOCATION:' + location.replace(/\n/g, ' '),
+          'STATUS:CONFIRMED',
+          'END:VEVENT',
+          'END:VCALENDAR'
+        ].join('\r\n');
+
+        var blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'party-invitation.ics';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+      } catch (err) {
+        console.error('[MobileBridge] Failed to create .ics calendar file:', err);
+      }
+    },
+
+    /**
+     * Opens native mail client with prefilled recipient, subject and body
+     * @param {string} email
+     * @param {string} subject
+     * @param {string} body
+     */
+    openEmailClient: function (email, subject, body) {
+      email = email || '';
+      subject = subject || 'אישור הגעה לאירוע / שאלה ל-DJ';
+      body = body || '';
+
+      if (this.platform === 'android' && window.OnyxNativeBridge && typeof window.OnyxNativeBridge.openEmailClient === 'function') {
+        try {
+          window.OnyxNativeBridge.openEmailClient(email, subject, body);
+          return;
+        } catch (e) {
+          console.warn('[MobileBridge] Android openEmailClient failed:', e);
+        }
+      }
+
+      var mailtoUrl = 'mailto:' + encodeURIComponent(email) +
+        '?subject=' + encodeURIComponent(subject) +
+        '&body=' + encodeURIComponent(body);
+      window.location.href = mailtoUrl;
     },
 
     _downloadBase64Image: function (base64Data, filename) {
