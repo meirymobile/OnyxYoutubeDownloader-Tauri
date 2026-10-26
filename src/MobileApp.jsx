@@ -163,6 +163,50 @@ export default function MobileApp() {
     if (!inputUrl.trim()) return
     setLoading(true)
     setErrorMessage('')
+
+    // Check if it's a Spotify or Apple Music playlist/album
+    if (inputUrl.includes('spotify.com/playlist') || inputUrl.includes('spotify.com/album') || (inputUrl.includes('music.apple.com') && (inputUrl.includes('/playlist') || inputUrl.includes('/album') || inputUrl.includes('/song')))) {
+      try {
+        const ports = [8001, 8000, 8002];
+        let parseRes = null;
+        for (const p of ports) {
+          try {
+            const r = await fetch(`http://127.0.0.1:${p}/api/playlist/parse`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: inputUrl })
+            });
+            if (r.ok) {
+              parseRes = await r.json();
+              break;
+            }
+          } catch (_) {}
+        }
+
+        if (parseRes && parseRes.tracks && parseRes.tracks.length > 0) {
+          parseRes.tracks.forEach((trackQuery, i) => {
+            setTimeout(() => {
+              addToQueue({
+                url: trackQuery,
+                title: trackQuery,
+                uploader: inputUrl.includes('apple.com') ? 'Apple Music' : 'Spotify',
+                formats: { ...defaultFormats }
+              });
+            }, i * 150);
+          });
+          setUrl('');
+          setLoading(false);
+          setMobileTab('queue');
+          return;
+        } else {
+          setErrorMessage('Could not extract tracks from playlist. Ensure URL is public.');
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('Playlist parse error:', err);
+      }
+    }
     
     const vidId = extractVideoId(inputUrl)
 
@@ -220,7 +264,7 @@ export default function MobileApp() {
         const text = await navigator.clipboard.readText()
         if (text) {
           setUrl(text)
-          if (text.includes('youtube.com') || text.includes('youtu.be')) {
+          if (text.includes('youtube.com') || text.includes('youtu.be') || text.includes('spotify.com') || text.includes('music.apple.com')) {
             handleUrlLoad(text)
           }
         }

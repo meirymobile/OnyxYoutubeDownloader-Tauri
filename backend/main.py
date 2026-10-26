@@ -213,6 +213,18 @@ class PlaylistParseReq(BaseModel):
     url: str
     shazam_sample_interval: Optional[int] = 90
 
+class FcmBroadcastReq(BaseModel):
+    credentials_json: Optional[str] = None
+    topic: Optional[str] = "all_guests"
+    title: str
+    message: str
+    image: Optional[str] = None
+    eventDate: Optional[str] = None
+    eventTime: Optional[str] = None
+    location: Optional[str] = None
+    contactEmail: Optional[str] = None
+    timestamp: Optional[str] = None
+
 
 from datetime import datetime
 
@@ -462,28 +474,116 @@ def parse_playlist(req: PlaylistParseReq):
 
     if "music.apple.com" in url:
         try:
-            req_obj = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            html = urllib.request.urlopen(req_obj, timeout=10).read().decode('utf-8')
-            match = re.search(r'<script type="application/json" id="serialized-server-data">(.*?)</script>', html, re.S)
-            if match:
-                data = json.loads(match.group(1))
-                def find_tracks(obj):
-                    if isinstance(obj, dict):
-                        if 'title' in obj and 'subtitleLinks' in obj:
-                            title = obj.get('title')
-                            artist_links = obj.get('subtitleLinks', [])
-                            if title and artist_links and isinstance(artist_links, list) and len(artist_links) > 0:
-                                artist = artist_links[0].get('title')
-                                if artist and "Apple Music" not in artist:
-                                    tracks.append(f"{artist} - {title}")
-                        for k, v in obj.items():
-                            find_tracks(v)
-                    elif isinstance(obj, list):
-                        for item in obj:
-                            find_tracks(item)
-                find_tracks(data)
+            req_obj = urllib.request.Request(url, headers={
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9'
+            })
+            html = urllib.request.urlopen(req_obj, timeout=12).read().decode('utf-8')
+
+            # Engine 1: serialized-server-data (primary for modern Apple Music web)
+            ssd = re.search(r'<script[^>]*id=["\']serialized-server-data["\'][^>]*>(.*?)</script>', html, re.DOTALL)
+            if ssd:
+                try:
+                    server_data = json.loads(ssd.group(1))
+                    album_artist = None
+                    found_items = []
+
+                    def find_items(obj):
+                        if isinstance(obj, dict):
+                            if 'title' in obj and any(k in obj for k in ['subtitleLinks', 'subtitle', 'artistName', 'contentDescriptor']):
+                                found_items.append(obj)
+                            for k, v in obj.items():
+                                find_items(v)
+                        elif isinstance(obj, list):
+                            for item in obj:
+                                find_items(item)
+
+                    find_items(server_data)
+
+                    # Determine album / curator artist
+                    for item in found_items:
+                        sub_links = item.get('subtitleLinks') or []
+                        if isinstance(sub_links, list) and len(sub_links) > 0:
+                            art = sub_links[0].get('title', '')
+                            if art and not any(skip in art.lower() for skip in ['apple music', 'curator', 'playlist', 'various artists']):
+                                album_artist = art
+                                break
+
+                    for item in found_items:
+                        title = item.get('title')
+                        if not title:
+                            continue
+                        sub_links = item.get('subtitleLinks') or []
+                        artist = None
+                        if isinstance(sub_links, list) and len(sub_links) > 0:
+                            for sl in sub_links:
+                                t = sl.get('title')
+                                if t and not any(skip in t.lower() for skip in ['apple music', 'curator']):
+                                    artist = t
+                                    break
+                        if not artist and album_artist and item.get('trackCount') is None:
+                            artist = album_artist
+
+                        if artist and title and item.get('trackCount') is None:
+                            track_str = f"{artist} - {title}"
+                            if track_str not in tracks:
+                                tracks.append(track_str)
+                except Exception as ex_ssd:
+                    logger.warning(f"Error parsing Apple Music serialized-server-data: {ex_ssd}")
+
+            # Engine 2: ld+json Schema.org (MusicPlaylist and MusicAlbum)
+            if not tracks:
+                ld_scripts = re.findall(r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', html, re.DOTALL)
+                for s in ld_scripts:
+                    try:
+                        data = json.loads(s.strip())
+                        if isinstance(data, dict):
+                            main_type = data.get('@type')
+                            if main_type in ['MusicPlaylist', 'MusicAlbum']:
+                                main_artist = ''
+                                by_art = data.get('byArtist')
+                                if isinstance(by_art, list) and len(by_art) > 0:
+                                    main_artist = by_art[0].get('name', '')
+                                elif isinstance(by_art, dict):
+                                    main_artist = by_art.get('name', '')
+                                elif isinstance(by_art, str):
+                                    main_artist = by_art
+
+                                track_list = data.get('track') or data.get('tracks') or []
+                                for t in track_list:
+                                    t_name = t.get('name')
+                                    if not t_name:
+                                        continue
+                                    t_art = ''
+                                    t_by = t.get('byArtist')
+                                    if isinstance(t_by, list) and len(t_by) > 0:
+                                        t_art = t_by[0].get('name', '')
+                                    elif isinstance(t_by, dict):
+                                        t_art = t_by.get('name', '')
+                                    elif isinstance(t_by, str):
+                                        t_art = t_by
+
+                                    art = t_art or main_artist
+                                    track_str = f"{art} - {t_name}" if art else t_name
+                                    if track_str not in tracks:
+                                        tracks.append(track_str)
+                    except Exception as ex_ld:
+                        logger.warning(f"Error parsing Apple Music ld+json: {ex_ld}")
+
+            # Engine 3: OpenGraph fallback for single song/album pages
+            if not tracks:
+                og_title = re.search(r'<meta property="og:title" content="(.*?)"', html)
+                if og_title:
+                    raw_title = og_title.group(1).replace("&amp;", "&")
+                    cleaned = re.sub(r'\s+on Apple Music$', '', raw_title, flags=re.I)
+                    if ' by ' in cleaned:
+                        parts = cleaned.split(' by ')
+                        tracks.append(f"{parts[1].strip()} - {parts[0].strip()}")
+                    else:
+                        tracks.append(cleaned)
         except Exception as e:
-            print(f"Failed to parse Apple Music playlist: {e}")
+            logger.error(f"Failed to parse Apple Music playlist/album: {e}")
             
     elif "spotify.com" in url:
         client_id = os.environ.get('SPOTIPY_CLIENT_ID')
@@ -528,6 +628,106 @@ def parse_playlist(req: PlaylistParseReq):
             unique_tracks.append(t)
 
     return {"tracks": unique_tracks}
+
+@app.post("/api/fcm/broadcast")
+def fcm_broadcast(req: FcmBroadcastReq):
+    """Dispatches a high-priority push notification to all guests via Google Firebase Cloud Messaging HTTP v1."""
+    import requests
+    import time
+
+    creds_raw = req.credentials_json
+    if not creds_raw or not creds_raw.strip():
+        env_cred = os.environ.get('FIREBASE_SERVICE_ACCOUNT')
+        if env_cred:
+            creds_raw = env_cred
+        else:
+            file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'firebase-service-account.json')
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        creds_raw = f.read()
+                except Exception as ef:
+                    logger.warning(f"Could not read local firebase-service-account.json: {ef}")
+
+    if not creds_raw or not creds_raw.strip():
+        return {
+            "status": "skipped",
+            "message": "FCM Service Account credentials not provided. Broadcast dispatched via NTFY and MQTT."
+        }
+
+    try:
+        if isinstance(creds_raw, str):
+            cred_dict = json.loads(creds_raw.strip())
+        else:
+            cred_dict = creds_raw
+
+        project_id = cred_dict.get('project_id')
+        if not project_id:
+            return {"status": "error", "message": "Missing 'project_id' in Firebase Service Account"}
+
+        from google.oauth2 import service_account
+        import google.auth.transport.requests
+
+        credentials = service_account.Credentials.from_service_account_info(
+            cred_dict,
+            scopes=['https://www.googleapis.com/auth/firebase.messaging']
+        )
+        auth_req = google.auth.transport.requests.Request()
+        credentials.refresh(auth_req)
+        bearer_token = credentials.token
+
+        clean_topic = (req.topic or "all_guests").replace("/topics/", "").strip()
+        fcm_url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
+
+        headers = {
+            "Authorization": f"Bearer {bearer_token}",
+            "Content-Type": "application/json"
+        }
+
+        fcm_payload = {
+            "message": {
+                "topic": clean_topic,
+                "notification": {
+                    "title": req.title,
+                    "body": req.message
+                },
+                "data": {
+                    "title": req.title,
+                    "message": req.message,
+                    "image": req.image or "",
+                    "eventDate": req.eventDate or "",
+                    "eventTime": req.eventTime or "",
+                    "location": req.location or "",
+                    "contactEmail": req.contactEmail or "",
+                    "timestamp": str(req.timestamp or time.time())
+                },
+                "android": {
+                    "priority": "high",
+                    "notification": {
+                        "channel_id": "onyx_dj_fcm_announcements",
+                        "sound": "default"
+                    }
+                }
+            }
+        }
+
+        resp = requests.post(fcm_url, headers=headers, json=fcm_payload, timeout=10)
+        if resp.status_code == 200:
+            return {
+                "status": "success",
+                "message": f"Successfully broadcast to topic '{clean_topic}' via FCM HTTP v1",
+                "fcm_response": resp.json()
+            }
+        else:
+            logger.warning(f"FCM HTTP v1 returned {resp.status_code}: {resp.text}")
+            return {
+                "status": "error",
+                "code": resp.status_code,
+                "message": resp.text
+            }
+    except Exception as e:
+        logger.error(f"FCM HTTP v1 broadcast failed: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.post("/api/download")
 def start_download(req: DownloadRequest, background_tasks: BackgroundTasks):

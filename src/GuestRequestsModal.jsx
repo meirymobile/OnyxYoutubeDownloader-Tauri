@@ -200,7 +200,30 @@ export default function GuestRequestsModal({
   const [broadcastTarget, setBroadcastTarget] = useState('all'); // 'all' | 'room'
   const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
   const [broadcastStatusMessage, setBroadcastStatusMessage] = useState(null);
-  const [fcmServerKey, setFcmServerKey] = useState(() => localStorage.getItem('onyx_fcm_server_key') || '');
+  const [fcmCredentials, setFcmCredentials] = useState(() => localStorage.getItem('onyx_fcm_credentials') || localStorage.getItem('onyx_fcm_server_key') || '');
+  const fcmFileInputRef = useRef(null);
+
+  const fcmProjectId = (() => {
+    try {
+      if (!fcmCredentials) return null;
+      const parsed = JSON.parse(fcmCredentials);
+      return parsed.project_id || null;
+    } catch (_) {
+      return null;
+    }
+  })();
+
+  const handleFcmFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target.result;
+      setFcmCredentials(content);
+      localStorage.setItem('onyx_fcm_credentials', content);
+    };
+    reader.readAsText(file);
+  };
 
   const handleBroadcastImageUpload = (e) => {
     const file = e.target.files?.[0];
@@ -297,38 +320,39 @@ export default function GuestRequestsModal({
       console.warn('[Onyx DJ Broadcast] NTFY error:', e);
     }
 
-    // 3. Google Firebase Cloud Messaging (FCM) Direct Topic Dispatch
-    if (fcmServerKey && fcmServerKey.trim()) {
+    // 3. Google Firebase Cloud Messaging (FCM HTTP v1) Dispatch via Backend
+    if (fcmCredentials && fcmCredentials.trim()) {
       try {
-        const targetTopic = broadcastTarget === 'all' ? '/topics/all_guests' : `/topics/room_${cleanRoom}`;
-        fetch('https://fcm.googleapis.com/fcm/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `key=${fcmServerKey.trim()}`
-          },
-          body: JSON.stringify({
-            to: targetTopic,
-            priority: 'high',
-            notification: {
-              title: payload.title,
-              body: payload.message,
-              sound: 'default'
-            },
-            data: {
-              title: payload.title,
-              message: payload.message,
-              image: payload.image || '',
-              eventDate: payload.eventDate || '',
-              eventTime: payload.eventTime || '',
-              location: payload.location || '',
-              contactEmail: payload.contactEmail || '',
-              timestamp: String(payload.timestamp)
+        const candidatePorts = [serverPort, 8001, 8000, 8002];
+        const fcmPayload = {
+          credentials_json: fcmCredentials.trim(),
+          topic: broadcastTarget === 'all' ? 'all_guests' : `room_${cleanRoom}`,
+          title: payload.title,
+          message: payload.message,
+          image: payload.image || '',
+          eventDate: payload.eventDate || '',
+          eventTime: payload.eventTime || '',
+          location: payload.location || '',
+          contactEmail: payload.contactEmail || '',
+          timestamp: String(payload.timestamp)
+        };
+
+        for (const p of candidatePorts) {
+          try {
+            const resp = await fetch(`http://127.0.0.1:${p}/api/fcm/broadcast`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(fcmPayload)
+            });
+            if (resp.ok) {
+              const resData = await resp.json();
+              console.log('[Onyx DJ Broadcast] FCM HTTP v1 dispatch result:', resData);
+              break;
             }
-          })
-        }).catch(err => console.warn('[Onyx DJ Broadcast] FCM dispatch error:', err));
+          } catch (_) {}
+        }
       } catch (err) {
-        console.warn('[Onyx DJ Broadcast] FCM error:', err);
+        console.warn('[Onyx DJ Broadcast] FCM HTTP v1 dispatch error:', err);
       }
     }
 
@@ -3481,24 +3505,64 @@ export default function GuestRequestsModal({
                 </p>
               </div>
 
-              {/* Firebase Cloud Messaging (FCM) Configuration */}
-              <div className="p-4 rounded-2xl bg-slate-900 border border-purple-500/30 space-y-2.5 shadow-lg">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs font-black text-white">חיבור Google Firebase Cloud Messaging (FCM) להודעות Push</span>
+              {/* Firebase Cloud Messaging (FCM HTTP v1) Configuration */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-purple-500/30 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-black text-white">Google Firebase Cloud Messaging (FCM HTTP v1)</span>
+                  </div>
+                  {fcmProjectId && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      {fcmProjectId}
+                    </span>
+                  )}
                 </div>
-                <input 
-                  type="password" 
-                  value={fcmServerKey}
+
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="file" 
+                    ref={fcmFileInputRef} 
+                    accept=".json" 
+                    onChange={handleFcmFileUpload} 
+                    className="hidden" 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fcmFileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                    העלה קובץ service-account.json
+                  </button>
+                  {fcmCredentials && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFcmCredentials('');
+                        localStorage.removeItem('onyx_fcm_credentials');
+                        localStorage.removeItem('onyx_fcm_server_key');
+                      }}
+                      className="px-2.5 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition-all"
+                    >
+                      נקה הגדרות
+                    </button>
+                  )}
+                </div>
+
+                <textarea 
+                  value={fcmCredentials}
                   onChange={(e) => {
-                    setFcmServerKey(e.target.value);
-                    localStorage.setItem('onyx_fcm_server_key', e.target.value);
+                    setFcmCredentials(e.target.value);
+                    localStorage.setItem('onyx_fcm_credentials', e.target.value);
                   }}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-purple-300 outline-none focus:border-purple-400"
-                  placeholder="הזן מפתח שרת (FCM Server Key מתוך Firebase Console -> Project Settings)"
+                  rows={2}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-[11px] font-mono text-purple-300 outline-none focus:border-purple-400 resize-none"
+                  placeholder='הדבק כאן את תוכן קובץ ה-Service Account JSON (מתוך Firebase Console -> Project Settings -> Service Accounts) או לחץ על הכפתור למעלה להעלאת הקובץ...'
                 />
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  מפתח זה מאפשר שידור Push ישיר מתוך התוכנה של הדיג'יי אל כל הסמארטפונים גם כשהאפליקציה שלהם סגורה לחלוטין.
+                  ממשק FCM HTTP v1 הרשמי של גוגל משדר הודעות Push והזמנות למסיבה ישירות אל וילון ההתראות בסמארטפונים גם כשהאפליקציה סגורה לחלוטין.
                 </p>
               </div>
 

@@ -597,8 +597,8 @@ function App() {
         return;
     }
 
-    // Check if it's a Spotify or Apple Music playlist
-    if (inputUrl.includes('spotify.com/playlist') || inputUrl.includes('spotify.com/album') || (inputUrl.includes('music.apple.com') && inputUrl.includes('/playlist'))) {
+    // Check if it's a Spotify or Apple Music playlist/album
+    if (inputUrl.includes('spotify.com/playlist') || inputUrl.includes('spotify.com/album') || (inputUrl.includes('music.apple.com') && (inputUrl.includes('/playlist') || inputUrl.includes('/album') || inputUrl.includes('/song')))) {
       try {
         const res = await fetch(`http://127.0.0.1:${serverPort}/api/playlist/parse`, {
           method: 'POST',

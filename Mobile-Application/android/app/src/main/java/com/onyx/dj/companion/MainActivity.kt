@@ -168,6 +168,11 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 notifyPermissionsUpdatedToWeb()
+                intent?.getStringExtra("announcement_payload")?.let { payloadJson ->
+                    val js = "if (window.handleDjAnnouncement) { window.handleDjAnnouncement($payloadJson); }"
+                    view?.evaluateJavascript(js, null)
+                    intent?.removeExtra("announcement_payload")
+                }
             }
         }
 
